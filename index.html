@@ -350,41 +350,47 @@
     }
 
     async function handleSubmitLimpeza() {
-      state.loading = true;
-      render();
-      try {
-        const mapsLink = `https://www.google.com/maps/?q=${state.location.latitude},${state.location.longitude}`;
-        const data = {
-          action: 'registarLimpeza',
-          condominio: state.condominioId,
-          pin: state.pin,
-          latitude: state.location.latitude,
-          longitude: state.location.longitude,
-          mapsLink: mapsLink,
-          timestamp: new Date().toISOString(),
-          accuracy: state.location.accuracy
-        };
-        console.log('Registando limpeza:', data);
-        await fetch(WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
-        state.step = 'success';
-        setTimeout(() => {
-          window.location.href = 'about:blank';
-        }, 2000);
-      } catch (err) {
-        console.error('Erro ao registar limpeza:', err);
-        state.errorMsg = 'Erro ao registar limpeza. Tenta novamente.';
-        state.step = 'error';
-      } finally {
-        state.loading = false;
-        render();
-      }
-    }
-
+  state.loading = true;
+  render();
+  try {
+    const mapsLink = `https://www.google.com/maps/?q=${state.location.latitude},${state.location.longitude}`;
+    const data = {
+      action: 'registarLimpeza',
+      condominio: state.condominioId,
+      pin: state.pin,
+      latitude: state.location.latitude,
+      longitude: state.location.longitude,
+      mapsLink: mapsLink,
+      timestamp: new Date().toISOString(),
+      accuracy: state.location.accuracy
+    };
+    
+    console.log('Dados a enviar:', data);
+    
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      body: new URLSearchParams(new FormData(
+        Object.entries(data).reduce((fd, [k, v]) => {
+          fd.append(k, v);
+          return fd;
+        }, new FormData())
+      ))
+    });
+    
+    state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
+    state.step = 'success';
+    setTimeout(() => {
+      window.location.href = 'about:blank';
+    }, 2000);
+  } catch (err) {
+    console.error('Erro ao registar limpeza:', err);
+    state.errorMsg = 'Erro ao registar limpeza. Tenta novamente.';
+    state.step = 'error';
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
     function goToLocation() {
       state.step = 'location';
       render();
