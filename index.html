@@ -5,99 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in Limpeza - Ímpar</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
     :root {
-      --color-slate-50: #f8fafc;
-      --color-slate-100: #f1f5f9;
-      --color-slate-200: #e2e8f0;
-      --color-slate-300: #cbd5e1;
-      --color-slate-400: #94a3b8;
-      --color-slate-500: #64748b;
-      --color-slate-600: #475569;
-      --color-slate-800: #1e293b;
-      --color-slate-900: #0f172a;
-      --color-blue-600: #2563eb;
-      --color-blue-700: #1d4ed8;
-      --color-blue-100: #dbeafe;
-      --color-green-600: #16a34a;
-      --color-green-700: #15803d;
-      --color-green-100: #dcfce7;
-      --color-emerald-600: #059669;
-      --color-emerald-700: #047857;
-      --color-amber-100: #fef3c7;
-      --color-red-600: #dc2626;
+      --blue-600: #2563eb; --blue-700: #1d4ed8; --blue-100: #dbeafe;
+      --green-600: #16a34a; --green-700: #15803d; --green-100: #dcfce7;
+      --emerald-600: #059669; --emerald-700: #047857; --amber-100: #fef3c7;
+      --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
+      --slate-600: #475569; --slate-800: #1e293b; --slate-900: #0f172a;
+      --red-600: #dc2626;
     }
-
-    html, body {
-      height: 100%;
-      width: 100%;
-    }
-
+    html, body { height: 100%; width: 100%; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(to bottom right, var(--color-slate-50), var(--color-slate-100));
-      color: var(--color-slate-900);
+      background: linear-gradient(to bottom right, var(--slate-50), var(--slate-100));
+      color: var(--slate-900);
       font-size: 16px;
       line-height: 1.5;
     }
-
-    .container {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
+    .container { display: flex; flex-direction: column; min-height: 100vh; }
     header {
       background-color: white;
-      border-bottom: 1px solid var(--color-slate-200);
+      border-bottom: 1px solid var(--slate-200);
       padding: 1rem 1.5rem;
       box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
     }
-
-    .header-content {
-      max-width: 56rem;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .logo-img {
-      height: 2.5rem;
-      object-fit: contain;
-    }
-
-    .logo-fallback {
-      font-size: 1.125rem;
-      font-weight: 700;
-      color: var(--color-slate-800);
-    }
-
-    .header-title {
-      font-size: 0.875rem;
-      color: var(--color-slate-500);
-    }
-
-    main {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem 1.5rem;
-    }
-
-    .card-wrapper {
-      width: 100%;
-      max-width: 28rem;
-    }
-
+    .header-content { max-width: 56rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .logo-img { height: 2.5rem; object-fit: contain; }
+    .logo-fallback { font-size: 1.125rem; font-weight: 700; color: var(--slate-800); }
+    .header-title { font-size: 0.875rem; color: var(--slate-500); }
+    main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
+    .card-wrapper { width: 100%; max-width: 28rem; }
     .card {
       background-color: white;
       border-radius: 1rem;
@@ -108,103 +47,34 @@
       gap: 1.5rem;
       animation: fadeIn 0.3s ease-in;
     }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .card-header {
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .card-icon {
-      width: 3rem;
-      height: 3rem;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto;
-      font-size: 1.5rem;
-    }
-
-    .card-icon.blue {
-      background-color: var(--color-blue-100);
-    }
-
-    .card-icon.green {
-      background-color: var(--color-green-100);
-    }
-
-    .card-icon.amber {
-      background-color: var(--color-amber-100);
-    }
-
-    .card-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--color-slate-900);
-    }
-
-    .card-subtitle {
-      font-size: 0.875rem;
-      color: var(--color-slate-600);
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    label {
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--color-slate-700);
-    }
-
-    input[type="password"],
-    input[type="text"] {
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .card-header { text-align: center; display: flex; flex-direction: column; gap: 0.5rem; }
+    .card-icon { width: 3rem; height: 3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 1.5rem; }
+    .card-icon.blue { background-color: var(--blue-100); }
+    .card-icon.green { background-color: var(--green-100); }
+    .card-icon.amber { background-color: var(--amber-100); }
+    .card-title { font-size: 1.5rem; font-weight: 700; color: var(--slate-900); }
+    .card-subtitle { font-size: 0.875rem; color: var(--slate-600); }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-size: 0.875rem; font-weight: 500; color: var(--slate-700); }
+    input[type="password"], input[type="text"] {
       padding: 0.75rem 1rem;
       font-size: 1rem;
-      border: 2px solid var(--color-slate-300);
+      border: 2px solid var(--slate-300);
       border-radius: 0.5rem;
       font-family: 'Inter', sans-serif;
       transition: border-color 0.2s;
     }
-
-    input[type="password"]:focus,
-    input[type="text"]:focus {
-      outline: none;
-      border-color: var(--color-blue-600);
-    }
-
-    input[type="password"] {
-      text-align: center;
-      font-size: 1.5rem;
-      letter-spacing: 0.3em;
-    }
-
-    input::placeholder {
-      color: var(--color-slate-400);
-    }
-
-    .error-message {
-      color: var(--color-red-600);
-      font-size: 0.875rem;
-      margin-top: 0.5rem;
-    }
-
+    input[type="password"]:focus, input[type="text"]:focus { outline: none; border-color: var(--blue-600); }
+    input[type="password"] { text-align: center; font-size: 1.5rem; letter-spacing: 0.3em; }
+    input::placeholder { color: var(--slate-400); }
+    .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.5rem; }
+    .info-box { background-color: var(--slate-50); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; }
+    .info-row { display: flex; justify-content: space-between; }
+    .info-label { color: var(--slate-600); }
+    .info-value { font-weight: 600; color: var(--slate-900); }
+    .info-mono { font-family: 'Courier New', monospace; font-size: 0.8rem; }
+    .button-group { display: flex; flex-direction: column; gap: 0.75rem; }
     button {
       padding: 0.75rem 1rem;
       font-size: 1rem;
@@ -216,119 +86,19 @@
       font-family: 'Inter', sans-serif;
       width: 100%;
     }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background-color: var(--color-blue-600);
-      color: white;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background-color: var(--color-blue-700);
-    }
-
-    .btn-success {
-      background-color: var(--color-green-600);
-      color: white;
-    }
-
-    .btn-success:hover:not(:disabled) {
-      background-color: var(--color-green-700);
-    }
-
-    .btn-confirm {
-      background-color: var(--color-emerald-600);
-      color: white;
-    }
-
-    .btn-confirm:hover:not(:disabled) {
-      background-color: var(--color-emerald-700);
-    }
-
-    .btn-secondary {
-      background-color: var(--color-slate-300);
-      color: var(--color-slate-900);
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background-color: var(--color-slate-400);
-    }
-
-    .info-box {
-      background-color: var(--color-slate-50);
-      border-radius: 0.5rem;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      font-size: 0.875rem;
-    }
-
-    .info-row {
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .info-label {
-      color: var(--color-slate-600);
-    }
-
-    .info-value {
-      font-weight: 600;
-      color: var(--color-slate-900);
-    }
-
-    .info-mono {
-      font-family: 'Courier New', monospace;
-      font-size: 0.8rem;
-    }
-
-    .button-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .helper-text {
-      font-size: 0.75rem;
-      color: var(--color-slate-500);
-      text-align: center;
-    }
-
-    footer {
-      background-color: white;
-      border-top: 1px solid var(--color-slate-200);
-      padding: 1rem 1.5rem;
-      text-align: center;
-      font-size: 0.75rem;
-      color: var(--color-slate-500);
-    }
-
-    .hidden {
-      display: none;
-    }
-
-    @media (max-width: 640px) {
-      main {
-        padding: 1rem;
-      }
-
-      .card {
-        padding: 1.5rem;
-      }
-
-      header {
-        padding: 0.75rem 1rem;
-      }
-
-      .card-title {
-        font-size: 1.25rem;
-      }
-    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-success { background-color: var(--green-600); color: white; }
+    .btn-success:hover:not(:disabled) { background-color: var(--green-700); }
+    .btn-confirm { background-color: var(--emerald-600); color: white; }
+    .btn-confirm:hover:not(:disabled) { background-color: var(--emerald-700); }
+    .btn-secondary { background-color: var(--slate-300); color: var(--slate-900); }
+    .btn-secondary:hover:not(:disabled) { background-color: var(--slate-400); }
+    .helper-text { font-size: 0.75rem; color: var(--slate-500); text-align: center; }
+    footer { background-color: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
+    .hidden { display: none; }
+    .loading-spinner { display: inline-block; animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @media (max-width: 640px) { main { padding: 1rem; } .card { padding: 1.5rem; } header { padding: 0.75rem 1rem; } .card-title { font-size: 1.25rem; } }
   </style>
 </head>
 <body>
@@ -336,19 +106,12 @@
     <header>
       <div class="header-content">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <img 
-            src="https://impar.pt/wp-content/uploads/2023/logo-impar.png" 
-            alt="Ímpar" 
-            class="logo-img"
-            id="logo"
-            onerror="showLogoFallback()"
-          />
+          <img src="https://impar.pt/wp-content/uploads/2023/logo-impar.png" alt="Ímpar" class="logo-img" id="logo" onerror="showLogoFallback()"/>
           <span class="logo-fallback hidden" id="logoFallback">ÍMPAR</span>
         </div>
         <span class="header-title">Check-in Limpeza</span>
       </div>
     </header>
-
     <main>
       <div class="card-wrapper" id="app">
         <div class="card">
@@ -359,7 +122,6 @@
         </div>
       </div>
     </main>
-
     <footer>
       <p>Sistema de Check-in de Limpezas © 2024</p>
     </footer>
@@ -371,21 +133,18 @@
       document.getElementById('logoFallback').classList.remove('hidden');
     }
 
-    // State
     let state = {
       step: 'init',
       condominioId: '',
       pin: '',
-      pinError: '',
       location: null,
       loading: false,
       errorMsg: '',
       successMsg: ''
     };
 
-    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwvP2chjeOIAKYmmms0xmbPSyj3W1AuJ6vkMCQwtfmqeAT_6fTHbNlw5tIo8mQi89Ni/exec';
+    const WEBHOOK_URL = 'WEBHOOK_URL_AQUI';
 
-    // Get condominio from URL
     function init() {
       const params = new URLSearchParams(window.location.search);
       const cond = params.get('condominio');
@@ -399,7 +158,6 @@
       render();
     }
 
-    // Render UI
     function render() {
       const app = document.getElementById('app');
 
@@ -411,37 +169,25 @@
               <h1 class="card-title">Validação de Acesso</h1>
               <p class="card-subtitle">Condomínio: <strong>${state.condominioId}</strong></p>
             </div>
-            <form onsubmit="handlePinSubmit(event)" style="display: flex; flex-direction: column; gap: 1rem;">
-              <div class="form-group">
-                <label for="pin">PIN de 4 dígitos</label>
-                <input
-                  id="pin"
-                  type="password"
-                  maxlength="4"
-                  value="${state.pin}"
-                  placeholder="••••"
-                  autocomplete="off"
-                />
-                ${state.pinError ? `<div class="error-message">⚠️ ${state.pinError}</div>` : ''}
-              </div>
-              <button
-                type="submit"
-                class="btn-primary"
-                ${state.loading || state.pin.length !== 4 ? 'disabled' : ''}
-              >
-                ${state.loading ? '⏳ Validando...' : 'Validar'}
-              </button>
-            </form>
+            <div class="form-group">
+              <label for="pin">PIN de 4 dígitos</label>
+              <input id="pin" type="password" maxlength="4" placeholder="••••" autocomplete="off"/>
+              <p class="helper-text">O acesso será validado automaticamente ao introduzir 4 dígitos</p>
+            </div>
           </div>
         `;
-        // Adiciona listeners após renderizar
         setTimeout(() => {
           const pinInput = document.getElementById('pin');
           if (pinInput) {
-            // Listener para change (mais confiável no iPhone)
-            pinInput.addEventListener('change', updatePin);
-            // Listener para input (fallback)
-            pinInput.addEventListener('input', updatePin);
+            pinInput.addEventListener('input', (e) => {
+              state.pin = e.target.value.replace(/\D/g, '').slice(0, 4);
+              e.target.value = state.pin;
+              
+              // Validação automática quando tem 4 dígitos
+              if (state.pin.length === 4) {
+                handlePinSubmit();
+              }
+            });
             pinInput.focus();
           }
         }, 0);
@@ -455,12 +201,8 @@
               <h1 class="card-title">Localização</h1>
               <p class="card-subtitle">Permite o acesso ao GPS do telemóvel</p>
             </div>
-            <button
-              onclick="handleLocationRequest()"
-              class="btn-success"
-              ${state.loading ? 'disabled' : ''}
-            >
-              ${state.loading ? '⏳ A obter localização...' : '📍 Obter Localização'}
+            <button onclick="handleLocationRequest()" class="btn-success" ${state.loading ? 'disabled' : ''}>
+              ${state.loading ? '<span class="loading-spinner">⏳</span> A obter localização...' : '📍 Obter Localização'}
             </button>
             <p class="helper-text">A precisão será registada para fins de auditoria.</p>
           </div>
@@ -497,18 +239,10 @@
               </div>
             </div>
             <div class="button-group">
-              <button
-                onclick="handleSubmitLimpeza()"
-                class="btn-confirm"
-                ${state.loading ? 'disabled' : ''}
-              >
-                ${state.loading ? '⏳ A registar...' : '✓ Registar Limpeza'}
+              <button onclick="handleSubmitLimpeza()" class="btn-confirm" ${state.loading ? 'disabled' : ''}>
+                ${state.loading ? '<span class="loading-spinner">⏳</span> A registar...' : '✓ Registar Limpeza'}
               </button>
-              <button
-                onclick="goToLocation()"
-                class="btn-secondary"
-                ${state.loading ? 'disabled' : ''}
-              >
+              <button onclick="goToLocation()" class="btn-secondary" ${state.loading ? 'disabled' : ''}>
                 ← Voltar
               </button>
             </div>
@@ -537,7 +271,7 @@
               <h1 class="card-title">Erro</h1>
               <p class="card-subtitle">${state.errorMsg}</p>
             </div>
-            <button onclick="reset()" class="btn-primary">Tentar Novamente</button>
+            <button onclick="reset()" style="background-color: var(--blue-600); color: white;">Tentar Novamente</button>
           </div>
         `;
       }
@@ -545,32 +279,22 @@
       else if (state.step === 'init') {
         app.innerHTML = `
           <div class="card" style="align-items: center; justify-content: center; min-height: 200px;">
-            <div style="font-size: 2rem; animation: spin 1s linear infinite;">⏳</div>
+            <div style="font-size: 2rem;" class="loading-spinner">⏳</div>
           </div>
         `;
       }
     }
 
-    function updatePin(e) {
-      const input = e.target;
-      state.pin = input.value.replace(/\D/g, '').slice(0, 4);
-      input.value = state.pin;
-      state.pinError = '';
-      // NÃO re-render - deixa o input manter o focus
-    }
-
-    async function handlePinSubmit(e) {
-      e.preventDefault();
+    async function handlePinSubmit() {
       if (state.pin.length !== 4 || !/^\d+$/.test(state.pin)) {
-        state.pinError = 'PIN deve ter 4 dígitos';
-        render();
-        return;
+        return; // Não faz nada se PIN não tem 4 dígitos
       }
+
       state.loading = true;
-      state.pinError = '';
       render();
+
       try {
-        console.log('Enviando validação de PIN:', { condominio: state.condominioId, pin: state.pin, url: WEBHOOK_URL });
+        console.log('Validando PIN:', { condominio: state.condominioId, pin: state.pin, url: WEBHOOK_URL });
         await fetch(WEBHOOK_URL, {
           method: 'POST',
           mode: 'no-cors',
@@ -583,7 +307,8 @@
         state.step = 'location';
       } catch (err) {
         console.error('Erro na validação:', err);
-        state.pinError = 'Erro na validação. Tenta novamente.';
+        state.step = 'error';
+        state.errorMsg = 'Erro na validação. Tenta novamente.';
       } finally {
         state.loading = false;
         render();
@@ -592,7 +317,6 @@
 
     function handleLocationRequest() {
       state.loading = true;
-      state.errorMsg = '';
       render();
 
       if (!navigator.geolocation) {
@@ -637,13 +361,12 @@
           timestamp: new Date().toISOString(),
           accuracy: state.location.accuracy
         };
-        console.log('Enviando limpeza:', data, 'para URL:', WEBHOOK_URL);
-        const response = await fetch(WEBHOOK_URL, {
+        console.log('Registando limpeza:', data);
+        await fetch(WEBHOOK_URL, {
           method: 'POST',
           mode: 'no-cors',
           body: JSON.stringify(data)
         });
-        console.log('Resposta do webhook:', response);
         state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
         state.step = 'success';
         setTimeout(() => reset(), 3000);
@@ -667,7 +390,6 @@
         step: 'pin',
         condominioId: state.condominioId,
         pin: '',
-        pinError: '',
         location: null,
         loading: false,
         errorMsg: '',
@@ -676,7 +398,6 @@
       render();
     }
 
-    // Start app
     init();
   </script>
 </body>
