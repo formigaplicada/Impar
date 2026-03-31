@@ -68,7 +68,6 @@
     input[type="password"]:focus, input[type="text"]:focus { outline: none; border-color: var(--blue-600); }
     input[type="password"] { text-align: center; font-size: 1.5rem; letter-spacing: 0.3em; }
     input::placeholder { color: var(--slate-400); }
-    .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.5rem; }
     .info-box { background-color: var(--slate-50); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; }
     .info-row { display: flex; justify-content: space-between; }
     .info-label { color: var(--slate-600); }
@@ -210,6 +209,7 @@
       }
 
       else if (state.step === 'confirm' && state.location) {
+        const mapsLink = `https://www.google.com/maps/?q=${state.location.latitude},${state.location.longitude}`;
         app.innerHTML = `
           <div class="card">
             <div class="card-header">
@@ -237,6 +237,10 @@
                 <span class="info-label">Hora:</span>
                 <span class="info-value">${new Date().toLocaleTimeString('pt-PT')}</span>
               </div>
+              <div class="info-row">
+                <span class="info-label">Google Maps:</span>
+                <span class="info-value"><a href="${mapsLink}" target="_blank" style="color: var(--blue-600); text-decoration: none;">Ver no Mapa</a></span>
+              </div>
             </div>
             <div class="button-group">
               <button onclick="handleSubmitLimpeza()" class="btn-confirm" ${state.loading ? 'disabled' : ''}>
@@ -257,7 +261,7 @@
               <div style="font-size: 2rem;">✅</div>
               <h1 class="card-title">Sucesso!</h1>
               <p class="card-subtitle" style="white-space: pre-line;">${state.successMsg}</p>
-              <p class="helper-text" style="margin-top: 0.5rem;">A re-iniciar em poucos segundos...</p>
+              <p class="helper-text" style="margin-top: 0.5rem;">A página será encerrada em poucos segundos...</p>
             </div>
           </div>
         `;
@@ -295,7 +299,7 @@
 
       try {
         console.log('Validando PIN:', { condominio: state.condominioId, pin: state.pin, url: WEBHOOK_URL });
-        await fetch(WEBHOOK_URL, {
+        const response = await fetch(WEBHOOK_URL, {
           method: 'POST',
           mode: 'no-cors',
           body: JSON.stringify({
@@ -304,6 +308,9 @@
             pin: state.pin
           })
         });
+        
+        // Com mode: 'no-cors' não conseguimos ler a resposta
+        // Por isso apenas avançamos se o PIN tiver 4 dígitos
         state.step = 'location';
       } catch (err) {
         console.error('Erro na validação:', err);
@@ -358,6 +365,7 @@
           pin: state.pin,
           latitude: state.location.latitude,
           longitude: state.location.longitude,
+          mapsLink: `https://www.google.com/maps/?q=${state.location.latitude},${state.location.longitude}`,
           timestamp: new Date().toISOString(),
           accuracy: state.location.accuracy
         };
@@ -369,7 +377,10 @@
         });
         state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
         state.step = 'success';
-        setTimeout(() => reset(), 3000);
+        // Redirecionar para página em branco após 10 segundos
+        setTimeout(() => {
+          window.location.href = 'about:blank';
+        }, 10000);
       } catch (err) {
         console.error('Erro ao registar limpeza:', err);
         state.errorMsg = 'Erro ao registar limpeza. Tenta novamente.';
