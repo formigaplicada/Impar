@@ -416,12 +416,10 @@
                 <label for="pin">PIN de 4 dígitos</label>
                 <input
                   id="pin"
-                  type="password"
+                  type="text"
                   inputmode="numeric"
                   maxlength="4"
                   value="${state.pin}"
-                  onchange="onPinChange()"
-                  oninput="onPinChange()"
                   placeholder="••••"
                 />
                 ${state.pinError ? `<div class="error-message">⚠️ ${state.pinError}</div>` : ''}
@@ -436,6 +434,18 @@
             </form>
           </div>
         `;
+        // Adiciona listener apenas após renderizar
+        setTimeout(() => {
+          const pinInput = document.getElementById('pin');
+          if (pinInput) {
+            pinInput.addEventListener('input', (e) => {
+              state.pin = e.target.value.replace(/\D/g, '').slice(0, 4);
+              e.target.value = state.pin;
+              state.pinError = '';
+            });
+            pinInput.focus();
+          }
+        }, 0);
       }
 
       else if (state.step === 'location') {
@@ -542,14 +552,6 @@
       }
     }
 
-    function onPinChange() {
-      const input = document.getElementById('pin');
-      state.pin = input.value.replace(/\D/g, '').slice(0, 4);
-      input.value = state.pin;
-      state.pinError = '';
-      render();
-    }
-
     async function handlePinSubmit(e) {
       e.preventDefault();
       if (state.pin.length !== 4 || !/^\d+$/.test(state.pin)) {
@@ -561,6 +563,7 @@
       state.pinError = '';
       render();
       try {
+        console.log('Enviando validação de PIN:', { condominio: state.condominioId, pin: state.pin, url: WEBHOOK_URL });
         await fetch(WEBHOOK_URL, {
           method: 'POST',
           mode: 'no-cors',
@@ -572,6 +575,7 @@
         });
         state.step = 'location';
       } catch (err) {
+        console.error('Erro na validação:', err);
         state.pinError = 'Erro na validação. Tenta novamente.';
       } finally {
         state.loading = false;
@@ -626,15 +630,18 @@
           timestamp: new Date().toISOString(),
           accuracy: state.location.accuracy
         };
-        await fetch(WEBHOOK_URL, {
+        console.log('Enviando limpeza:', data, 'para URL:', WEBHOOK_URL);
+        const response = await fetch(WEBHOOK_URL, {
           method: 'POST',
           mode: 'no-cors',
           body: JSON.stringify(data)
         });
+        console.log('Resposta do webhook:', response);
         state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
         state.step = 'success';
         setTimeout(() => reset(), 3000);
       } catch (err) {
+        console.error('Erro ao registar limpeza:', err);
         state.errorMsg = 'Erro ao registar limpeza. Tenta novamente.';
         state.step = 'error';
       } finally {
