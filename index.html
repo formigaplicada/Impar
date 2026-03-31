@@ -349,7 +349,7 @@
       );
     }
 
-    async function handleSubmitLimpeza() {
+   async function handleSubmitLimpeza() {
   state.loading = true;
   render();
   try {
@@ -364,19 +364,12 @@
       timestamp: new Date().toISOString(),
       accuracy: state.location.accuracy
     };
-    
-    console.log('Dados a enviar:', data);
-    
-    const response = await fetch(WEBHOOK_URL, {
+    console.log('Registando limpeza:', data);
+    await fetch(WEBHOOK_URL, {
       method: 'POST',
-      body: new URLSearchParams(new FormData(
-        Object.entries(data).reduce((fd, [k, v]) => {
-          fd.append(k, v);
-          return fd;
-        }, new FormData())
-      ))
+      mode: 'no-cors',
+      body: JSON.stringify(data)
     });
-    
     state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
     state.step = 'success';
     setTimeout(() => {
