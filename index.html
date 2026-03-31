@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Check-in Limpeza - Ímpar</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -34,7 +32,6 @@
       --color-emerald-600: #059669;
       --color-emerald-700: #047857;
       --color-amber-100: #fef3c7;
-      --color-amber-600: #d97706;
       --color-red-600: #dc2626;
     }
 
@@ -51,18 +48,10 @@
       line-height: 1.5;
     }
 
-    #root {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-
     .container {
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      max-width: 100%;
-      margin: 0 auto;
     }
 
     header {
@@ -80,18 +69,12 @@
       justify-content: space-between;
     }
 
-    .logo-section {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
     .logo-img {
       height: 2.5rem;
       object-fit: contain;
     }
 
-    .logo-text {
+    .logo-fallback {
       font-size: 1.125rem;
       font-weight: 700;
       color: var(--color-slate-800);
@@ -120,9 +103,9 @@
       border-radius: 1rem;
       box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
       padding: 2rem;
-      gap: 1.5rem;
       display: flex;
       flex-direction: column;
+      gap: 1.5rem;
       animation: fadeIn 0.3s ease-in;
     }
 
@@ -147,7 +130,7 @@
     .card-icon {
       width: 3rem;
       height: 3rem;
-      border-radius: 9999px;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -219,9 +202,6 @@
     .error-message {
       color: var(--color-red-600);
       font-size: 0.875rem;
-      display: flex;
-      align-items: center;
-      gap: 0.25rem;
       margin-top: 0.5rem;
     }
 
@@ -234,10 +214,6 @@
       cursor: pointer;
       transition: all 0.2s;
       font-family: 'Inter', sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
       width: 100%;
     }
 
@@ -317,25 +293,6 @@
       gap: 0.75rem;
     }
 
-    .success-message {
-      white-space: pre-line;
-      text-align: center;
-    }
-
-    .spinner {
-      display: inline-block;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      from {
-        transform: rotate(0deg);
-      }
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
     .helper-text {
       font-size: 0.75rem;
       color: var(--color-slate-500);
@@ -351,7 +308,10 @@
       color: var(--color-slate-500);
     }
 
-    /* Responsive */
+    .hidden {
+      display: none;
+    }
+
     @media (max-width: 640px) {
       main {
         padding: 1rem;
@@ -359,7 +319,6 @@
 
       .card {
         padding: 1.5rem;
-        border-radius: 0.75rem;
       }
 
       header {
@@ -373,294 +332,338 @@
   </style>
 </head>
 <body>
-  <div id="root"></div>
-
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-
-    function CheckinLimpeza() {
-      const [step, setStep] = useState('init');
-      const [condominioId, setCondominioId] = useState('');
-      const [pin, setPin] = useState('');
-      const [pinError, setPinError] = useState('');
-      const [location, setLocation] = useState(null);
-      const [loading, setLoading] = useState(false);
-      const [errorMsg, setErrorMsg] = useState('');
-      const [successMsg, setSuccessMsg] = useState('');
-
-      const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwvP2chjeOIAKYmmms0xmbPSyj3W1AuJ6vkMCQwtfmqeAT_6fTHbNlw5tIo8mQi89Ni/exec'; // SUBSTITUI COM URL DO APPS SCRIPT
-
-      useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const cond = params.get('condominio');
-        if (cond) {
-          setCondominioId(cond);
-          setStep('pin');
-        } else {
-          setStep('error');
-          setErrorMsg('Condomínio não identificado. Verifica o QR Code.');
-        }
-      }, []);
-
-      const handlePinSubmit = async (e) => {
-        e.preventDefault();
-        if (pin.length !== 4 || !/^\d+$/.test(pin)) {
-          setPinError('PIN deve ter 4 dígitos');
-          return;
-        }
-        setLoading(true);
-        setPinError('');
-        try {
-          await fetch(WEBHOOK_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            body: JSON.stringify({
-              action: 'validatePin',
-              condominio: condominioId,
-              pin: pin
-            })
-          });
-          setStep('location');
-        } catch (err) {
-          setPinError('Erro na validação. Tenta novamente.');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const handleLocationRequest = () => {
-        setLoading(true);
-        setErrorMsg('');
-        if (!navigator.geolocation) {
-          setErrorMsg('Geolocalização não suportada neste navegador.');
-          setStep('error');
-          setLoading(false);
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setLocation({
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy
-            });
-            setStep('confirm');
-            setLoading(false);
-          },
-          (error) => {
-            setErrorMsg(`Erro ao obter localização: ${error.message}`);
-            setStep('error');
-            setLoading(false);
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      };
-
-      const handleSubmitLimpeza = async () => {
-        setLoading(true);
-        try {
-          const data = {
-            action: 'registarLimpeza',
-            condominio: condominioId,
-            pin: pin,
-            latitude: location.latitude,
-            longitude: location.longitude,
-            timestamp: new Date().toISOString(),
-            accuracy: location.accuracy
-          };
-          await fetch(WEBHOOK_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            body: JSON.stringify(data)
-          });
-          setSuccessMsg(`Limpeza registada com sucesso!\nCondomínio: ${condominioId}`);
-          setStep('success');
-          setTimeout(() => {
-            setPin('');
-            setPinError('');
-            setLocation(null);
-            setStep('pin');
-          }, 3000);
-        } catch (err) {
-          setErrorMsg('Erro ao registar limpeza. Tenta novamente.');
-          setStep('error');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      return (
-        <div className="container">
-          <header>
-            <div className="header-content">
-              <div className="logo-section">
-                <img 
-                  src="https://impar.pt/wp-content/uploads/2023/logo-impar.png" 
-                  alt="Ímpar" 
-                  className="logo-img"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-                <span className="logo-text" style={{ display: 'none' }}>ÍMPAR</span>
-              </div>
-              <span className="header-title">Check-in Limpeza</span>
-            </div>
-          </header>
-
-          <main>
-            <div className="card-wrapper">
-              
-              {step === 'pin' && (
-                <div className="card">
-                  <div className="card-header">
-                    <div className="card-icon blue">🔒</div>
-                    <h1 className="card-title">Validação de Acesso</h1>
-                    <p className="card-subtitle">Condomínio: <strong>{condominioId}</strong></p>
-                  </div>
-                  <form onSubmit={handlePinSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label htmlFor="pin">PIN de 4 dígitos</label>
-                      <input
-                        id="pin"
-                        type="password"
-                        inputMode="numeric"
-                        maxLength="4"
-                        value={pin}
-                        onChange={(e) => {
-                          setPin(e.target.value.replace(/\D/g, ''));
-                          setPinError('');
-                        }}
-                        placeholder="••••"
-                      />
-                      {pinError && <div className="error-message">⚠️ {pinError}</div>}
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={loading || pin.length !== 4}
-                      className="btn-primary"
-                    >
-                      {loading && <span className="spinner">⏳</span>}
-                      {loading ? 'Validando...' : 'Validar'}
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              {step === 'location' && (
-                <div className="card">
-                  <div className="card-header">
-                    <div className="card-icon green">📍</div>
-                    <h1 className="card-title">Localização</h1>
-                    <p className="card-subtitle">Permite o acesso ao GPS do telemóvel</p>
-                  </div>
-                  <button
-                    onClick={handleLocationRequest}
-                    disabled={loading}
-                    className="btn-success"
-                  >
-                    {loading ? '⏳ A obter localização...' : '📍 Obter Localização'}
-                  </button>
-                  <p className="helper-text">A precisão será registada para fins de auditoria.</p>
-                </div>
-              )}
-
-              {step === 'confirm' && location && (
-                <div className="card">
-                  <div className="card-header">
-                    <div className="card-icon amber">✓</div>
-                    <h1 className="card-title">Confirmar Registo</h1>
-                  </div>
-                  <div className="info-box">
-                    <div className="info-row">
-                      <span className="info-label">Condomínio:</span>
-                      <span className="info-value">{condominioId}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Latitude:</span>
-                      <span className="info-value info-mono">{location.latitude.toFixed(6)}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Longitude:</span>
-                      <span className="info-value info-mono">{location.longitude.toFixed(6)}</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Precisão:</span>
-                      <span className="info-value">{Math.round(location.accuracy)}m</span>
-                    </div>
-                    <div className="info-row">
-                      <span className="info-label">Hora:</span>
-                      <span className="info-value">{new Date().toLocaleTimeString('pt-PT')}</span>
-                    </div>
-                  </div>
-                  <div className="button-group">
-                    <button
-                      onClick={handleSubmitLimpeza}
-                      disabled={loading}
-                      className="btn-confirm"
-                    >
-                      {loading ? '⏳ A registar...' : '✓ Registar Limpeza'}
-                    </button>
-                    <button
-                      onClick={() => setStep('location')}
-                      disabled={loading}
-                      className="btn-secondary"
-                    >
-                      ← Voltar
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {step === 'success' && (
-                <div className="card">
-                  <div className="card-header">
-                    <div style={{ fontSize: '2rem' }}>✅</div>
-                    <h1 className="card-title">Sucesso!</h1>
-                    <p className="card-subtitle success-message">{successMsg}</p>
-                    <p className="helper-text" style={{ marginTop: '0.5rem' }}>A re-iniciar em poucos segundos...</p>
-                  </div>
-                </div>
-              )}
-
-              {step === 'error' && (
-                <div className="card">
-                  <div className="card-header">
-                    <div style={{ fontSize: '2rem' }}>⚠️</div>
-                    <h1 className="card-title">Erro</h1>
-                    <p className="card-subtitle">{errorMsg}</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setPin('');
-                      setPinError('');
-                      setLocation(null);
-                      setErrorMsg('');
-                      setStep('pin');
-                    }}
-                    className="btn-primary"
-                  >
-                    Tentar Novamente
-                  </button>
-                </div>
-              )}
-
-              {step === 'init' && (
-                <div className="card" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
-                  <div style={{ fontSize: '2rem' }} className="spinner">⏳</div>
-                </div>
-              )}
-            </div>
-          </main>
-
-          <footer>
-            <p>Sistema de Check-in de Limpezas © 2024</p>
-          </footer>
+  <div class="container">
+    <header>
+      <div class="header-content">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <img 
+            src="https://impar.pt/wp-content/uploads/2023/logo-impar.png" 
+            alt="Ímpar" 
+            class="logo-img"
+            id="logo"
+            onerror="showLogoFallback()"
+          />
+          <span class="logo-fallback hidden" id="logoFallback">ÍMPAR</span>
         </div>
+        <span class="header-title">Check-in Limpeza</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="card-wrapper" id="app">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon blue">⏳</div>
+            <h1 class="card-title">Carregando...</h1>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>Sistema de Check-in de Limpezas © 2024</p>
+    </footer>
+  </div>
+
+  <script>
+    function showLogoFallback() {
+      document.getElementById('logo').classList.add('hidden');
+      document.getElementById('logoFallback').classList.remove('hidden');
+    }
+
+    // State
+    let state = {
+      step: 'init',
+      condominioId: '',
+      pin: '',
+      pinError: '',
+      location: null,
+      loading: false,
+      errorMsg: '',
+      successMsg: ''
+    };
+
+    const WEBHOOK_URL = 'WEBHOOK_URL_AQUI'; // SUBSTITUIR
+
+    // Get condominio from URL
+    function init() {
+      const params = new URLSearchParams(window.location.search);
+      const cond = params.get('condominio');
+      if (cond) {
+        state.condominioId = cond;
+        state.step = 'pin';
+      } else {
+        state.step = 'error';
+        state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
+      }
+      render();
+    }
+
+    // Render UI
+    function render() {
+      const app = document.getElementById('app');
+
+      if (state.step === 'pin') {
+        app.innerHTML = `
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon blue">🔒</div>
+              <h1 class="card-title">Validação de Acesso</h1>
+              <p class="card-subtitle">Condomínio: <strong>${state.condominioId}</strong></p>
+            </div>
+            <form onsubmit="handlePinSubmit(event)" style="display: flex; flex-direction: column; gap: 1rem;">
+              <div class="form-group">
+                <label for="pin">PIN de 4 dígitos</label>
+                <input
+                  id="pin"
+                  type="password"
+                  inputmode="numeric"
+                  maxlength="4"
+                  value="${state.pin}"
+                  onchange="onPinChange()"
+                  oninput="onPinChange()"
+                  placeholder="••••"
+                />
+                ${state.pinError ? `<div class="error-message">⚠️ ${state.pinError}</div>` : ''}
+              </div>
+              <button
+                type="submit"
+                class="btn-primary"
+                ${state.loading || state.pin.length !== 4 ? 'disabled' : ''}
+              >
+                ${state.loading ? '⏳ Validando...' : 'Validar'}
+              </button>
+            </form>
+          </div>
+        `;
+      }
+
+      else if (state.step === 'location') {
+        app.innerHTML = `
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon green">📍</div>
+              <h1 class="card-title">Localização</h1>
+              <p class="card-subtitle">Permite o acesso ao GPS do telemóvel</p>
+            </div>
+            <button
+              onclick="handleLocationRequest()"
+              class="btn-success"
+              ${state.loading ? 'disabled' : ''}
+            >
+              ${state.loading ? '⏳ A obter localização...' : '📍 Obter Localização'}
+            </button>
+            <p class="helper-text">A precisão será registada para fins de auditoria.</p>
+          </div>
+        `;
+      }
+
+      else if (state.step === 'confirm' && state.location) {
+        app.innerHTML = `
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon amber">✓</div>
+              <h1 class="card-title">Confirmar Registo</h1>
+            </div>
+            <div class="info-box">
+              <div class="info-row">
+                <span class="info-label">Condomínio:</span>
+                <span class="info-value">${state.condominioId}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Latitude:</span>
+                <span class="info-value info-mono">${state.location.latitude.toFixed(6)}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Longitude:</span>
+                <span class="info-value info-mono">${state.location.longitude.toFixed(6)}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Precisão:</span>
+                <span class="info-value">${Math.round(state.location.accuracy)}m</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Hora:</span>
+                <span class="info-value">${new Date().toLocaleTimeString('pt-PT')}</span>
+              </div>
+            </div>
+            <div class="button-group">
+              <button
+                onclick="handleSubmitLimpeza()"
+                class="btn-confirm"
+                ${state.loading ? 'disabled' : ''}
+              >
+                ${state.loading ? '⏳ A registar...' : '✓ Registar Limpeza'}
+              </button>
+              <button
+                onclick="goToLocation()"
+                class="btn-secondary"
+                ${state.loading ? 'disabled' : ''}
+              >
+                ← Voltar
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      else if (state.step === 'success') {
+        app.innerHTML = `
+          <div class="card">
+            <div class="card-header">
+              <div style="font-size: 2rem;">✅</div>
+              <h1 class="card-title">Sucesso!</h1>
+              <p class="card-subtitle" style="white-space: pre-line;">${state.successMsg}</p>
+              <p class="helper-text" style="margin-top: 0.5rem;">A re-iniciar em poucos segundos...</p>
+            </div>
+          </div>
+        `;
+      }
+
+      else if (state.step === 'error') {
+        app.innerHTML = `
+          <div class="card">
+            <div class="card-header">
+              <div style="font-size: 2rem;">⚠️</div>
+              <h1 class="card-title">Erro</h1>
+              <p class="card-subtitle">${state.errorMsg}</p>
+            </div>
+            <button onclick="reset()" class="btn-primary">Tentar Novamente</button>
+          </div>
+        `;
+      }
+
+      else if (state.step === 'init') {
+        app.innerHTML = `
+          <div class="card" style="align-items: center; justify-content: center; min-height: 200px;">
+            <div style="font-size: 2rem; animation: spin 1s linear infinite;">⏳</div>
+          </div>
+        `;
+      }
+    }
+
+    function onPinChange() {
+      const input = document.getElementById('pin');
+      state.pin = input.value.replace(/\D/g, '').slice(0, 4);
+      input.value = state.pin;
+      state.pinError = '';
+      render();
+    }
+
+    async function handlePinSubmit(e) {
+      e.preventDefault();
+      if (state.pin.length !== 4 || !/^\d+$/.test(state.pin)) {
+        state.pinError = 'PIN deve ter 4 dígitos';
+        render();
+        return;
+      }
+      state.loading = true;
+      state.pinError = '';
+      render();
+      try {
+        await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify({
+            action: 'validatePin',
+            condominio: state.condominioId,
+            pin: state.pin
+          })
+        });
+        state.step = 'location';
+      } catch (err) {
+        state.pinError = 'Erro na validação. Tenta novamente.';
+      } finally {
+        state.loading = false;
+        render();
+      }
+    }
+
+    function handleLocationRequest() {
+      state.loading = true;
+      state.errorMsg = '';
+      render();
+
+      if (!navigator.geolocation) {
+        state.errorMsg = 'Geolocalização não suportada neste navegador.';
+        state.step = 'error';
+        state.loading = false;
+        render();
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          state.location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          };
+          state.step = 'confirm';
+          state.loading = false;
+          render();
+        },
+        (error) => {
+          state.errorMsg = `Erro ao obter localização: ${error.message}`;
+          state.step = 'error';
+          state.loading = false;
+          render();
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<CheckinLimpeza />);
+    async function handleSubmitLimpeza() {
+      state.loading = true;
+      render();
+      try {
+        const data = {
+          action: 'registarLimpeza',
+          condominio: state.condominioId,
+          pin: state.pin,
+          latitude: state.location.latitude,
+          longitude: state.location.longitude,
+          timestamp: new Date().toISOString(),
+          accuracy: state.location.accuracy
+        };
+        await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify(data)
+        });
+        state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
+        state.step = 'success';
+        setTimeout(() => reset(), 3000);
+      } catch (err) {
+        state.errorMsg = 'Erro ao registar limpeza. Tenta novamente.';
+        state.step = 'error';
+      } finally {
+        state.loading = false;
+        render();
+      }
+    }
+
+    function goToLocation() {
+      state.step = 'location';
+      render();
+    }
+
+    function reset() {
+      state = {
+        step: 'pin',
+        condominioId: state.condominioId,
+        pin: '',
+        pinError: '',
+        location: null,
+        loading: false,
+        errorMsg: '',
+        successMsg: ''
+      };
+      render();
+    }
+
+    // Start app
+    init();
   </script>
 </body>
 </html>
