@@ -70,6 +70,8 @@
     input[type="password"]:focus, input[type="text"]:focus { outline: none; border-color: var(--blue-600); }
     input[type="password"] { text-align: center; font-size: 1.5rem; letter-spacing: 0.3em; }
     input::placeholder { color: var(--slate-400); }
+    .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.5rem; font-weight: 500; }
+    .success-message { color: var(--green-600); font-size: 0.875rem; margin-top: 0.5rem; font-weight: 500; }
     .info-box { background-color: var(--slate-50); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; }
     .info-row { display: flex; justify-content: space-between; }
     .info-label { color: var(--slate-600); }
@@ -111,7 +113,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 1rem;">
           <span class="header-title">Check-in Limpeza</span>
-          <span class="version-badge">v1.5</span>
+          <span class="version-badge">v1.6</span>
         </div>
       </div>
     </header>
@@ -176,6 +178,7 @@
               <label for="pin">PIN de 4 dígitos</label>
               <input id="pin" type="password" maxlength="4" placeholder="••••" autocomplete="off"/>
               <p class="helper-text">O acesso será validado automaticamente ao introduzir 4 dígitos</p>
+              ${state.errorMsg ? `<div class="error-message">❌ ${state.errorMsg}</div>` : ''}
             </div>
           </div>
         `;
@@ -185,8 +188,8 @@
             pinInput.addEventListener('input', (e) => {
               state.pin = e.target.value.replace(/\D/g, '').slice(0, 4);
               e.target.value = state.pin;
+              state.errorMsg = '';
               
-              // Validação automática quando tem 4 dígitos
               if (state.pin.length === 4) {
                 handlePinSubmit();
               }
@@ -295,18 +298,18 @@
 
     async function handlePinSubmit() {
       if (state.pin.length !== 4) {
-        return; // Espera por 4 dígitos
+        return;
       }
 
       state.loading = true;
       render();
 
       try {
-        // Envia o PIN para o webhook (será validado na sheet)
-        console.log('Enviando PIN:', { condominio: state.condominioId, pin: state.pin });
-        await fetch(WEBHOOK_URL, {
+        console.log('Validando PIN:', { condominio: state.condominioId, pin: state.pin });
+        const response = await fetch(WEBHOOK_URL, {
           method: 'POST',
-          mode: 'no-cors',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'validatePin',
             condominio: state.condominioId,
@@ -314,12 +317,23 @@
           })
         });
         
-        // Avança independentemente (validação real é na sheet)
-        state.step = 'location';
+        const data = await response.json();
+        console.log('Resposta do webhook:', data);
+        
+        // Se PIN é válido, avança
+        if (data.success) {
+          state.step = 'location';
+        } else {
+          // PIN inválido - mostra erro e permite novo PIN
+          state.errorMsg = 'PIN inválido. Tenta novamente.';
+          state.pin = '';
+          state.step = 'pin';
+        }
       } catch (err) {
-        console.error('Erro:', err);
-        state.step = 'error';
-        state.errorMsg = 'Erro na comunicação. Tenta novamente.';
+        console.error('Erro na validação:', err);
+        state.errorMsg = 'Erro ao validar PIN. Tenta novamente.';
+        state.pin = '';
+        state.step = 'pin';
       } finally {
         state.loading = false;
         render();
@@ -376,7 +390,8 @@
         console.log('Registando limpeza:', data);
         await fetch(WEBHOOK_URL, {
           method: 'POST',
-          mode: 'no-cors',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
         state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
