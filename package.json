@@ -1,0 +1,6 @@
+{
+  "name": "checkin-limpeza",
+  "version": "1.0.0",
+  "description": "App de check-in de limpezas com QR Code, PIN e geolocalização",
+  "license": "MIT"
+}

@@ -1,0 +1,9 @@
+[build]
+  command = "echo 'No build needed for static site'"
+  publish = "."
+
+# Redirect all URLs to index.html (para SPA routing)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
