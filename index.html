@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-in Limpeza - Ímpar</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --color-slate-50: #f8fafc;
+      --color-slate-100: #f1f5f9;
+      --color-slate-200: #e2e8f0;
+      --color-slate-300: #cbd5e1;
+      --color-slate-400: #94a3b8;
+      --color-slate-500: #64748b;
+      --color-slate-600: #475569;
+      --color-slate-800: #1e293b;
+      --color-slate-900: #0f172a;
+      --color-blue-600: #2563eb;
+      --color-blue-700: #1d4ed8;
+      --color-blue-100: #dbeafe;
+      --color-green-600: #16a34a;
+      --color-green-700: #15803d;
+      --color-green-100: #dcfce7;
+      --color-emerald-600: #059669;
+      --color-emerald-700: #047857;
+      --color-amber-100: #fef3c7;
+      --color-amber-600: #d97706;
+      --color-red-600: #dc2626;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(to bottom right, var(--color-slate-50), var(--color-slate-100));
+      color: var(--color-slate-900);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    #root {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    header {
+      background-color: white;
+      border-bottom: 1px solid var(--color-slate-200);
+      padding: 1rem 1.5rem;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .header-content {
+      max-width: 56rem;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo-section {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .logo-img {
+      height: 2.5rem;
+      object-fit: contain;
+    }
+
+    .logo-text {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--color-slate-800);
+    }
+
+    .header-title {
+      font-size: 0.875rem;
+      color: var(--color-slate-500);
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+    }
+
+    .card-wrapper {
+      width: 100%;
+      max-width: 28rem;
+    }
+
+    .card {
+      background-color: white;
+      border-radius: 1rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      gap: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .card-header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .card-icon {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      font-size: 1.5rem;
+    }
+
+    .card-icon.blue {
+      background-color: var(--color-blue-100);
+    }
+
+    .card-icon.green {
+      background-color: var(--color-green-100);
+    }
+
+    .card-icon.amber {
+      background-color: var(--color-amber-100);
+    }
+
+    .card-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-slate-900);
+    }
+
+    .card-subtitle {
+      font-size: 0.875rem;
+      color: var(--color-slate-600);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-slate-700);
+    }
+
+    input[type="password"],
+    input[type="text"] {
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      border: 2px solid var(--color-slate-300);
+      border-radius: 0.5rem;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s;
+    }
+
+    input[type="password"]:focus,
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--color-blue-600);
+    }
+
+    input[type="password"] {
+      text-align: center;
+      font-size: 1.5rem;
+      letter-spacing: 0.3em;
+    }
+
+    input::placeholder {
+      color: var(--color-slate-400);
+    }
+
+    .error-message {
+      color: var(--color-red-600);
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      margin-top: 0.5rem;
+    }
+
+    button {
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--color-blue-600);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--color-blue-700);
+    }
+
+    .btn-success {
+      background-color: var(--color-green-600);
+      color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background-color: var(--color-green-700);
+    }
+
+    .btn-confirm {
+      background-color: var(--color-emerald-600);
+      color: white;
+    }
+
+    .btn-confirm:hover:not(:disabled) {
+      background-color: var(--color-emerald-700);
+    }
+
+    .btn-secondary {
+      background-color: var(--color-slate-300);
+      color: var(--color-slate-900);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background-color: var(--color-slate-400);
+    }
+
+    .info-box {
+      background-color: var(--color-slate-50);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .info-label {
+      color: var(--color-slate-600);
+    }
+
+    .info-value {
+      font-weight: 600;
+      color: var(--color-slate-900);
+    }
+
+    .info-mono {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+    }
+
+    .button-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .success-message {
+      white-space: pre-line;
+      text-align: center;
+    }
+
+    .spinner {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from {
+        transform: rotate(0deg);
+      }
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .helper-text {
+      font-size: 0.75rem;
+      color: var(--color-slate-500);
+      text-align: center;
+    }
+
+    footer {
+      background-color: white;
+      border-top: 1px solid var(--color-slate-200);
+      padding: 1rem 1.5rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--color-slate-500);
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      main {
+        padding: 1rem;
+      }
+
+      .card {
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+      }
+
+      header {
+        padding: 0.75rem 1rem;
+      }
+
+      .card-title {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function CheckinLimpeza() {
+      const [step, setStep] = useState('init');
+      const [condominioId, setCondominioId] = useState('');
+      const [pin, setPin] = useState('');
+      const [pinError, setPinError] = useState('');
+      const [location, setLocation] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [errorMsg, setErrorMsg] = useState('');
+      const [successMsg, setSuccessMsg] = useState('');
+
+      const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwvP2chjeOIAKYmmms0xmbPSyj3W1AuJ6vkMCQwtfmqeAT_6fTHbNlw5tIo8mQi89Ni/exec'; // SUBSTITUI COM URL DO APPS SCRIPT
+
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const cond = params.get('condominio');
+        if (cond) {
+          setCondominioId(cond);
+          setStep('pin');
+        } else {
+          setStep('error');
+          setErrorMsg('Condomínio não identificado. Verifica o QR Code.');
+        }
+      }, []);
+
+      const handlePinSubmit = async (e) => {
+        e.preventDefault();
+        if (pin.length !== 4 || !/^\d+$/.test(pin)) {
+          setPinError('PIN deve ter 4 dígitos');
+          return;
+        }
+        setLoading(true);
+        setPinError('');
+        try {
+          await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+              action: 'validatePin',
+              condominio: condominioId,
+              pin: pin
+            })
+          });
+          setStep('location');
+        } catch (err) {
+          setPinError('Erro na validação. Tenta novamente.');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleLocationRequest = () => {
+        setLoading(true);
+        setErrorMsg('');
+        if (!navigator.geolocation) {
+          setErrorMsg('Geolocalização não suportada neste navegador.');
+          setStep('error');
+          setLoading(false);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setLocation({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            });
+            setStep('confirm');
+            setLoading(false);
+          },
+          (error) => {
+            setErrorMsg(`Erro ao obter localização: ${error.message}`);
+            setStep('error');
+            setLoading(false);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      };
+
+      const handleSubmitLimpeza = async () => {
+        setLoading(true);
+        try {
+          const data = {
+            action: 'registarLimpeza',
+            condominio: condominioId,
+            pin: pin,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            timestamp: new Date().toISOString(),
+            accuracy: location.accuracy
+          };
+          await fetch(WEBHOOK_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify(data)
+          });
+          setSuccessMsg(`Limpeza registada com sucesso!\nCondomínio: ${condominioId}`);
+          setStep('success');
+          setTimeout(() => {
+            setPin('');
+            setPinError('');
+            setLocation(null);
+            setStep('pin');
+          }, 3000);
+        } catch (err) {
+          setErrorMsg('Erro ao registar limpeza. Tenta novamente.');
+          setStep('error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="container">
+          <header>
+            <div className="header-content">
+              <div className="logo-section">
+                <img 
+                  src="https://impar.pt/wp-content/uploads/2023/logo-impar.png" 
+                  alt="Ímpar" 
+                  className="logo-img"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+                <span className="logo-text" style={{ display: 'none' }}>ÍMPAR</span>
+              </div>
+              <span className="header-title">Check-in Limpeza</span>
+            </div>
+          </header>
+
+          <main>
+            <div className="card-wrapper">
+              
+              {step === 'pin' && (
+                <div className="card">
+                  <div className="card-header">
+                    <div className="card-icon blue">🔒</div>
+                    <h1 className="card-title">Validação de Acesso</h1>
+                    <p className="card-subtitle">Condomínio: <strong>{condominioId}</strong></p>
+                  </div>
+                  <form onSubmit={handlePinSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div className="form-group">
+                      <label htmlFor="pin">PIN de 4 dígitos</label>
+                      <input
+                        id="pin"
+                        type="password"
+                        inputMode="numeric"
+                        maxLength="4"
+                        value={pin}
+                        onChange={(e) => {
+                          setPin(e.target.value.replace(/\D/g, ''));
+                          setPinError('');
+                        }}
+                        placeholder="••••"
+                      />
+                      {pinError && <div className="error-message">⚠️ {pinError}</div>}
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading || pin.length !== 4}
+                      className="btn-primary"
+                    >
+                      {loading && <span className="spinner">⏳</span>}
+                      {loading ? 'Validando...' : 'Validar'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {step === 'location' && (
+                <div className="card">
+                  <div className="card-header">
+                    <div className="card-icon green">📍</div>
+                    <h1 className="card-title">Localização</h1>
+                    <p className="card-subtitle">Permite o acesso ao GPS do telemóvel</p>
+                  </div>
+                  <button
+                    onClick={handleLocationRequest}
+                    disabled={loading}
+                    className="btn-success"
+                  >
+                    {loading ? '⏳ A obter localização...' : '📍 Obter Localização'}
+                  </button>
+                  <p className="helper-text">A precisão será registada para fins de auditoria.</p>
+                </div>
+              )}
+
+              {step === 'confirm' && location && (
+                <div className="card">
+                  <div className="card-header">
+                    <div className="card-icon amber">✓</div>
+                    <h1 className="card-title">Confirmar Registo</h1>
+                  </div>
+                  <div className="info-box">
+                    <div className="info-row">
+                      <span className="info-label">Condomínio:</span>
+                      <span className="info-value">{condominioId}</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-label">Latitude:</span>
+                      <span className="info-value info-mono">{location.latitude.toFixed(6)}</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-label">Longitude:</span>
+                      <span className="info-value info-mono">{location.longitude.toFixed(6)}</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-label">Precisão:</span>
+                      <span className="info-value">{Math.round(location.accuracy)}m</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-label">Hora:</span>
+                      <span className="info-value">{new Date().toLocaleTimeString('pt-PT')}</span>
+                    </div>
+                  </div>
+                  <div className="button-group">
+                    <button
+                      onClick={handleSubmitLimpeza}
+                      disabled={loading}
+                      className="btn-confirm"
+                    >
+                      {loading ? '⏳ A registar...' : '✓ Registar Limpeza'}
+                    </button>
+                    <button
+                      onClick={() => setStep('location')}
+                      disabled={loading}
+                      className="btn-secondary"
+                    >
+                      ← Voltar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {step === 'success' && (
+                <div className="card">
+                  <div className="card-header">
+                    <div style={{ fontSize: '2rem' }}>✅</div>
+                    <h1 className="card-title">Sucesso!</h1>
+                    <p className="card-subtitle success-message">{successMsg}</p>
+                    <p className="helper-text" style={{ marginTop: '0.5rem' }}>A re-iniciar em poucos segundos...</p>
+                  </div>
+                </div>
+              )}
+
+              {step === 'error' && (
+                <div className="card">
+                  <div className="card-header">
+                    <div style={{ fontSize: '2rem' }}>⚠️</div>
+                    <h1 className="card-title">Erro</h1>
+                    <p className="card-subtitle">{errorMsg}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setPin('');
+                      setPinError('');
+                      setLocation(null);
+                      setErrorMsg('');
+                      setStep('pin');
+                    }}
+                    className="btn-primary"
+                  >
+                    Tentar Novamente
+                  </button>
+                </div>
+              )}
+
+              {step === 'init' && (
+                <div className="card" style={{ alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+                  <div style={{ fontSize: '2rem' }} className="spinner">⏳</div>
+                </div>
+              )}
+            </div>
+          </main>
+
+          <footer>
+            <p>Sistema de Check-in de Limpezas © 2024</p>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<CheckinLimpeza />);
+  </script>
+</body>
+</html>
