@@ -131,7 +131,7 @@
     </footer>
   </div>
 
-  <script>
+ <script>
     function showLogoFallback() {
       document.getElementById('logo').classList.add('hidden');
       document.getElementById('logoFallback').classList.remove('hidden');
@@ -147,12 +147,24 @@
       successMsg: ''
     };
 
+    // VERIFIQUE SE ESTE URL É O DA "NOVA IMPLEMENTAÇÃO"
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwMDRuLzYKC5BVa_ECGP_voiaAc3snxDV3RIenqE4r8zAc3_ozYh79m6DdYBKLvnTXh/exec';
 
-    // Calcular PIN correto: 9 + condominio invertido
     function generateCorrectPin(condominioId) {
       const reversed = condominioId.split('').reverse().join('');
       return '9' + reversed;
+    }
+
+    function reset() {
+      state.pin = '';
+      state.step = 'pin';
+      state.errorMsg = '';
+      render();
+    }
+
+    function goToLocation() {
+      state.step = 'location';
+      render();
     }
 
     function init() {
@@ -181,7 +193,7 @@
             </div>
             <div class="form-group">
               <label for="pin">PIN de 4 dígitos</label>
-              <input id="pin" type="password" maxlength="4" placeholder="••••" autocomplete="off"/>
+              <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" autocomplete="off"/>
               <p class="helper-text">O acesso será validado automaticamente ao introduzir 4 dígitos</p>
               ${state.errorMsg ? `<div class="error-message">❌ ${state.errorMsg}</div>` : ''}
             </div>
@@ -193,11 +205,7 @@
             pinInput.addEventListener('input', (e) => {
               state.pin = e.target.value.replace(/\D/g, '').slice(0, 4);
               e.target.value = state.pin;
-              state.errorMsg = '';
-              
-              if (state.pin.length === 4) {
-                handlePinSubmit();
-              }
+              if (state.pin.length === 4) handlePinSubmit();
             });
             pinInput.focus();
           }
@@ -215,7 +223,6 @@
             <button onclick="handleLocationRequest()" class="btn-success" ${state.loading ? 'disabled' : ''}>
               ${state.loading ? '⏳ A obter localização...' : '📍 Obter Localização'}
             </button>
-            <p class="helper-text">A precisão será registada para fins de auditoria.</p>
           </div>
         `;
       }
@@ -228,34 +235,15 @@
               <h1 class="card-title">Confirmar Registo</h1>
             </div>
             <div class="info-box">
-              <div class="info-row">
-                <span class="info-label">Condomínio:</span>
-                <span class="info-value">${state.condominioId}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Latitude:</span>
-                <span class="info-value info-mono">${state.location.latitude.toFixed(6)}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Longitude:</span>
-                <span class="info-value info-mono">${state.location.longitude.toFixed(6)}</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Precisão:</span>
-                <span class="info-value">${Math.round(state.location.accuracy)}m</span>
-              </div>
-              <div class="info-row">
-                <span class="info-label">Hora:</span>
-                <span class="info-value">${new Date().toLocaleTimeString('pt-PT')}</span>
-              </div>
+              <div class="info-row"><span class="info-label">Condomínio:</span><span class="info-value">${state.condominioId}</span></div>
+              <div class="info-row"><span class="info-label">Precisão:</span><span class="info-value">${Math.round(state.location.accuracy)}m</span></div>
+              <div class="info-row"><span class="info-label">Hora:</span><span class="info-value">${new Date().toLocaleTimeString('pt-PT')}</span></div>
             </div>
             <div class="button-group">
               <button onclick="handleSubmitLimpeza()" class="btn-confirm" ${state.loading ? 'disabled' : ''}>
                 ${state.loading ? '⏳ A registar...' : '✓ Registar Limpeza'}
               </button>
-              <button onclick="goToLocation()" class="btn-secondary" ${state.loading ? 'disabled' : ''}>
-                ← Voltar
-              </button>
+              <button onclick="goToLocation()" class="btn-secondary" ${state.loading ? 'disabled' : ''}>← Voltar</button>
             </div>
           </div>
         `;
@@ -263,141 +251,73 @@
 
       else if (state.step === 'success') {
         app.innerHTML = `
-          <div class="card">
-            <div class="card-header">
-              <div style="font-size: 2rem;">✅</div>
-              <h1 class="card-title">Sucesso!</h1>
-              <p class="card-subtitle" style="white-space: pre-line;">${state.successMsg}</p>
-              <p class="helper-text" style="margin-top: 0.5rem;">A página será encerrada em poucos segundos...</p>
-            </div>
-          </div>
+          <div class="card"><div class="card-header"><div style="font-size: 2rem;">✅</div><h1 class="card-title">Sucesso!</h1><p class="card-subtitle">${state.successMsg}</p></div></div>
         `;
       }
 
       else if (state.step === 'error') {
         app.innerHTML = `
-          <div class="card">
-            <div class="card-header">
-              <div style="font-size: 2rem;">⚠️</div>
-              <h1 class="card-title">Erro</h1>
-              <p class="card-subtitle">${state.errorMsg}</p>
-            </div>
-            <button onclick="reset()" style="background-color: var(--blue-600); color: white;">Tentar Novamente</button>
-          </div>
-        `;
-      }
-
-      else if (state.step === 'init') {
-        app.innerHTML = `
-          <div class="card" style="align-items: center; justify-content: center; min-height: 200px;">
-            <div style="font-size: 2rem;">⏳</div>
-          </div>
+          <div class="card"><div class="card-header"><div style="font-size: 2rem;">⚠️</div><h1 class="card-title">Erro</h1><p class="card-subtitle">${state.errorMsg}</p></div><button onclick="reset()" class="btn-success">Tentar Novamente</button></div>
         `;
       }
     }
 
     function handlePinSubmit() {
-      if (state.pin.length !== 4) {
-        return;
-      }
-
-      const correctPin = generateCorrectPin(state.condominioId);
-      
-      if (state.pin === correctPin) {
-        // PIN correto
+      if (state.pin === generateCorrectPin(state.condominioId)) {
         state.step = 'location';
       } else {
-        // PIN inválido
-        state.errorMsg = 'PIN inválido. Tenta novamente.';
+        state.errorMsg = 'PIN inválido.';
         state.pin = '';
-        state.step = 'pin';
       }
-      
       render();
     }
 
     function handleLocationRequest() {
-      state.loading = true;
-      render();
-
-      if (!navigator.geolocation) {
-        state.errorMsg = 'Geolocalização não suportada neste navegador.';
-        state.step = 'error';
-        state.loading = false;
-        render();
-        return;
-      }
-
+      state.loading = true; render();
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          state.location = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          };
-          state.step = 'confirm';
-          state.loading = false;
-          render();
+        (pos) => {
+          state.location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          state.step = 'confirm'; state.loading = false; render();
         },
-        (error) => {
-          state.errorMsg = `Erro ao obter localização: ${error.message}`;
-          state.step = 'error';
-          state.loading = false;
-          render();
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        (err) => { state.errorMsg = "Ative o GPS."; state.step = 'error'; state.loading = false; render(); },
+        { enableHighAccuracy: true }
       );
     }
 
-// No render() dentro do step 'pin', altere o input para:
-// <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" ... />
+    async function handleSubmitLimpeza() {
+      state.loading = true;
+      render();
 
-async function handleSubmitLimpeza() {
-  state.loading = true;
-  render();
+      // Mudança crucial: Usar URLSearchParams para compatibilidade total com o modo no-cors do Google
+      const params = new URLSearchParams();
+      params.append('action', 'registarLimpeza');
+      params.append('condominio', state.condominioId);
+      params.append('latitude', state.location.latitude);
+      params.append('longitude', state.location.longitude);
+      params.append('accuracy', state.location.accuracy);
+      params.append('timestamp', new Date().toLocaleString('pt-PT'));
 
-  const data = {
-    condominio: state.condominioId,
-    pin: state.pin,
-    latitude: state.location.latitude,
-    longitude: state.location.longitude,
-    timestamp: new Date().toISOString(),
-    accuracy: state.location.accuracy
-  };
+      try {
+        await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors', 
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: params.toString()
+        });
 
-  try {
-    // Usando URLSearchParams para evitar problemas de pre-flight CORS no Google Apps Script
-    const formData = new FormData();
-    for (const key in data) {
-      formData.append(key, data[key]);
+        // Com no-cors o fetch não "rebenta" se o Google não responder JSON, ele apenas segue.
+        state.successMsg = `Limpeza registada!\nCondomínio: ${state.condominioId}`;
+        state.step = 'success';
+        render();
+        setTimeout(() => { window.location.href = 'https://impar.pt'; }, 4000);
+      } catch (err) {
+        state.errorMsg = 'Erro ao enviar dados.';
+        state.step = 'error';
+        render();
+      }
     }
 
-    await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      body: formData, // Enviar como FormData é mais aceite pelo Google Apps Script
-      mode: 'no-cors' // Evita erros de CORS
-    });
-
-    // Como o 'no-cors' não permite ler a resposta, assumimos sucesso se não houver erro de rede
-    state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
-    state.step = 'success';
-    
-    setTimeout(() => {
-      // Em vez de about:blank, talvez redirecionar para o site da Ímpar?
-      window.location.href = 'https://impar.pt'; 
-    }, 5000);
-
-  } catch (err) {
-    console.error('Erro:', err);
-    state.errorMsg = 'Erro de ligação. Verifique a internet.';
-    state.step = 'error';
-  } finally {
-    state.loading = false;
-    render();
-  }
-}
-
     init();
-  </script>
+</script>
 </body>
 </html>
