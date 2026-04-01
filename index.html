@@ -363,16 +363,25 @@
       accuracy: state.location.accuracy
     };
     console.log('Registando limpeza:', data);
+    
+    // AGUARDA o fetch terminar ANTES de fazer nada
     await fetch(WEBHOOK_URL, {
       method: 'POST',
       mode: 'no-cors',
       body: JSON.stringify(data)
     });
+    
+    // SÓ DEPOIS de o fetch terminar com sucesso
+    console.log('Fetch completado com sucesso!');
+    
     state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
     state.step = 'success';
+    
+    // Aumentar o tempo de espera antes de redirecionar (dar tempo ao servidor)
     setTimeout(() => {
       window.location.href = 'about:blank';
-    }, 2000);
+    }, 30000);  // ← Aumentei de 2000 para 3000ms
+    
   } catch (err) {
     console.error('Erro ao registar limpeza:', err);
     state.errorMsg = 'Erro ao registar limpeza. Tenta novamente.';
@@ -382,23 +391,6 @@
     render();
   }
 }
-    function goToLocation() {
-      state.step = 'location';
-      render();
-    }
-
-    function reset() {
-      state = {
-        step: 'pin',
-        condominioId: state.condominioId,
-        pin: '',
-        location: null,
-        loading: false,
-        errorMsg: '',
-        successMsg: ''
-      };
-      render();
-    }
 
     init();
   </script>
