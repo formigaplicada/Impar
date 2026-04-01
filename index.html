@@ -349,42 +349,47 @@
       );
     }
 
- async function handleSubmitLimpeza() {
+// No render() dentro do step 'pin', altere o input para:
+// <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" ... />
+
+async function handleSubmitLimpeza() {
   state.loading = true;
   render();
+
+  const data = {
+    condominio: state.condominioId,
+    pin: state.pin,
+    latitude: state.location.latitude,
+    longitude: state.location.longitude,
+    timestamp: new Date().toISOString(),
+    accuracy: state.location.accuracy
+  };
+
   try {
-    const data = {
-      action: 'registarLimpeza',
-      condominio: state.condominioId,
-      pin: state.pin,
-      latitude: state.location.latitude,
-      longitude: state.location.longitude,
-      timestamp: new Date().toISOString(),
-      accuracy: state.location.accuracy
-    };
-    console.log('Registando limpeza:', data);
-    
-    // AGUARDA o fetch terminar ANTES de fazer nada
-await fetch(WEBHOOK_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(data)
-});
-    
-    // SÓ DEPOIS de o fetch terminar com sucesso
-    console.log('Fetch completado com sucesso!');
-    
+    // Usando URLSearchParams para evitar problemas de pre-flight CORS no Google Apps Script
+    const formData = new FormData();
+    for (const key in data) {
+      formData.append(key, data[key]);
+    }
+
+    await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      body: formData, // Enviar como FormData é mais aceite pelo Google Apps Script
+      mode: 'no-cors' // Evita erros de CORS
+    });
+
+    // Como o 'no-cors' não permite ler a resposta, assumimos sucesso se não houver erro de rede
     state.successMsg = `Limpeza registada com sucesso!\nCondomínio: ${state.condominioId}`;
     state.step = 'success';
     
-    // Aumentar o tempo de espera antes de redirecionar (dar tempo ao servidor)
     setTimeout(() => {
-      window.location.href = 'about:blank';
-    }, 30000);  // ← Aumentei de 2000 para 3000ms
-    
+      // Em vez de about:blank, talvez redirecionar para o site da Ímpar?
+      window.location.href = 'https://impar.pt'; 
+    }, 5000);
+
   } catch (err) {
-    console.error('Erro ao registar limpeza:', err);
-    state.errorMsg = 'Erro ao registar limpeza. Tenta novamente.';
+    console.error('Erro:', err);
+    state.errorMsg = 'Erro de ligação. Verifique a internet.';
     state.step = 'error';
   } finally {
     state.loading = false;
