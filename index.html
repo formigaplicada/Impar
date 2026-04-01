@@ -349,18 +349,16 @@
       );
     }
 
-   async function handleSubmitLimpeza() {
+ async function handleSubmitLimpeza() {
   state.loading = true;
   render();
   try {
-    const mapsLink = `https://www.google.com/maps/?q=${state.location.latitude},${state.location.longitude}`;
     const data = {
       action: 'registarLimpeza',
       condominio: state.condominioId,
       pin: state.pin,
       latitude: state.location.latitude,
       longitude: state.location.longitude,
-      mapsLink: mapsLink,
       timestamp: new Date().toISOString(),
       accuracy: state.location.accuracy
     };
