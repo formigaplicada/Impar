@@ -422,7 +422,7 @@
       render();
     }
 
-   async function handleSubmitLimpeza() {
+async function handleSubmitLimpeza() {
   state.loading = true;
   render();
 
@@ -433,22 +433,27 @@
     longitude: state.location.longitude,
     accuracy: state.location.accuracy,
     timestamp: new Date().toLocaleString('pt-PT'),
-    photoBase64: state.photoBase64 // Envia a string completa
+    photoBase64: state.photoBase64 // A string comprimida
   };
 
   try {
     await fetch(WEBHOOK_URL, {
       method: 'POST',
-      mode: 'no-cors', // Mantém no-cors para evitar problemas de pre-flight
-      headers: { 'Content-Type': 'text/plain' }, // Truque: usar text/plain evita o erro de CORS em POSTs JSON
+      mode: 'no-cors', // Importante para não dar erro de CORS
+      headers: { 
+        'Content-Type': 'text/plain' // O segredo para o Google aceitar o JSON no body
+      },
       body: JSON.stringify(dados)
     });
 
+    // Como usamos no-cors, não conseguimos ler a resposta 'Sucesso'
+    // mas o fetch não dará erro se chegar ao servidor.
     state.successMsg = `Limpeza registada!\nCondomínio: ${state.condominioId}`;
     state.step = 'success';
     render();
   } catch (err) {
-    state.errorMsg = 'Erro ao enviar dados.';
+    console.error(err);
+    state.errorMsg = 'Erro na ligação ao servidor.';
     state.step = 'error';
     render();
   }
