@@ -426,34 +426,32 @@ async function handleSubmitLimpeza() {
   state.loading = true;
   render();
 
-  const dados = {
-    action: 'registarLimpeza',
-    condominio: state.condominioId,
-    latitude: state.location.latitude,
-    longitude: state.location.longitude,
-    accuracy: state.location.accuracy,
-    timestamp: new Date().toLocaleString('pt-PT'),
-    photoBase64: state.photoBase64 // A string comprimida
-  };
+  // Criar FormData para garantir que o Apps Script receba via e.parameter
+  const formData = new URLSearchParams();
+  formData.append('condominio', state.condominioId);
+  formData.append('latitude', state.location.latitude);
+  formData.append('longitude', state.location.longitude);
+  formData.append('accuracy', state.location.accuracy);
+  formData.append('timestamp', new Date().toLocaleString('pt-PT'));
+  
+  if (state.photoBase64) {
+    formData.append('photoBase64', state.photoBase64);
+  }
 
   try {
     await fetch(WEBHOOK_URL, {
       method: 'POST',
-      mode: 'no-cors', // Importante para não dar erro de CORS
-      headers: { 
-        'Content-Type': 'text/plain' // O segredo para o Google aceitar o JSON no body
-      },
-      body: JSON.stringify(dados)
+      mode: 'no-cors', 
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString()
     });
 
-    // Como usamos no-cors, não conseguimos ler a resposta 'Sucesso'
-    // mas o fetch não dará erro se chegar ao servidor.
+    // Se chegou aqui sem crashar o fetch, assumimos sucesso no no-cors
     state.successMsg = `Limpeza registada!\nCondomínio: ${state.condominioId}`;
     state.step = 'success';
     render();
   } catch (err) {
-    console.error(err);
-    state.errorMsg = 'Erro na ligação ao servidor.';
+    state.errorMsg = 'Erro de rede. Verifique a ligação.';
     state.step = 'error';
     render();
   }
