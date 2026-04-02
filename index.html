@@ -422,38 +422,37 @@
       render();
     }
 
-    async function handleSubmitLimpeza() {
-      state.loading = true;
-      render();
+   async function handleSubmitLimpeza() {
+  state.loading = true;
+  render();
 
-      const params = new URLSearchParams();
-      params.append('action', 'registarLimpeza');
-      params.append('condominio', state.condominioId);
-      params.append('latitude', state.location.latitude);
-      params.append('longitude', state.location.longitude);
-      params.append('accuracy', state.location.accuracy);
-      params.append('timestamp', new Date().toLocaleString('pt-PT'));
-      if (state.photoBase64) {
-        params.append('photoBase64', state.photoBase64);
-      }
+  const dados = {
+    action: 'registarLimpeza',
+    condominio: state.condominioId,
+    latitude: state.location.latitude,
+    longitude: state.location.longitude,
+    accuracy: state.location.accuracy,
+    timestamp: new Date().toLocaleString('pt-PT'),
+    photoBase64: state.photoBase64 // Envia a string completa
+  };
 
-      try {
-        await fetch(WEBHOOK_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: params.toString()
-        });
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors', // Mantém no-cors para evitar problemas de pre-flight
+      headers: { 'Content-Type': 'text/plain' }, // Truque: usar text/plain evita o erro de CORS em POSTs JSON
+      body: JSON.stringify(dados)
+    });
 
-        state.successMsg = `Limpeza registada!\nCondomínio: ${state.condominioId}`;
-        state.step = 'success';
-        render();
-      } catch (err) {
-        state.errorMsg = 'Erro ao enviar dados.';
-        state.step = 'error';
-        render();
-      }
-    }
+    state.successMsg = `Limpeza registada!\nCondomínio: ${state.condominioId}`;
+    state.step = 'success';
+    render();
+  } catch (err) {
+    state.errorMsg = 'Erro ao enviar dados.';
+    state.step = 'error';
+    render();
+  }
+}
 
     init();
   </script>
