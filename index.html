@@ -426,33 +426,32 @@ async function handleSubmitLimpeza() {
   state.loading = true;
   render();
 
-  // Vamos usar URLSearchParams para garantir compatibilidade total
-  const params = new URLSearchParams();
-  params.append('condominio', state.condominioId);
-  params.append('latitude', state.location.latitude);
-  params.append('longitude', state.location.longitude);
-  params.append('accuracy', state.location.accuracy);
-  params.append('timestamp', new Date().toLocaleString('pt-PT'));
-  params.append('photoBase64', state.photoBase64 || "");
+  // Usar FormData é o padrão mais estável para ficheiros/binários
+  const formData = new FormData();
+  formData.append('condominio', state.condominioId);
+  formData.append('latitude', state.location.latitude);
+  formData.append('longitude', state.location.longitude);
+  formData.append('accuracy', state.location.accuracy);
+  formData.append('timestamp', new Date().toLocaleString('pt-PT'));
+  formData.append('photoBase64', state.photoBase64);
 
   try {
+    // IMPORTANTE: Ao usar FormData com no-cors, não definimos o Header Content-Type manualmente
     await fetch(WEBHOOK_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
+      body: formData
     });
 
     state.successMsg = `Limpeza registada com sucesso!`;
     state.step = 'success';
     render();
   } catch (err) {
-    state.errorMsg = 'Erro ao comunicar com o servidor.';
+    state.errorMsg = 'Erro na submissão.';
     state.step = 'error';
     render();
   }
 }
-
     init();
   </script>
 </body>
