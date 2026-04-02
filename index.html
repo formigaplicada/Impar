@@ -76,7 +76,6 @@
     .info-row { display: flex; justify-content: space-between; }
     .info-label { color: var(--slate-600); }
     .info-value { font-weight: 600; color: var(--slate-900); }
-    .info-mono { font-family: 'Courier New', monospace; font-size: 0.8rem; }
     .button-group { display: flex; flex-direction: column; gap: 0.75rem; }
     button {
       padding: 0.75rem 1rem;
@@ -102,6 +101,7 @@
     footer { background-color: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
     .hidden { display: none; }
     .photo-preview { width: 100%; max-height: 200px; border-radius: 0.5rem; margin-top: 0.5rem; object-fit: cover; }
+    .photo-size { font-size: 0.7rem; color: var(--slate-500); margin-top: 0.25rem; }
   </style>
 </head>
 <body>
@@ -114,7 +114,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 1rem;">
           <span class="header-title">Check-in Limpeza</span>
-          <span class="version-badge">v2.1</span>
+          <span class="version-badge">v2.2</span>
         </div>
       </div>
     </header>
@@ -145,37 +145,75 @@
       pin: '',
       location: null,
       photoBase64: null,
+      photoSize: 0,
       loading: false,
       errorMsg: '',
       successMsg: ''
     };
 
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwMDRuLzYKC5BVa_ECGP_voiaAc3snxDV3RIenqE4r8zAc3_ozYh79m6DdYBKLvnTXh/exec';
+    const MAX_PHOTO_SIZE = 1024 * 1024; // 1MB
 
     function generateCorrectPin(condominioId) {
       const reversed = condominioId.split('').reverse().join('');
       return '9' + reversed;
     }
 
+    // Função para comprimir imagem
+    function compressImage(base64Image, callback) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Redimensiona se muito grande
+        const maxWidth = 1920;
+        const maxHeight = 1440;
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = width * ratio;
+          height = height * ratio;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Tenta diferentes níveis de qualidade até ficar < 1MB
+        let quality = 0.8;
+        let compressed = canvas.toDataURL('image/jpeg', quality);
+        
+        while (compressed.length > MAX_PHOTO_SIZE && quality > 0.1) {
+          quality -= 0.1;
+          compressed = canvas.toDataURL('image/jpeg', quality);
+        }
+        
+        console.log('Foto comprimida: ' + Math.round(compressed.length / 1024) + 'KB (qualidade: ' + Math.round(quality * 100) + '%)');
+        callback(compressed, compressed.length);
+      };
+      img.src = base64Image;
+    }
+
     function init() {
-  const params = new URLSearchParams(window.location.search);
-  let cond = params.get('condominio');
-  
-  // Se não vem na URL, tenta recuperar do localStorage
-  if (!cond) {
-    cond = localStorage.getItem('condominioId');
-  }
-  
-  if (cond) {
-    state.condominioId = cond;
-    localStorage.setItem('condominioId', cond); // Guarda para depois
-    state.step = 'pin';
-  } else {
-    state.step = 'error';
-    state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
-  }
-  render();
-}
+      const params = new URLSearchParams(window.location.search);
+      let cond = params.get('condominio');
+      
+      if (!cond) {
+        cond = localStorage.getItem('condominioId');
+      }
+      
+      if (cond) {
+        state.condominioId = cond;
+        localStorage.setItem('condominioId', cond);
+        state.step = 'pin';
+      } else {
+        state.step = 'error';
+        state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
+      }
+      render();
+    }
 
     function render() {
       const app = document.getElementById('app');
@@ -234,7 +272,10 @@
             </div>
             <div class="form-group">
               <input id="photoInput" type="file" accept="image/*" capture="environment"/>
-              ${state.photoBase64 ? `<img src="${state.photoBase64}" alt="Foto capturada" class="photo-preview"/>` : ''}
+              ${state.photoBase64 ? `
+                <img src="${state.photoBase64}" alt="Foto capturada" class="photo-preview"/>
+                <p class="photo-size">Tamanho: ${Math.round(state.photoSize / 1024)}KB</p>
+              ` : ''}
               <p class="helper-text">Clique para tirar uma foto ou selecione uma do galeria</p>
             </div>
             <div class="button-group">
@@ -253,8 +294,13 @@
               if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => {
-                  state.photoBase64 = event.target.result;
-                  render();
+                  console.log('Foto original: ' + Math.round(file.size / 1024) + 'KB');
+                  // Comprime a imagem
+                  compressImage(event.target.result, (compressed, size) => {
+                    state.photoBase64 = compressed;
+                    state.photoSize = size;
+                    render();
+                  });
                 };
                 reader.readAsDataURL(file);
               }
@@ -274,7 +320,7 @@
               <div class="info-row"><span class="info-label">Condomínio:</span><span class="info-value">${state.condominioId}</span></div>
               <div class="info-row"><span class="info-label">Precisão:</span><span class="info-value">${Math.round(state.location.accuracy)}m</span></div>
               <div class="info-row"><span class="info-label">Hora:</span><span class="info-value">${new Date().toLocaleTimeString('pt-PT')}</span></div>
-              <div class="info-row"><span class="info-label">Foto:</span><span class="info-value">${state.photoBase64 ? '✓ Sim' : '✗ Não'}</span></div>
+              <div class="info-row"><span class="info-label">Foto:</span><span class="info-value">${state.photoBase64 ? '✓ Sim (' + Math.round(state.photoSize / 1024) + 'KB)' : '✗ Não'}</span></div>
             </div>
             <div class="button-group">
               <button onclick="handleSubmitLimpeza()" class="btn-confirm" ${state.loading ? 'disabled' : ''}>
@@ -362,18 +408,19 @@
     }
 
     function reset() {
-  state = {
-    step: 'pin',
-    condominioId: state.condominioId,  // ← MANTÉM o condominio!
-    pin: '',
-    location: null,
-    photoBase64: null,
-    loading: false,
-    errorMsg: '',
-    successMsg: ''
-  };
-  render();
-}
+      state = {
+        step: 'pin',
+        condominioId: state.condominioId,
+        pin: '',
+        location: null,
+        photoBase64: null,
+        photoSize: 0,
+        loading: false,
+        errorMsg: '',
+        successMsg: ''
+      };
+      render();
+    }
 
     async function handleSubmitLimpeza() {
       state.loading = true;
