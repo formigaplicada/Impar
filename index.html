@@ -158,17 +158,24 @@
     }
 
     function init() {
-      const params = new URLSearchParams(window.location.search);
-      const cond = params.get('condominio');
-      if (cond) {
-        state.condominioId = cond;
-        state.step = 'pin';
-      } else {
-        state.step = 'error';
-        state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
-      }
-      render();
-    }
+  const params = new URLSearchParams(window.location.search);
+  let cond = params.get('condominio');
+  
+  // Se não vem na URL, tenta recuperar do localStorage
+  if (!cond) {
+    cond = localStorage.getItem('condominioId');
+  }
+  
+  if (cond) {
+    state.condominioId = cond;
+    localStorage.setItem('condominioId', cond); // Guarda para depois
+    state.step = 'pin';
+  } else {
+    state.step = 'error';
+    state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
+  }
+  render();
+}
 
     function render() {
       const app = document.getElementById('app');
@@ -355,18 +362,18 @@
     }
 
     function reset() {
-      state = {
-        step: 'pin',
-        condominioId: state.condominioId,
-        pin: '',
-        location: null,
-        photoBase64: null,
-        loading: false,
-        errorMsg: '',
-        successMsg: ''
-      };
-      render();
-    }
+  state = {
+    step: 'pin',
+    condominioId: state.condominioId,  // ← MANTÉM o condominio!
+    pin: '',
+    location: null,
+    photoBase64: null,
+    loading: false,
+    errorMsg: '',
+    successMsg: ''
+  };
+  render();
+}
 
     async function handleSubmitLimpeza() {
       state.loading = true;
