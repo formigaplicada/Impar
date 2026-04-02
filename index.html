@@ -14,7 +14,7 @@
       --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
       --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
       --slate-600: #475569; --slate-800: #1e293b; --slate-900: #0f172a;
-      --red-600: #dc2626; --green-500: #22c55e;
+      --red-600: #dc2626;
     }
     html, body { height: 100%; width: 100%; }
     body {
@@ -55,11 +55,12 @@
     .card-icon.blue { background-color: var(--blue-100); }
     .card-icon.green { background-color: var(--green-100); }
     .card-icon.amber { background-color: var(--amber-100); }
+    .card-icon.purple { background-color: #f3e8ff; }
     .card-title { font-size: 1.5rem; font-weight: 700; color: var(--slate-900); }
     .card-subtitle { font-size: 0.875rem; color: var(--slate-600); }
     .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
     label { font-size: 0.875rem; font-weight: 500; color: var(--slate-700); }
-    input[type="password"], input[type="text"] {
+    input[type="password"], input[type="text"], input[type="file"] {
       padding: 0.75rem 1rem;
       font-size: 1rem;
       border: 2px solid var(--slate-300);
@@ -67,7 +68,7 @@
       font-family: 'Inter', sans-serif;
       transition: border-color 0.2s;
     }
-    input[type="password"]:focus, input[type="text"]:focus { outline: none; border-color: var(--blue-600); }
+    input[type="password"]:focus, input[type="text"]:focus, input[type="file"]:focus { outline: none; border-color: var(--blue-600); }
     input[type="password"] { text-align: center; font-size: 1.5rem; letter-spacing: 0.3em; }
     input::placeholder { color: var(--slate-400); }
     .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.5rem; font-weight: 500; }
@@ -95,11 +96,12 @@
     .btn-confirm:hover:not(:disabled) { background-color: var(--emerald-700); }
     .btn-secondary { background-color: var(--slate-300); color: var(--slate-900); }
     .btn-secondary:hover:not(:disabled) { background-color: var(--slate-400); }
+    .btn-primary { background-color: var(--blue-600); color: white; }
+    .btn-primary:hover:not(:disabled) { background-color: var(--blue-700); }
     .helper-text { font-size: 0.75rem; color: var(--slate-500); text-align: center; }
     footer { background-color: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
     .hidden { display: none; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    @media (max-width: 640px) { main { padding: 1rem; } .card { padding: 1.5rem; } header { padding: 0.75rem 1rem; } .card-title { font-size: 1.25rem; } }
+    .photo-preview { width: 100%; max-height: 200px; border-radius: 0.5rem; margin-top: 0.5rem; object-fit: cover; }
   </style>
 </head>
 <body>
@@ -112,7 +114,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 1rem;">
           <span class="header-title">Check-in Limpeza</span>
-          <span class="version-badge">v2.0</span>
+          <span class="version-badge">v2.1</span>
         </div>
       </div>
     </header>
@@ -131,7 +133,7 @@
     </footer>
   </div>
 
- <script>
+  <script>
     function showLogoFallback() {
       document.getElementById('logo').classList.add('hidden');
       document.getElementById('logoFallback').classList.remove('hidden');
@@ -142,29 +144,17 @@
       condominioId: '',
       pin: '',
       location: null,
+      photoBase64: null,
       loading: false,
       errorMsg: '',
       successMsg: ''
     };
 
-    // VERIFIQUE SE ESTE URL É O DA "NOVA IMPLEMENTAÇÃO"
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwMDRuLzYKC5BVa_ECGP_voiaAc3snxDV3RIenqE4r8zAc3_ozYh79m6DdYBKLvnTXh/exec';
 
     function generateCorrectPin(condominioId) {
       const reversed = condominioId.split('').reverse().join('');
       return '9' + reversed;
-    }
-
-    function reset() {
-      state.pin = '';
-      state.step = 'pin';
-      state.errorMsg = '';
-      render();
-    }
-
-    function goToLocation() {
-      state.step = 'location';
-      render();
     }
 
     function init() {
@@ -193,7 +183,7 @@
             </div>
             <div class="form-group">
               <label for="pin">PIN de 4 dígitos</label>
-              <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" autocomplete="off"/>
+              <input id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off"/>
               <p class="helper-text">O acesso será validado automaticamente ao introduzir 4 dígitos</p>
               ${state.errorMsg ? `<div class="error-message">❌ ${state.errorMsg}</div>` : ''}
             </div>
@@ -227,6 +217,45 @@
         `;
       }
 
+      else if (state.step === 'photo') {
+        app.innerHTML = `
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon purple">📸</div>
+              <h1 class="card-title">Capturar Foto</h1>
+              <p class="card-subtitle">Tire uma foto do local da limpeza</p>
+            </div>
+            <div class="form-group">
+              <input id="photoInput" type="file" accept="image/*" capture="environment"/>
+              ${state.photoBase64 ? `<img src="${state.photoBase64}" alt="Foto capturada" class="photo-preview"/>` : ''}
+              <p class="helper-text">Clique para tirar uma foto ou selecione uma do galeria</p>
+            </div>
+            <div class="button-group">
+              <button onclick="handlePhotoContinue()" class="btn-confirm" ${!state.photoBase64 || state.loading ? 'disabled' : ''}>
+                ${state.loading ? '⏳ A processar...' : '✓ Continuar'}
+              </button>
+              <button onclick="goToLocation()" class="btn-secondary">← Voltar</button>
+            </div>
+          </div>
+        `;
+        setTimeout(() => {
+          const photoInput = document.getElementById('photoInput');
+          if (photoInput) {
+            photoInput.addEventListener('change', (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  state.photoBase64 = event.target.result;
+                  render();
+                };
+                reader.readAsDataURL(file);
+              }
+            });
+          }
+        }, 0);
+      }
+
       else if (state.step === 'confirm' && state.location) {
         app.innerHTML = `
           <div class="card">
@@ -238,12 +267,13 @@
               <div class="info-row"><span class="info-label">Condomínio:</span><span class="info-value">${state.condominioId}</span></div>
               <div class="info-row"><span class="info-label">Precisão:</span><span class="info-value">${Math.round(state.location.accuracy)}m</span></div>
               <div class="info-row"><span class="info-label">Hora:</span><span class="info-value">${new Date().toLocaleTimeString('pt-PT')}</span></div>
+              <div class="info-row"><span class="info-label">Foto:</span><span class="info-value">${state.photoBase64 ? '✓ Sim' : '✗ Não'}</span></div>
             </div>
             <div class="button-group">
               <button onclick="handleSubmitLimpeza()" class="btn-confirm" ${state.loading ? 'disabled' : ''}>
                 ${state.loading ? '⏳ A registar...' : '✓ Registar Limpeza'}
               </button>
-              <button onclick="goToLocation()" class="btn-secondary" ${state.loading ? 'disabled' : ''}>← Voltar</button>
+              <button onclick="goToPhoto()" class="btn-secondary">← Voltar</button>
             </div>
           </div>
         `;
@@ -251,13 +281,27 @@
 
       else if (state.step === 'success') {
         app.innerHTML = `
-          <div class="card"><div class="card-header"><div style="font-size: 2rem;">✅</div><h1 class="card-title">Sucesso!</h1><p class="card-subtitle">${state.successMsg}</p></div></div>
+          <div class="card">
+            <div class="card-header">
+              <div style="font-size: 2rem;">✅</div>
+              <h1 class="card-title">Sucesso!</h1>
+              <p class="card-subtitle">${state.successMsg}</p>
+            </div>
+          </div>
         `;
+        setTimeout(() => { window.location.href = 'https://impar.pt'; }, 4000);
       }
 
       else if (state.step === 'error') {
         app.innerHTML = `
-          <div class="card"><div class="card-header"><div style="font-size: 2rem;">⚠️</div><h1 class="card-title">Erro</h1><p class="card-subtitle">${state.errorMsg}</p></div><button onclick="reset()" class="btn-success">Tentar Novamente</button></div>
+          <div class="card">
+            <div class="card-header">
+              <div style="font-size: 2rem;">⚠️</div>
+              <h1 class="card-title">Erro</h1>
+              <p class="card-subtitle">${state.errorMsg}</p>
+            </div>
+            <button onclick="reset()" class="btn-primary">Tentar Novamente</button>
+          </div>
         `;
       }
     }
@@ -265,6 +309,7 @@
     function handlePinSubmit() {
       if (state.pin === generateCorrectPin(state.condominioId)) {
         state.step = 'location';
+        state.errorMsg = '';
       } else {
         state.errorMsg = 'PIN inválido.';
         state.pin = '';
@@ -273,22 +318,60 @@
     }
 
     function handleLocationRequest() {
-      state.loading = true; render();
+      state.loading = true;
+      render();
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           state.location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
-          state.step = 'confirm'; state.loading = false; render();
+          state.step = 'photo';
+          state.loading = false;
+          render();
         },
-        (err) => { state.errorMsg = "Ative o GPS."; state.step = 'error'; state.loading = false; render(); },
+        (err) => {
+          state.errorMsg = "Ative o GPS.";
+          state.step = 'error';
+          state.loading = false;
+          render();
+        },
         { enableHighAccuracy: true }
       );
+    }
+
+    function handlePhotoContinue() {
+      if (state.photoBase64) {
+        state.step = 'confirm';
+        render();
+      }
+    }
+
+    function goToLocation() {
+      state.step = 'location';
+      render();
+    }
+
+    function goToPhoto() {
+      state.step = 'photo';
+      render();
+    }
+
+    function reset() {
+      state = {
+        step: 'pin',
+        condominioId: state.condominioId,
+        pin: '',
+        location: null,
+        photoBase64: null,
+        loading: false,
+        errorMsg: '',
+        successMsg: ''
+      };
+      render();
     }
 
     async function handleSubmitLimpeza() {
       state.loading = true;
       render();
 
-      // Mudança crucial: Usar URLSearchParams para compatibilidade total com o modo no-cors do Google
       const params = new URLSearchParams();
       params.append('action', 'registarLimpeza');
       params.append('condominio', state.condominioId);
@@ -296,20 +379,21 @@
       params.append('longitude', state.location.longitude);
       params.append('accuracy', state.location.accuracy);
       params.append('timestamp', new Date().toLocaleString('pt-PT'));
+      if (state.photoBase64) {
+        params.append('photoBase64', state.photoBase64);
+      }
 
       try {
         await fetch(WEBHOOK_URL, {
           method: 'POST',
-          mode: 'no-cors', 
+          mode: 'no-cors',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: params.toString()
         });
 
-        // Com no-cors o fetch não "rebenta" se o Google não responder JSON, ele apenas segue.
         state.successMsg = `Limpeza registada!\nCondomínio: ${state.condominioId}`;
         state.step = 'success';
         render();
-        setTimeout(() => { window.location.href = 'https://impar.pt'; }, 4000);
       } catch (err) {
         state.errorMsg = 'Erro ao enviar dados.';
         state.step = 'error';
@@ -318,6 +402,6 @@
     }
 
     init();
-</script>
+  </script>
 </body>
 </html>
