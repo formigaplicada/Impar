@@ -2,7 +2,11 @@
   command = "echo 'No build needed for static site'"
   publish = "."
 
-# Redirect all URLs to index.html (para SPA routing)
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
