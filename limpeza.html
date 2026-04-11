@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-in Limpeza - Ímpar</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --blue-600: #2563eb; --blue-700: #1d4ed8; --blue-100: #dbeafe;
+      --green-600: #16a34a; --green-700: #15803d; --green-100: #dcfce7;
+      --emerald-600: #059669; --emerald-700: #047857; --amber-100: #fef3c7;
+      --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
+      --slate-600: #475569; --slate-800: #1e293b; --slate-900: #0f172a;
+      --red-600: #dc2626;
+    }
+    html, body { height: 100%; width: 100%; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(to bottom right, var(--slate-50), var(--slate-100));
+      color: var(--slate-900); font-size: 16px; line-height: 1.5;
+    }
+    .container { display: flex; flex-direction: column; min-height: 100vh; }
+    header {
+      background: #64748b; padding: 0.875rem 1.5rem;
+    }
+    .header-content { max-width: 56rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .logo-img { height: 2.5rem; object-fit: contain; }
+    .logo-fallback { font-size: 1.125rem; font-weight: 700; color: white; }
+    .header-title { font-size: 0.875rem; color: var(--slate-500); }
+    .version-badge { background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; }
+    main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
+    .card-wrapper { width: 100%; max-width: 28rem; }
+    .card {
+      background-color: white; border-radius: 1rem;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem;
+      animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .card-header { text-align: center; display: flex; flex-direction: column; gap: 0.5rem; }
+    .card-icon { width: 3rem; height: 3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 1.5rem; }
+    .card-icon.blue { background-color: var(--blue-100); }
+    .card-icon.green { background-color: var(--green-100); }
+    .card-icon.amber { background-color: var(--amber-100); }
+    .card-icon.purple { background-color: #f3e8ff; }
+    .card-title { font-size: 1.5rem; font-weight: 700; color: var(--slate-900); }
+    .card-subtitle { font-size: 0.875rem; color: var(--slate-600); }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-size: 0.875rem; font-weight: 500; color: var(--slate-700); }
+    input[type="password"], input[type="text"], input[type="file"] {
+      padding: 0.75rem 1rem; font-size: 1rem; border: 2px solid var(--slate-300);
+      border-radius: 0.5rem; font-family: 'DM Sans', sans-serif; transition: border-color 0.2s;
+    }
+    input[type="password"]:focus, input[type="text"]:focus, input[type="file"]:focus { outline: none; border-color: var(--blue-600); }
+    input[type="password"] { text-align: center; font-size: 1.5rem; letter-spacing: 0.3em; }
+    input::placeholder { color: var(--slate-400); }
+    .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.5rem; font-weight: 500; }
+    .info-box { background-color: var(--slate-50); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; }
+    .info-row { display: flex; justify-content: space-between; }
+    .info-label { color: var(--slate-600); }
+    .info-value { font-weight: 600; color: var(--slate-900); }
+    .button-group { display: flex; flex-direction: column; gap: 0.75rem; }
+    button {
+      padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border: none;
+      border-radius: 0.5rem; cursor: pointer; transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif; width: 100%;
+    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-success { background-color: var(--green-600); color: white; }
+    .btn-success:hover:not(:disabled) { background-color: var(--green-700); }
+    .btn-confirm { background-color: var(--emerald-600); color: white; }
+    .btn-confirm:hover:not(:disabled) { background-color: var(--emerald-700); }
+    .btn-secondary { background-color: var(--slate-300); color: var(--slate-900); }
+    .btn-secondary:hover:not(:disabled) { background-color: var(--slate-400); }
+    .btn-primary { background-color: var(--blue-600); color: white; }
+    .btn-primary:hover:not(:disabled) { background-color: var(--blue-700); }
+    .helper-text { font-size: 0.75rem; color: var(--slate-500); text-align: center; }
+    footer { background-color: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
+    .hidden { display: none; }
+    .photo-preview { width: 100%; max-height: 200px; border-radius: 0.5rem; margin-top: 0.5rem; object-fit: cover; }
+    .photo-size { font-size: 0.7rem; color: var(--slate-500); margin-top: 0.25rem; }
+    .back-link { text-align: center; margin-top: 0.5rem; }
+    .back-link a { font-size: 0.78rem; color: var(--slate-400); text-decoration: none; }
+    .back-link a:hover { color: var(--slate-600); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-content">
+        <div style="display:flex; align-items:center; gap:0.5rem;">
+          <img src="https://www.impar.pt/wp-content/uploads/2025/01/logo-impar-2048x807.png" alt="Ímpar" class="logo-img" id="logo" onerror="showLogoFallback()"/>
+          <span class="logo-fallback hidden" id="logoFallback">ÍMPAR</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:1rem;">
+          <span class="header-title">Check-in Limpeza</span>
+          <span class="version-badge">v2.3</span>
+        </div>
+      </div>
+    </header>
+    <main>
+      <div class="card-wrapper" id="app">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon blue">⏳</div>
+            <h1 class="card-title">Carregando...</h1>
+          </div>
+        </div>
+      </div>
+    </main>
+    <footer><p>Sistema de Check-in de Limpezas © 2026</p></footer>
+  </div>
+
+  <script>
+    function showLogoFallback() {
+      document.getElementById('logo').classList.add('hidden');
+      document.getElementById('logoFallback').classList.remove('hidden');
+    }
+
+    let state = {
+      step: 'init', condominioId: '', pin: '', location: null,
+      photoBase64: null, photoSize: 0, loading: false, errorMsg: '', successMsg: ''
+    };
+
+    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwMDRuLzYKC5BVa_ECGP_voiaAc3snxDV3RIenqE4r8zAc3_ozYh79m6DdYBKLvnTXh/exec';
+    const WEBHOOK_EMAIL_URL = 'https://script.google.com/macros/s/AKfycbz1XqtmKDfI3O9mogrxCPneYbLZn5YKJ3yBUhGNVDSMUmsjnY0wAFKU5jF5hglhem3r/exec';
+    const MAX_PHOTO_SIZE = 1024 * 1024;
+
+    function generateCorrectPin(condominioId) {
+      const reversed = condominioId.split('').reverse().join('');
+      return '9' + reversed;
+    }
+
+    function compressImage(base64Image, callback) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let width = img.width, height = img.height;
+        const maxWidth = 1920, maxHeight = 1440;
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = width * ratio; height = height * ratio;
+        }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        let quality = 0.8;
+        let compressed = canvas.toDataURL('image/jpeg', quality);
+        while (compressed.length > MAX_PHOTO_SIZE && quality > 0.1) {
+          quality -= 0.1;
+          compressed = canvas.toDataURL('image/jpeg', quality);
+        }
+        callback(compressed, compressed.length);
+      };
+      img.src = base64Image;
+    }
+
+    function init() {
+      const params = new URLSearchParams(window.location.search);
+      let cond = params.get('condominio') || localStorage.getItem('condominioId');
+      if (cond) {
+        state.condominioId = cond;
+        localStorage.setItem('condominioId', cond);
+        state.step = 'pin';
+      } else {
+        state.step = 'error';
+        state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
+      }
+      render();
+    }
+
+    function backToIndex() {
+      const base = state.condominioId ? '?condominio=' + encodeURIComponent(state.condominioId) : '';
+      window.location.href = 'index.html' + base;
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+
+      if (state.step === 'pin') {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon blue">🔒</div>' +
+            '<h1 class="card-title">Validação de Acesso</h1>' +
+            '<p class="card-subtitle">Condomínio: <strong>' + state.condominioId + '</strong></p></div>' +
+            '<div class="form-group"><label for="pin">PIN de 4 dígitos</label>' +
+            '<input id="pin" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off"/>' +
+            '<p class="helper-text">O acesso será validado automaticamente ao introduzir 4 dígitos</p>' +
+            (state.errorMsg ? '<div class="error-message">❌ ' + state.errorMsg + '</div>' : '') +
+            '</div>' +
+            '<div class="back-link"><a href="#" onclick="backToIndex(); return false;">← Voltar ao início</a></div>' +
+          '</div>';
+        setTimeout(() => {
+          const pinInput = document.getElementById('pin');
+          if (pinInput) {
+            pinInput.addEventListener('input', (e) => {
+              state.pin = e.target.value.replace(/\D/g, '').slice(0, 4);
+              e.target.value = state.pin;
+              if (state.pin.length === 4) handlePinSubmit();
+            });
+            pinInput.focus();
+          }
+        }, 0);
+      }
+
+      else if (state.step === 'location') {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon green">📍</div>' +
+            '<h1 class="card-title">Localização</h1>' +
+            '<p class="card-subtitle">Permite o acesso ao GPS do telemóvel</p></div>' +
+            '<button onclick="handleLocationRequest()" class="btn-success"' + (state.loading ? ' disabled' : '') + '>' +
+            (state.loading ? '⏳ A obter localização...' : '📍 Obter Localização') + '</button>' +
+          '</div>';
+      }
+
+      else if (state.step === 'photo') {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon purple">📸</div>' +
+            '<h1 class="card-title">Capturar Foto</h1>' +
+            '<p class="card-subtitle">Tire uma foto do local da limpeza</p></div>' +
+            '<div class="form-group">' +
+            '<input id="photoInput" type="file" accept="image/*" capture="environment"/>' +
+            (state.photoBase64 ? '<img src="' + state.photoBase64 + '" alt="Foto capturada" class="photo-preview"/><p class="photo-size">Tamanho: ' + Math.round(state.photoSize / 1024) + 'KB</p>' : '') +
+            '<p class="helper-text">Clique para tirar uma foto ou selecione uma da galeria</p></div>' +
+            '<div class="button-group">' +
+            '<button onclick="handlePhotoContinue()" class="btn-confirm"' + (!state.photoBase64 || state.loading ? ' disabled' : '') + '>' +
+            (state.loading ? '⏳ A processar...' : '✓ Continuar') + '</button>' +
+            '<button onclick="goToLocation()" class="btn-secondary">← Voltar</button></div>' +
+          '</div>';
+        setTimeout(() => {
+          const photoInput = document.getElementById('photoInput');
+          if (photoInput) {
+            photoInput.addEventListener('change', (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  compressImage(event.target.result, (compressed, size) => {
+                    state.photoBase64 = compressed; state.photoSize = size; render();
+                  });
+                };
+                reader.readAsDataURL(file);
+              }
+            });
+          }
+        }, 0);
+      }
+
+      else if (state.step === 'confirm' && state.location) {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon amber">✓</div>' +
+            '<h1 class="card-title">Confirmar Registo</h1></div>' +
+            '<div class="info-box">' +
+            '<div class="info-row"><span class="info-label">Condomínio:</span><span class="info-value">' + state.condominioId + '</span></div>' +
+            '<div class="info-row"><span class="info-label">Precisão:</span><span class="info-value">' + Math.round(state.location.accuracy) + 'm</span></div>' +
+            '<div class="info-row"><span class="info-label">Hora:</span><span class="info-value">' + new Date().toLocaleTimeString('pt-PT') + '</span></div>' +
+            '<div class="info-row"><span class="info-label">Foto:</span><span class="info-value">' + (state.photoBase64 ? '✓ Sim (' + Math.round(state.photoSize / 1024) + 'KB)' : '✗ Não') + '</span></div>' +
+            '</div>' +
+            '<div class="button-group">' +
+            '<button onclick="handleSubmitLimpeza()" class="btn-confirm"' + (state.loading ? ' disabled' : '') + '>' +
+            (state.loading ? '⏳ A registar...' : '✓ Registar Limpeza') + '</button>' +
+            '<button onclick="goToPhoto()" class="btn-secondary">← Voltar</button></div>' +
+          '</div>';
+      }
+
+      else if (state.step === 'success') {
+        app.innerHTML =
+          '<div class="card"><div class="card-header">' +
+          '<div style="font-size:2rem;">✅</div>' +
+          '<h1 class="card-title">Sucesso!</h1>' +
+          '<p class="card-subtitle">' + state.successMsg + '</p></div></div>';
+        setTimeout(() => { window.location.href = 'https://impar.pt'; }, 4000);
+      }
+
+      else if (state.step === 'error') {
+        app.innerHTML =
+          '<div class="card"><div class="card-header">' +
+          '<div style="font-size:2rem;">⚠️</div>' +
+          '<h1 class="card-title">Erro</h1>' +
+          '<p class="card-subtitle">' + state.errorMsg + '</p></div>' +
+          '<button onclick="reset()" class="btn-primary">Tentar Novamente</button></div>';
+      }
+    }
+
+    function handlePinSubmit() {
+      if (state.pin === generateCorrectPin(state.condominioId)) {
+        state.step = 'location'; state.errorMsg = '';
+      } else {
+        state.errorMsg = 'PIN inválido.'; state.pin = '';
+      }
+      render();
+    }
+
+    function handleLocationRequest() {
+      state.loading = true; render();
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          state.location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          state.step = 'photo'; state.loading = false; render();
+        },
+        () => { state.errorMsg = 'Ative o GPS.'; state.step = 'error'; state.loading = false; render(); },
+        { enableHighAccuracy: true }
+      );
+    }
+
+    function handlePhotoContinue() { if (state.photoBase64) { state.step = 'confirm'; render(); } }
+    function goToLocation() { state.step = 'location'; render(); }
+    function goToPhoto() { state.step = 'photo'; render(); }
+
+    function reset() {
+      state = { step: 'pin', condominioId: state.condominioId, pin: '', location: null, photoBase64: null, photoSize: 0, loading: false, errorMsg: '', successMsg: '' };
+      render();
+    }
+
+    async function handleSubmitLimpeza() {
+      state.loading = true; render();
+      const timestamp = new Date().toLocaleString('pt-PT');
+      const formData = new FormData();
+      formData.append('condominio', state.condominioId);
+      formData.append('latitude', state.location.latitude);
+      formData.append('longitude', state.location.longitude);
+      formData.append('accuracy', state.location.accuracy);
+      formData.append('timestamp', timestamp);
+      formData.append('photoBase64', state.photoBase64);
+
+      const emailData = new FormData();
+      emailData.append('condominio', state.condominioId);
+      emailData.append('latitude', state.location.latitude);
+      emailData.append('longitude', state.location.longitude);
+      emailData.append('timestamp', timestamp);
+      emailData.append('temFoto', state.photoBase64 ? 'true' : 'false');
+
+      fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
+      fetch(WEBHOOK_EMAIL_URL, { method: 'POST', mode: 'no-cors', body: emailData });
+
+      state.successMsg = 'Limpeza registada com sucesso!';
+      state.step = 'success';
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
