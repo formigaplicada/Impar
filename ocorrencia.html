@@ -9,9 +9,10 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
       --amber: #d97706; --amber-700: #b45309; --amber-100: #fef3c7;
-      --blue-600: #2563eb; --blue-700: #1d4ed8;
-      --green-600: #16a34a; --green-700: #15803d; --green-100: #dcfce7;
+      --blue-600: #2563eb; --blue-700: #1d4ed8; --blue-100: #dbeafe;
+      --green-600: #16a34a; --green-100: #dcfce7;
       --emerald-600: #059669; --emerald-700: #047857;
+      --purple-100: #f3e8ff; --purple-600: #7c3aed;
       --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
       --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
       --slate-600: #475569; --slate-700: #334155; --slate-800: #1e293b; --slate-900: #0f172a;
@@ -20,7 +21,7 @@
     }
     html, body { height: 100%; width: 100%; }
     body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'DM Sans', -apple-system, sans-serif;
       background: linear-gradient(to bottom right, var(--slate-50), var(--slate-100));
       color: var(--slate-900); font-size: 16px; line-height: 1.5;
     }
@@ -46,8 +47,8 @@
     .card-icon { width: 3rem; height: 3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 1.5rem; }
     .card-icon.amber { background: var(--amber-100); }
     .card-icon.green { background: var(--green-100); }
-    .card-icon.purple { background: #f3e8ff; }
-    .card-icon.blue { background: #dbeafe; }
+    .card-icon.purple { background: var(--purple-100); }
+    .card-icon.blue { background: var(--blue-100); }
     .card-title { font-size: 1.5rem; font-weight: 700; color: var(--slate-900); }
     .card-subtitle { font-size: 0.875rem; color: var(--slate-600); }
     .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -60,10 +61,6 @@
     textarea { resize: vertical; min-height: 100px; }
     input::placeholder, textarea::placeholder { color: var(--slate-400); }
     .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.25rem; font-weight: 500; }
-    .info-box { background: var(--slate-50); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; }
-    .info-row { display: flex; justify-content: space-between; gap: 1rem; }
-    .info-label { color: var(--slate-600); flex-shrink: 0; }
-    .info-value { font-weight: 600; color: var(--slate-900); text-align: right; word-break: break-word; }
     .button-group { display: flex; flex-direction: column; gap: 0.75rem; }
     button {
       padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border: none;
@@ -82,15 +79,42 @@
     .helper-text { font-size: 0.75rem; color: var(--slate-500); text-align: center; }
     .skip-link { text-align: center; margin-top: -0.5rem; }
     .skip-link a { font-size: 0.8rem; color: var(--slate-400); text-decoration: underline; cursor: pointer; }
-    .skip-link a:hover { color: var(--slate-600); }
     .back-link { text-align: center; }
     .back-link a { font-size: 0.78rem; color: var(--slate-400); text-decoration: none; cursor: pointer; }
-    .back-link a:hover { color: var(--slate-600); }
     .photo-preview { width: 100%; max-height: 200px; border-radius: 0.5rem; margin-top: 0.5rem; object-fit: cover; }
     .ai-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; font-weight: 600; background: #ede9fe; color: #6d28d9; padding: 3px 8px; border-radius: 4px; margin-bottom: 0.5rem; }
-    .ai-loading { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--slate-500); padding: 0.75rem 0; }
     .spinner { width: 18px; height: 18px; border: 2px solid var(--slate-200); border-top-color: var(--blue-600); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-row { display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.875rem; color: var(--slate-500); padding: 0.75rem 0; }
+
+    /* Categorias */
+    .categorias-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .categoria-btn {
+      background: var(--slate-50); border: 2px solid var(--slate-200);
+      border-radius: 0.75rem; padding: 0.75rem 0.5rem;
+      display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+      cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+      width: 100%;
+    }
+    .categoria-btn:hover { border-color: var(--amber); background: var(--amber-100); }
+    .categoria-btn.selected { border-color: var(--amber); background: var(--amber-100); }
+    .categoria-btn.ai-sugerida { border-color: var(--purple-600); background: var(--purple-100); }
+    .categoria-btn.ai-sugerida.selected { border-color: var(--purple-600); background: var(--purple-100); }
+    .categoria-emoji { font-size: 1.5rem; }
+    .categoria-nome { font-size: 0.72rem; font-weight: 500; color: var(--slate-700); text-align: center; line-height: 1.2; }
+    .ai-sugestao-label { font-size: 0.65rem; color: var(--purple-600); font-weight: 600; }
+    .categoria-outra { grid-column: 1 / -1; }
+
+    /* Confirmação */
+    .confirm-box { background: var(--slate-50); border-radius: 0.75rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    .confirm-id { text-align: center; background: var(--amber-100); border-radius: 0.5rem; padding: 0.75rem; }
+    .confirm-id-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--amber-700); }
+    .confirm-id-value { font-size: 1.1rem; font-weight: 700; color: var(--slate-800); margin-top: 0.2rem; }
+    .confirm-row { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.875rem; }
+    .confirm-label { color: var(--slate-600); flex-shrink: 0; }
+    .confirm-value { font-weight: 600; color: var(--slate-900); text-align: right; word-break: break-word; }
+    .confirm-descricao { background: white; border: 1px solid var(--slate-200); border-radius: 0.5rem; padding: 0.75rem; font-size: 0.875rem; color: var(--slate-700); text-align: center; line-height: 1.5; }
+
     footer { background: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
   </style>
 </head>
@@ -103,7 +127,7 @@
       <span class="logo-fallback" id="logoFallback">ÍMPAR</span>
       <div style="display:flex; align-items:center; gap:0.75rem;">
         <span style="font-size:0.875rem; color:rgba(255,255,255,0.8);">Reportar Ocorrência</span>
-        <span class="version-badge">v1.0</span>
+        <span class="version-badge">v2.0</span>
       </div>
     </header>
     <main>
@@ -120,25 +144,48 @@
   </div>
 
   <script>
+    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzhnxJ7ZSpwa4dkYWcYJeEhINVAjJK2BvIwWlU5xjgt2d8B0eaFPfJB3khVg7axSdsd/exec';
+    const MAX_PHOTO_SIZE = 1024 * 1024;
+
     let state = {
       step: 'init',
       condominioId: '',
       location: null,
       photoBase64: null,
       photoSize: 0,
+      categorias: [],
+      categoriaAI: '',
+      categoriaSelected: '',
+      categoriaOutra: '',
       descricaoAI: '',
       descricaoFinal: '',
       nome: '',
       telefone: '',
       email: '',
+      ocId: '',
       loading: false,
       errorMsg: '',
       errors: {}
     };
 
-    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzhnxJ7ZSpwa4dkYWcYJeEhINVAjJK2BvIwWlU5xjgt2d8B0eaFPfJB3khVg7axSdsd/exec';
-    const WEBHOOK_EMAIL_URL = 'https://script.google.com/macros/s/AKfycbzhnxJ7ZSpwa4dkYWcYJeEhINVAjJK2BvIwWlU5xjgt2d8B0eaFPfJB3khVg7axSdsd/exec';
-    const MAX_PHOTO_SIZE = 1024 * 1024;
+    function cleanAIText(text) {
+      return text
+        .replace(/#{1,6}\s*/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/\r\n/g, ' ')
+        .replace(/\n/g, ' ')
+        .trim();
+    }
+
+    function gerarIdLocal(condominioId) {
+      var now = new Date();
+      var data = now.getFullYear().toString() +
+        String(now.getMonth()+1).padStart(2,'0') +
+        String(now.getDate()).padStart(2,'0');
+      var rand = Math.floor(Math.random() * 9000) + 1000;
+      return "OC-" + condominioId + "-" + data + "-" + rand;
+    }
 
     function compressImage(base64Image, callback) {
       const img = new Image();
@@ -173,7 +220,50 @@
       return data.descricao || '';
     }
 
-    function init() {
+    async function carregarCategorias() {
+      try {
+        const res = await fetch(WEBHOOK_URL + '?action=getCategorias');
+        const data = await res.json();
+        return data.categorias || [];
+      } catch(e) {
+        return [
+          { emoji: '🔧', nome: 'Avaria / Equipamento' },
+          { emoji: '💧', nome: 'Infiltração / Humidade' },
+          { emoji: '🗑️', nome: 'Limpeza / Resíduos' },
+          { emoji: '🚪', nome: 'Acesso / Portões / Fechaduras' },
+          { emoji: '💡', nome: 'Iluminação' },
+          { emoji: '🌿', nome: 'Espaços Verdes' },
+          { emoji: '🚗', nome: 'Estacionamento' },
+          { emoji: '🔊', nome: 'Ruído / Perturbação' },
+          { emoji: '🏗️', nome: 'Danos Estruturais' },
+          { emoji: '📦', nome: 'Outras' }
+        ];
+      }
+    }
+
+    async function sugerirCategoria(descricao, categorias) {
+      if (!descricao || categorias.length === 0) return '';
+      try {
+        const nomes = categorias.map(function(c) { return c.nome; }).join(', ');
+        const res = await fetch('/.netlify/functions/analyze-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: 'Com base nesta descrição de ocorrência de condomínio: "' + descricao + '", qual destas categorias é a mais adequada? Responde apenas com o nome exato da categoria, sem mais texto: ' + nomes
+          })
+        });
+        const data = await res.json();
+        const sugestao = cleanAIText(data.descricao || '');
+        const match = categorias.find(function(c) {
+          return sugestao.toLowerCase().includes(c.nome.toLowerCase());
+        });
+        return match ? match.nome : '';
+      } catch(e) {
+        return '';
+      }
+    }
+
+    async function init() {
       const params = new URLSearchParams(window.location.search);
       const cond = params.get('condominio') || localStorage.getItem('condominioId');
       if (cond) {
@@ -201,7 +291,8 @@
             '<h1 class="card-title">Localização</h1>' +
             '<p class="card-subtitle">Precisamos da tua localização para registar a ocorrência</p></div>' +
             '<button onclick="handleLocationRequest()" class="btn-amber"' + (state.loading ? ' disabled' : '') + '>' +
-            (state.loading ? '⏳ A obter localização...' : '📍 Obter Localização') + '</button>' +
+            (state.loading ? '<span style="display:flex;align-items:center;justify-content:center;gap:0.5rem;"><span class="spinner"></span> A obter localização...</span>' : '📍 Obter Localização') +
+            '</button>' +
             '<div class="back-link"><a onclick="backToIndex()">← Voltar ao início</a></div>' +
           '</div>';
       }
@@ -221,22 +312,64 @@
             (state.loading ? '<span style="display:flex;align-items:center;justify-content:center;gap:0.5rem;"><span class="spinner"></span> A analisar com IA...</span>' : '✓ Continuar') +
             '</button></div>' +
             '<div class="skip-link"><a onclick="handleSkipPhoto()">Reportar sem foto →</a></div>' +
-            '<div class="back-link"><a onclick="handleBackToLocation()">← Voltar</a></div>' +
+            '<div class="back-link"><a onclick="handleBackTo(\'location\')">← Voltar</a></div>' +
           '</div>';
-        setTimeout(() => {
+        setTimeout(function() {
           const photoInput = document.getElementById('photoInput');
           if (photoInput) {
-            photoInput.addEventListener('change', (e) => {
+            photoInput.addEventListener('change', function(e) {
               const file = e.target.files[0];
               if (file) {
                 const reader = new FileReader();
-                reader.onload = (event) => {
-                  compressImage(event.target.result, (compressed, size) => {
+                reader.onload = function(event) {
+                  compressImage(event.target.result, function(compressed, size) {
                     state.photoBase64 = compressed; state.photoSize = size; render();
                   });
                 };
                 reader.readAsDataURL(file);
               }
+            });
+          }
+        }, 0);
+      }
+
+      else if (state.step === 'categoria') {
+        let gridHTML = '';
+        state.categorias.forEach(function(cat) {
+          const isSelected = state.categoriaSelected === cat.nome;
+          const isAI = state.categoriaAI === cat.nome;
+          const classes = 'categoria-btn' + (isSelected ? ' selected' : '') + (isAI ? ' ai-sugerida' : '');
+          gridHTML +=
+            '<button class="' + classes + '" onclick="selecionarCategoria(\'' + cat.nome.replace(/'/g, "\\'") + '\')">' +
+            '<span class="categoria-emoji">' + cat.emoji + '</span>' +
+            '<span class="categoria-nome">' + cat.nome + '</span>' +
+            (isAI ? '<span class="ai-sugestao-label">✦ IA sugere</span>' : '') +
+            '</button>';
+        });
+
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon amber">🏷️</div>' +
+            '<h1 class="card-title">Categoria</h1>' +
+            '<p class="card-subtitle">Seleciona o tipo de ocorrência' + (state.categoriaAI ? ' (a IA sugere a destacada)' : '') + '</p></div>' +
+            '<div class="categorias-grid">' + gridHTML +
+            '<div class="categoria-outra">' +
+            '<input type="text" id="categoriaOutra" placeholder="Outra categoria (escreve aqui)" value="' + state.categoriaOutra + '"/>' +
+            '</div></div>' +
+            '<div class="button-group">' +
+            '<button onclick="handleCategoriaContinue()" class="btn-amber"' + (!state.categoriaSelected && !state.categoriaOutra ? ' disabled' : '') + ' id="btnCategoria">Continuar →</button>' +
+            '<button onclick="handleBackTo(\'photo\')" class="btn-secondary">← Voltar</button>' +
+            '</div>' +
+          '</div>';
+
+        setTimeout(function() {
+          const outraInput = document.getElementById('categoriaOutra');
+          if (outraInput) {
+            outraInput.addEventListener('input', function(e) {
+              state.categoriaOutra = e.target.value;
+              if (state.categoriaOutra) state.categoriaSelected = '';
+              const btn = document.getElementById('btnCategoria');
+              if (btn) btn.disabled = !state.categoriaSelected && !state.categoriaOutra;
             });
           }
         }, 0);
@@ -254,10 +387,10 @@
             '</div>' +
             '<div class="button-group">' +
             '<button onclick="handleDescricaoContinue()" class="btn-amber">Continuar →</button>' +
-            '<button onclick="handleBackToPhoto()" class="btn-secondary">← Voltar</button>' +
+            '<button onclick="handleBackTo(\'categoria\')" class="btn-secondary">← Voltar</button>' +
             '</div>' +
           '</div>';
-        setTimeout(() => {
+        setTimeout(function() {
           const t = document.getElementById('descricaoInput');
           if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
         }, 0);
@@ -269,47 +402,46 @@
             '<div class="card-header"><div class="card-icon blue">👤</div>' +
             '<h1 class="card-title">Contacto</h1>' +
             '<p class="card-subtitle">Precisamos de pelo menos um contacto para acompanhar a ocorrência</p></div>' +
-            '<div class="form-group">' +
-            '<label for="nomeInput">Nome *</label>' +
+            '<div class="form-group"><label for="nomeInput">Nome *</label>' +
             '<input type="text" id="nomeInput" placeholder="O seu nome" value="' + state.nome + '"/>' +
-            (state.errors.nome ? '<p class="error-message">❌ ' + state.errors.nome + '</p>' : '') +
-            '</div>' +
-            '<div class="form-group">' +
-            '<label for="telInput">Telefone</label>' +
-            '<input type="tel" id="telInput" placeholder="9XX XXX XXX" value="' + state.telefone + '"/>' +
-            '</div>' +
-            '<div class="form-group">' +
-            '<label for="emailInput">Email</label>' +
+            (state.errors.nome ? '<p class="error-message">❌ ' + state.errors.nome + '</p>' : '') + '</div>' +
+            '<div class="form-group"><label for="telInput">Telefone</label>' +
+            '<input type="tel" id="telInput" placeholder="9XX XXX XXX" value="' + state.telefone + '"/></div>' +
+            '<div class="form-group"><label for="emailInput">Email</label>' +
             '<input type="email" id="emailInput" placeholder="email@exemplo.com" value="' + state.email + '"/>' +
-            (state.errors.contacto ? '<p class="error-message">❌ ' + state.errors.contacto + '</p>' : '') +
-            '</div>' +
+            (state.errors.contacto ? '<p class="error-message">❌ ' + state.errors.contacto + '</p>' : '') + '</div>' +
             '<p class="helper-text">* Telefone ou email obrigatório (pelo menos um)</p>' +
             '<div class="button-group">' +
             '<button onclick="handleContactoContinue()" class="btn-amber">Continuar →</button>' +
-            '<button onclick="handleBackToDescricao()" class="btn-secondary">← Voltar</button>' +
+            '<button onclick="handleBackTo(\'descricao\')" class="btn-secondary">← Voltar</button>' +
             '</div>' +
           '</div>';
       }
 
       else if (state.step === 'confirm') {
-        const mapsLink = 'https://www.google.com/maps?q=' + state.location.latitude + ',' + state.location.longitude;
+        const categoriaFinal = state.categoriaOutra || state.categoriaSelected;
         app.innerHTML =
           '<div class="card">' +
             '<div class="card-header"><div class="card-icon amber">✓</div>' +
             '<h1 class="card-title">Confirmar Ocorrência</h1></div>' +
-            '<div class="info-box">' +
-            '<div class="info-row"><span class="info-label">Condomínio:</span><span class="info-value">' + state.condominioId + '</span></div>' +
-            '<div class="info-row"><span class="info-label">Hora:</span><span class="info-value">' + new Date().toLocaleTimeString('pt-PT') + '</span></div>' +
-            '<div class="info-row"><span class="info-label">Foto:</span><span class="info-value">' + (state.photoBase64 ? '✓ Sim' : '✗ Sem foto') + '</span></div>' +
-            '<div class="info-row"><span class="info-label">Descrição:</span><span class="info-value">' + (state.descricaoFinal || '—') + '</span></div>' +
-            '<div class="info-row"><span class="info-label">Nome:</span><span class="info-value">' + state.nome + '</span></div>' +
-            (state.telefone ? '<div class="info-row"><span class="info-label">Telefone:</span><span class="info-value">' + state.telefone + '</span></div>' : '') +
-            (state.email ? '<div class="info-row"><span class="info-label">Email:</span><span class="info-value">' + state.email + '</span></div>' : '') +
+            '<div class="confirm-box">' +
+            '<div class="confirm-id">' +
+            '<p class="confirm-id-label">ID da Ocorrência</p>' +
+            '<p class="confirm-id-value">' + state.ocId + '</p>' +
             '</div>' +
+            '<div class="confirm-row"><span class="confirm-label">Condomínio:</span><span class="confirm-value">' + state.condominioId + '</span></div>' +
+            '<div class="confirm-row"><span class="confirm-label">Hora:</span><span class="confirm-value">' + new Date().toLocaleTimeString('pt-PT') + '</span></div>' +
+            '<div class="confirm-row"><span class="confirm-label">Categoria:</span><span class="confirm-value">' + (categoriaFinal || '—') + '</span></div>' +
+            '<div class="confirm-row"><span class="confirm-label">Foto:</span><span class="confirm-value">' + (state.photoBase64 ? '✓ Sim' : '✗ Sem foto') + '</span></div>' +
+            '<div class="confirm-row"><span class="confirm-label">Nome:</span><span class="confirm-value">' + state.nome + '</span></div>' +
+            (state.telefone ? '<div class="confirm-row"><span class="confirm-label">Telefone:</span><span class="confirm-value">' + state.telefone + '</span></div>' : '') +
+            (state.email ? '<div class="confirm-row"><span class="confirm-label">Email:</span><span class="confirm-value">' + state.email + '</span></div>' : '') +
+            '</div>' +
+            (state.descricaoFinal ? '<div class="confirm-descricao">' + state.descricaoFinal + '</div>' : '') +
             '<div class="button-group">' +
             '<button onclick="handleSubmit()" class="btn-confirm"' + (state.loading ? ' disabled' : '') + '>' +
             (state.loading ? '⏳ A submeter...' : '✓ Submeter Ocorrência') + '</button>' +
-            '<button onclick="handleBackToContacto()" class="btn-secondary">← Voltar</button>' +
+            '<button onclick="handleBackTo(\'contacto\')" class="btn-secondary">← Voltar</button>' +
             '</div>' +
           '</div>';
       }
@@ -319,9 +451,15 @@
           '<div class="card"><div class="card-header">' +
           '<div style="font-size:2rem;">✅</div>' +
           '<h1 class="card-title">Obrigado!</h1>' +
-          '<p class="card-subtitle">A tua ocorrência foi registada. Entraremos em contacto brevemente.</p>' +
-          '</div></div>';
-        setTimeout(() => { window.location.href = 'https://impar.pt'; }, 5000);
+          '<p class="card-subtitle">A tua ocorrência foi registada.</p>' +
+          '</div>' +
+          '<div class="confirm-id">' +
+          '<p class="confirm-id-label">O teu ID de referência</p>' +
+          '<p class="confirm-id-value">' + state.ocId + '</p>' +
+          '</div>' +
+          (state.email ? '<p class="helper-text">Enviámos uma confirmação para ' + state.email + '</p>' : '') +
+          '</div>';
+        setTimeout(function() { window.location.href = 'https://impar.pt'; }, 6000);
       }
 
       else if (state.step === 'error') {
@@ -334,14 +472,20 @@
       }
     }
 
+    function selecionarCategoria(nome) {
+      state.categoriaSelected = nome;
+      state.categoriaOutra = '';
+      render();
+    }
+
     function handleLocationRequest() {
       state.loading = true; render();
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        function(pos) {
           state.location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
           state.step = 'photo'; state.loading = false; render();
         },
-        () => { state.errorMsg = 'Ative o GPS e tente novamente.'; state.step = 'error'; state.loading = false; render(); },
+        function() { state.errorMsg = 'Ative o GPS e tente novamente.'; state.step = 'error'; state.loading = false; render(); },
         { enableHighAccuracy: true }
       );
     }
@@ -350,31 +494,49 @@
       if (!state.photoBase64) return;
       state.loading = true; render();
       try {
-        state.descricaoAI = await analyzeImage(state.photoBase64);
+        const textoAI = await analyzeImage(state.photoBase64);
+        state.descricaoAI = cleanAIText(textoAI);
         state.descricaoFinal = state.descricaoAI;
+
+        // Carregar categorias e sugerir
+        if (state.categorias.length === 0) {
+          state.categorias = await carregarCategorias();
+        }
+        state.categoriaAI = await sugerirCategoria(state.descricaoAI, state.categorias);
+        if (state.categoriaAI) state.categoriaSelected = state.categoriaAI;
+
       } catch(e) {
-        state.descricaoAI = '';
-        state.descricaoFinal = '';
+        state.descricaoAI = ''; state.descricaoFinal = '';
+        if (state.categorias.length === 0) state.categorias = await carregarCategorias();
       }
       state.loading = false;
-      state.step = 'descricao';
+      state.step = 'categoria';
       render();
     }
 
-    function handleSkipPhoto() {
-      state.photoBase64 = null;
-      state.photoSize = 0;
-      state.descricaoAI = '';
-      state.descricaoFinal = '';
-      state.step = 'descricao';
+    async function handleSkipPhoto() {
+      state.photoBase64 = null; state.photoSize = 0;
+      state.descricaoAI = ''; state.descricaoFinal = '';
+      state.loading = true; render();
+      if (state.categorias.length === 0) {
+        state.categorias = await carregarCategorias();
+      }
+      state.loading = false;
+      state.step = 'categoria';
       render();
+    }
+
+    function handleCategoriaContinue() {
+      const outraInput = document.getElementById('categoriaOutra');
+      if (outraInput) state.categoriaOutra = outraInput.value.trim();
+      if (!state.categoriaSelected && !state.categoriaOutra) return;
+      state.step = 'descricao'; render();
     }
 
     function handleDescricaoContinue() {
       const t = document.getElementById('descricaoInput');
       state.descricaoFinal = t ? t.value.trim() : '';
-      state.step = 'contacto';
-      render();
+      state.step = 'contacto'; render();
     }
 
     function handleContactoContinue() {
@@ -383,51 +545,37 @@
       const email = document.getElementById('emailInput').value.trim();
       state.errors = {};
       if (!nome) state.errors.nome = 'O nome é obrigatório.';
-      if (!tel && !email) state.errors.contacto = 'Introduz pelo menos um contacto (telefone ou email).';
+      if (!tel && !email) state.errors.contacto = 'Introduz pelo menos um contacto.';
       if (Object.keys(state.errors).length > 0) { render(); return; }
       state.nome = nome; state.telefone = tel; state.email = email;
+      state.ocId = gerarIdLocal(state.condominioId);
       state.step = 'confirm'; render();
     }
 
-    function handleBackToLocation() { state.step = 'location'; render(); }
-    function handleBackToPhoto() { state.step = 'photo'; render(); }
-    function handleBackToDescricao() { state.step = 'descricao'; render(); }
-    function handleBackToContacto() { state.step = 'contacto'; render(); }
+    function handleBackTo(step) { state.step = step; render(); }
 
     async function handleSubmit() {
       state.loading = true; render();
       const timestamp = new Date().toLocaleString('pt-PT');
-      const mapsLink = 'https://www.google.com/maps?q=' + state.location.latitude + ',' + state.location.longitude;
+      const categoriaFinal = state.categoriaOutra || state.categoriaSelected;
 
       const formData = new FormData();
       formData.append('sheet', 'Ocorrencias');
+      formData.append('ocId', state.ocId);
       formData.append('condominio', state.condominioId);
       formData.append('timestamp', timestamp);
       formData.append('latitude', state.location.latitude);
       formData.append('longitude', state.location.longitude);
-      formData.append('mapsLink', mapsLink);
       formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
       formData.append('photoBase64', state.photoBase64 || '');
+      formData.append('categoria', categoriaFinal);
       formData.append('descricaoAI', state.descricaoAI);
       formData.append('descricaoFinal', state.descricaoFinal);
       formData.append('nome', state.nome);
       formData.append('telefone', state.telefone);
       formData.append('email', state.email);
 
-      const emailData = new FormData();
-      emailData.append('tipo', 'ocorrencia');
-      emailData.append('condominio', state.condominioId);
-      emailData.append('timestamp', timestamp);
-      emailData.append('latitude', state.location.latitude);
-      emailData.append('longitude', state.location.longitude);
-      emailData.append('temFoto', state.photoBase64 ? 'true' : 'false');
-      emailData.append('descricao', state.descricaoFinal);
-      emailData.append('nome', state.nome);
-      emailData.append('telefone', state.telefone);
-      emailData.append('email', state.email);
-
       fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
-      fetch(WEBHOOK_EMAIL_URL, { method: 'POST', mode: 'no-cors', body: emailData });
 
       state.step = 'success'; render();
     }
