@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reportar Ocorrência - Ímpar</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --amber: #d97706; --amber-700: #b45309; --amber-100: #fef3c7;
+      --blue-600: #2563eb; --blue-700: #1d4ed8;
+      --green-600: #16a34a; --green-700: #15803d; --green-100: #dcfce7;
+      --emerald-600: #059669; --emerald-700: #047857;
+      --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
+      --slate-600: #475569; --slate-700: #334155; --slate-800: #1e293b; --slate-900: #0f172a;
+      --red-600: #dc2626;
+      --header-bg: #64748b;
+    }
+    html, body { height: 100%; width: 100%; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(to bottom right, var(--slate-50), var(--slate-100));
+      color: var(--slate-900); font-size: 16px; line-height: 1.5;
+    }
+    .container { display: flex; flex-direction: column; min-height: 100vh; }
+    header {
+      background: var(--header-bg);
+      padding: 0.875rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo-img { height: 36px; width: auto; mix-blend-mode: screen; }
+    .logo-fallback { font-size: 1.125rem; font-weight: 700; color: white; display: none; }
+    .version-badge { background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; }
+    main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
+    .card-wrapper { width: 100%; max-width: 28rem; }
+    .card {
+      background: white; border-radius: 1rem;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem;
+      animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .card-header { text-align: center; display: flex; flex-direction: column; gap: 0.5rem; }
+    .card-icon { width: 3rem; height: 3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 1.5rem; }
+    .card-icon.amber { background: var(--amber-100); }
+    .card-icon.green { background: var(--green-100); }
+    .card-icon.purple { background: #f3e8ff; }
+    .card-icon.blue { background: #dbeafe; }
+    .card-title { font-size: 1.5rem; font-weight: 700; color: var(--slate-900); }
+    .card-subtitle { font-size: 0.875rem; color: var(--slate-600); }
+    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+    label { font-size: 0.875rem; font-weight: 500; color: var(--slate-700); }
+    input[type="text"], input[type="email"], input[type="tel"], input[type="file"], textarea {
+      padding: 0.75rem 1rem; font-size: 1rem; border: 2px solid var(--slate-300);
+      border-radius: 0.5rem; font-family: 'DM Sans', sans-serif; transition: border-color 0.2s; width: 100%;
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--blue-600); }
+    textarea { resize: vertical; min-height: 100px; }
+    input::placeholder, textarea::placeholder { color: var(--slate-400); }
+    .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.25rem; font-weight: 500; }
+    .info-box { background: var(--slate-50); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; }
+    .info-row { display: flex; justify-content: space-between; gap: 1rem; }
+    .info-label { color: var(--slate-600); flex-shrink: 0; }
+    .info-value { font-weight: 600; color: var(--slate-900); text-align: right; word-break: break-word; }
+    .button-group { display: flex; flex-direction: column; gap: 0.75rem; }
+    button {
+      padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border: none;
+      border-radius: 0.5rem; cursor: pointer; transition: all 0.2s;
+      font-family: 'DM Sans', sans-serif; width: 100%;
+    }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-amber { background: var(--amber); color: white; }
+    .btn-amber:hover:not(:disabled) { background: var(--amber-700); }
+    .btn-confirm { background: var(--emerald-600); color: white; }
+    .btn-confirm:hover:not(:disabled) { background: var(--emerald-700); }
+    .btn-secondary { background: var(--slate-300); color: var(--slate-900); }
+    .btn-secondary:hover:not(:disabled) { background: var(--slate-400); }
+    .btn-primary { background: var(--blue-600); color: white; }
+    .btn-primary:hover:not(:disabled) { background: var(--blue-700); }
+    .helper-text { font-size: 0.75rem; color: var(--slate-500); text-align: center; }
+    .skip-link { text-align: center; margin-top: -0.5rem; }
+    .skip-link a { font-size: 0.8rem; color: var(--slate-400); text-decoration: underline; cursor: pointer; }
+    .skip-link a:hover { color: var(--slate-600); }
+    .back-link { text-align: center; }
+    .back-link a { font-size: 0.78rem; color: var(--slate-400); text-decoration: none; cursor: pointer; }
+    .back-link a:hover { color: var(--slate-600); }
+    .photo-preview { width: 100%; max-height: 200px; border-radius: 0.5rem; margin-top: 0.5rem; object-fit: cover; }
+    .ai-badge { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.7rem; font-weight: 600; background: #ede9fe; color: #6d28d9; padding: 3px 8px; border-radius: 4px; margin-bottom: 0.5rem; }
+    .ai-loading { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: var(--slate-500); padding: 0.75rem 0; }
+    .spinner { width: 18px; height: 18px; border: 2px solid var(--slate-200); border-top-color: var(--blue-600); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    footer { background: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <img src="https://www.impar.pt/wp-content/uploads/2025/01/logo-impar-2048x807.png"
+           class="logo-img" id="logo" alt="Ímpar"
+           onerror="document.getElementById('logo').style.display='none'; document.getElementById('logoFallback').style.display='block'"/>
+      <span class="logo-fallback" id="logoFallback">ÍMPAR</span>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <span style="font-size:0.875rem; color:rgba(255,255,255,0.8);">Reportar Ocorrência</span>
+        <span class="version-badge">v1.0</span>
+      </div>
+    </header>
+    <main>
+      <div class="card-wrapper" id="app">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon amber">⏳</div>
+            <h1 class="card-title">A carregar...</h1>
+          </div>
+        </div>
+      </div>
+    </main>
+    <footer><p>Sistema de Ocorrências © 2026</p></footer>
+  </div>
+
+  <script>
+    let state = {
+      step: 'init',
+      condominioId: '',
+      location: null,
+      photoBase64: null,
+      photoSize: 0,
+      descricaoAI: '',
+      descricaoFinal: '',
+      nome: '',
+      telefone: '',
+      email: '',
+      loading: false,
+      errorMsg: '',
+      errors: {}
+    };
+
+    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbwMDRuLzYKC5BVa_ECGP_voiaAc3snxDV3RIenqE4r8zAc3_ozYh79m6DdYBKLvnTXh/exec';
+    const WEBHOOK_EMAIL_URL = 'https://script.google.com/macros/s/AKfycbz1XqtmKDfI3O9mogrxCPneYbLZn5YKJ3yBUhGNVDSMUmsjnY0wAFKU5jF5hglhem3r/exec';
+    const MAX_PHOTO_SIZE = 1024 * 1024;
+
+    function compressImage(base64Image, callback) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        let width = img.width, height = img.height;
+        const maxWidth = 1920, maxHeight = 1440;
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = width * ratio; height = height * ratio;
+        }
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        let quality = 0.8;
+        let compressed = canvas.toDataURL('image/jpeg', quality);
+        while (compressed.length > MAX_PHOTO_SIZE && quality > 0.1) {
+          quality -= 0.1;
+          compressed = canvas.toDataURL('image/jpeg', quality);
+        }
+        callback(compressed, compressed.length);
+      };
+      img.src = base64Image;
+    }
+
+    async function analyzeImage(base64) {
+      const res = await fetch('/.netlify/functions/analyze-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: base64 })
+      });
+      const data = await res.json();
+      return data.descricao || '';
+    }
+
+    function init() {
+      const params = new URLSearchParams(window.location.search);
+      const cond = params.get('condominio') || localStorage.getItem('condominioId');
+      if (cond) {
+        state.condominioId = cond;
+        localStorage.setItem('condominioId', cond);
+        state.step = 'location';
+      } else {
+        state.step = 'error';
+        state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
+      }
+      render();
+    }
+
+    function backToIndex() {
+      window.location.href = 'index.html?condominio=' + encodeURIComponent(state.condominioId);
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+
+      if (state.step === 'location') {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon amber">📍</div>' +
+            '<h1 class="card-title">Localização</h1>' +
+            '<p class="card-subtitle">Precisamos da tua localização para registar a ocorrência</p></div>' +
+            '<button onclick="handleLocationRequest()" class="btn-amber"' + (state.loading ? ' disabled' : '') + '>' +
+            (state.loading ? '⏳ A obter localização...' : '📍 Obter Localização') + '</button>' +
+            '<div class="back-link"><a onclick="backToIndex()">← Voltar ao início</a></div>' +
+          '</div>';
+      }
+
+      else if (state.step === 'photo') {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon purple">📸</div>' +
+            '<h1 class="card-title">Foto da Ocorrência</h1>' +
+            '<p class="card-subtitle">Tire uma foto do problema para ajudar na análise</p></div>' +
+            '<div class="form-group">' +
+            '<input id="photoInput" type="file" accept="image/*" capture="environment"/>' +
+            (state.photoBase64 ? '<img src="' + state.photoBase64 + '" class="photo-preview" alt="Foto"/>' : '') +
+            '</div>' +
+            '<div class="button-group">' +
+            '<button onclick="handlePhotoContinue()" class="btn-amber"' + (!state.photoBase64 || state.loading ? ' disabled' : '') + '>' +
+            (state.loading ? '<span style="display:flex;align-items:center;justify-content:center;gap:0.5rem;"><span class="spinner"></span> A analisar com IA...</span>' : '✓ Continuar') +
+            '</button></div>' +
+            '<div class="skip-link"><a onclick="handleSkipPhoto()">Reportar sem foto →</a></div>' +
+            '<div class="back-link"><a onclick="handleBackToLocation()">← Voltar</a></div>' +
+          '</div>';
+        setTimeout(() => {
+          const photoInput = document.getElementById('photoInput');
+          if (photoInput) {
+            photoInput.addEventListener('change', (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  compressImage(event.target.result, (compressed, size) => {
+                    state.photoBase64 = compressed; state.photoSize = size; render();
+                  });
+                };
+                reader.readAsDataURL(file);
+              }
+            });
+          }
+        }, 0);
+      }
+
+      else if (state.step === 'descricao') {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon purple">✏️</div>' +
+            '<h1 class="card-title">Descrição</h1>' +
+            '<p class="card-subtitle">Revê e edita a descrição da ocorrência</p></div>' +
+            '<div class="form-group">' +
+            (state.photoBase64 ? '<div class="ai-badge">✦ Sugestão da IA</div>' : '') +
+            '<textarea id="descricaoInput" placeholder="Descreve o problema observado...">' + (state.descricaoFinal || state.descricaoAI) + '</textarea>' +
+            '</div>' +
+            '<div class="button-group">' +
+            '<button onclick="handleDescricaoContinue()" class="btn-amber">Continuar →</button>' +
+            '<button onclick="handleBackToPhoto()" class="btn-secondary">← Voltar</button>' +
+            '</div>' +
+          '</div>';
+        setTimeout(() => {
+          const t = document.getElementById('descricaoInput');
+          if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
+        }, 0);
+      }
+
+      else if (state.step === 'contacto') {
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon blue">👤</div>' +
+            '<h1 class="card-title">Contacto</h1>' +
+            '<p class="card-subtitle">Precisamos de pelo menos um contacto para acompanhar a ocorrência</p></div>' +
+            '<div class="form-group">' +
+            '<label for="nomeInput">Nome *</label>' +
+            '<input type="text" id="nomeInput" placeholder="O seu nome" value="' + state.nome + '"/>' +
+            (state.errors.nome ? '<p class="error-message">❌ ' + state.errors.nome + '</p>' : '') +
+            '</div>' +
+            '<div class="form-group">' +
+            '<label for="telInput">Telefone</label>' +
+            '<input type="tel" id="telInput" placeholder="9XX XXX XXX" value="' + state.telefone + '"/>' +
+            '</div>' +
+            '<div class="form-group">' +
+            '<label for="emailInput">Email</label>' +
+            '<input type="email" id="emailInput" placeholder="email@exemplo.com" value="' + state.email + '"/>' +
+            (state.errors.contacto ? '<p class="error-message">❌ ' + state.errors.contacto + '</p>' : '') +
+            '</div>' +
+            '<p class="helper-text">* Telefone ou email obrigatório (pelo menos um)</p>' +
+            '<div class="button-group">' +
+            '<button onclick="handleContactoContinue()" class="btn-amber">Continuar →</button>' +
+            '<button onclick="handleBackToDescricao()" class="btn-secondary">← Voltar</button>' +
+            '</div>' +
+          '</div>';
+      }
+
+      else if (state.step === 'confirm') {
+        const mapsLink = 'https://www.google.com/maps?q=' + state.location.latitude + ',' + state.location.longitude;
+        app.innerHTML =
+          '<div class="card">' +
+            '<div class="card-header"><div class="card-icon amber">✓</div>' +
+            '<h1 class="card-title">Confirmar Ocorrência</h1></div>' +
+            '<div class="info-box">' +
+            '<div class="info-row"><span class="info-label">Condomínio:</span><span class="info-value">' + state.condominioId + '</span></div>' +
+            '<div class="info-row"><span class="info-label">Hora:</span><span class="info-value">' + new Date().toLocaleTimeString('pt-PT') + '</span></div>' +
+            '<div class="info-row"><span class="info-label">Foto:</span><span class="info-value">' + (state.photoBase64 ? '✓ Sim' : '✗ Sem foto') + '</span></div>' +
+            '<div class="info-row"><span class="info-label">Descrição:</span><span class="info-value">' + (state.descricaoFinal || '—') + '</span></div>' +
+            '<div class="info-row"><span class="info-label">Nome:</span><span class="info-value">' + state.nome + '</span></div>' +
+            (state.telefone ? '<div class="info-row"><span class="info-label">Telefone:</span><span class="info-value">' + state.telefone + '</span></div>' : '') +
+            (state.email ? '<div class="info-row"><span class="info-label">Email:</span><span class="info-value">' + state.email + '</span></div>' : '') +
+            '</div>' +
+            '<div class="button-group">' +
+            '<button onclick="handleSubmit()" class="btn-confirm"' + (state.loading ? ' disabled' : '') + '>' +
+            (state.loading ? '⏳ A submeter...' : '✓ Submeter Ocorrência') + '</button>' +
+            '<button onclick="handleBackToContacto()" class="btn-secondary">← Voltar</button>' +
+            '</div>' +
+          '</div>';
+      }
+
+      else if (state.step === 'success') {
+        app.innerHTML =
+          '<div class="card"><div class="card-header">' +
+          '<div style="font-size:2rem;">✅</div>' +
+          '<h1 class="card-title">Obrigado!</h1>' +
+          '<p class="card-subtitle">A tua ocorrência foi registada. Entraremos em contacto brevemente.</p>' +
+          '</div></div>';
+        setTimeout(() => { window.location.href = 'https://impar.pt'; }, 5000);
+      }
+
+      else if (state.step === 'error') {
+        app.innerHTML =
+          '<div class="card"><div class="card-header">' +
+          '<div style="font-size:2rem;">⚠️</div>' +
+          '<h1 class="card-title">Erro</h1>' +
+          '<p class="card-subtitle">' + state.errorMsg + '</p></div>' +
+          '<button onclick="init()" class="btn-primary">Tentar Novamente</button></div>';
+      }
+    }
+
+    function handleLocationRequest() {
+      state.loading = true; render();
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          state.location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          state.step = 'photo'; state.loading = false; render();
+        },
+        () => { state.errorMsg = 'Ative o GPS e tente novamente.'; state.step = 'error'; state.loading = false; render(); },
+        { enableHighAccuracy: true }
+      );
+    }
+
+    async function handlePhotoContinue() {
+      if (!state.photoBase64) return;
+      state.loading = true; render();
+      try {
+        state.descricaoAI = await analyzeImage(state.photoBase64);
+        state.descricaoFinal = state.descricaoAI;
+      } catch(e) {
+        state.descricaoAI = '';
+        state.descricaoFinal = '';
+      }
+      state.loading = false;
+      state.step = 'descricao';
+      render();
+    }
+
+    function handleSkipPhoto() {
+      state.photoBase64 = null;
+      state.photoSize = 0;
+      state.descricaoAI = '';
+      state.descricaoFinal = '';
+      state.step = 'descricao';
+      render();
+    }
+
+    function handleDescricaoContinue() {
+      const t = document.getElementById('descricaoInput');
+      state.descricaoFinal = t ? t.value.trim() : '';
+      state.step = 'contacto';
+      render();
+    }
+
+    function handleContactoContinue() {
+      const nome = document.getElementById('nomeInput').value.trim();
+      const tel = document.getElementById('telInput').value.trim();
+      const email = document.getElementById('emailInput').value.trim();
+      state.errors = {};
+      if (!nome) state.errors.nome = 'O nome é obrigatório.';
+      if (!tel && !email) state.errors.contacto = 'Introduz pelo menos um contacto (telefone ou email).';
+      if (Object.keys(state.errors).length > 0) { render(); return; }
+      state.nome = nome; state.telefone = tel; state.email = email;
+      state.step = 'confirm'; render();
+    }
+
+    function handleBackToLocation() { state.step = 'location'; render(); }
+    function handleBackToPhoto() { state.step = 'photo'; render(); }
+    function handleBackToDescricao() { state.step = 'descricao'; render(); }
+    function handleBackToContacto() { state.step = 'contacto'; render(); }
+
+    async function handleSubmit() {
+      state.loading = true; render();
+      const timestamp = new Date().toLocaleString('pt-PT');
+      const mapsLink = 'https://www.google.com/maps?q=' + state.location.latitude + ',' + state.location.longitude;
+
+      const formData = new FormData();
+      formData.append('sheet', 'Ocorrencias');
+      formData.append('condominio', state.condominioId);
+      formData.append('timestamp', timestamp);
+      formData.append('latitude', state.location.latitude);
+      formData.append('longitude', state.location.longitude);
+      formData.append('mapsLink', mapsLink);
+      formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
+      formData.append('photoBase64', state.photoBase64 || '');
+      formData.append('descricaoAI', state.descricaoAI);
+      formData.append('descricaoFinal', state.descricaoFinal);
+      formData.append('nome', state.nome);
+      formData.append('telefone', state.telefone);
+      formData.append('email', state.email);
+
+      const emailData = new FormData();
+      emailData.append('tipo', 'ocorrencia');
+      emailData.append('condominio', state.condominioId);
+      emailData.append('timestamp', timestamp);
+      emailData.append('latitude', state.location.latitude);
+      emailData.append('longitude', state.location.longitude);
+      emailData.append('temFoto', state.photoBase64 ? 'true' : 'false');
+      emailData.append('descricao', state.descricaoFinal);
+      emailData.append('nome', state.nome);
+      emailData.append('telefone', state.telefone);
+      emailData.append('email', state.email);
+
+      fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
+      fetch(WEBHOOK_EMAIL_URL, { method: 'POST', mode: 'no-cors', body: emailData });
+
+      state.step = 'success'; render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
