@@ -33,27 +33,62 @@
       align-items: center;
       justify-content: space-between;
     }
-    .logo-img {
-      height: 36px;
-      width: auto;
-      mix-blend-mode: screen;
-    }
-    .logo-fallback {
-      font-family: 'DM Serif Display', serif;
-      font-size: 1.1rem;
-      color: white;
-      display: none;
-    }
-    .version {
-      font-size: 0.7rem;
-      font-weight: 600;
-      background: rgba(255,255,255,0.2);
-      color: white;
-      padding: 3px 8px;
-      border-radius: 4px;
-    }
+    .logo-img { height: 36px; width: auto; mix-blend-mode: screen; }
+    .logo-fallback { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: white; display: none; }
+    .version { font-size: 0.7rem; font-weight: 600; background: rgba(255,255,255,0.2); color: white; padding: 3px 8px; border-radius: 4px; }
     main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1.25rem; }
     .wrapper { width: 100%; max-width: 26rem; }
+
+    /* Ecrã de seleção de perfil */
+    .profile-screen { display: flex; flex-direction: column; align-items: center; gap: 2rem; }
+    .profile-title { text-align: center; }
+    .profile-title p { font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate-400); margin-bottom: 0.5rem; }
+    .profile-title h1 { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--slate-800); }
+    .profile-buttons { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; }
+    .btn-profile {
+      padding: 0.875rem 1rem; font-size: 1rem; font-weight: 600;
+      border: 2px solid var(--slate-200); border-radius: 10px;
+      cursor: pointer; background: white; color: var(--slate-800);
+      font-family: 'DM Sans', sans-serif; width: 100%;
+      transition: all 0.15s; text-align: center;
+    }
+    .btn-profile:hover { border-color: var(--slate-400); background: var(--slate-50); }
+    .btn-profile.impar { border-color: var(--header-bg); color: var(--header-bg); }
+    .btn-profile.impar:hover { background: #f1f5f9; }
+    .btn-profile.condómino { border-color: var(--amber); color: var(--amber); }
+    .btn-profile.condómino:hover { background: var(--amber-bg); }
+
+    /* Ecrã de inserção de ID (Ímpar sem QR) */
+    .id-screen { display: flex; flex-direction: column; gap: 1.5rem; }
+    .id-screen h2 { font-size: 1.1rem; font-weight: 600; color: var(--slate-800); text-align: center; }
+    .id-screen p { font-size: 0.85rem; color: var(--slate-500); text-align: center; }
+    .id-input-group { display: flex; gap: 0.5rem; }
+    .id-input {
+      flex: 1; padding: 0.75rem 1rem; font-size: 1rem;
+      border: 2px solid var(--slate-300); border-radius: 0.5rem;
+      font-family: 'DM Sans', sans-serif; outline: none;
+      transition: border-color 0.2s;
+    }
+    .id-input:focus { border-color: var(--blue); }
+    .id-input::placeholder { color: var(--slate-400); }
+    .btn-go {
+      padding: 0.75rem 1.25rem; font-size: 1rem; font-weight: 600;
+      border: none; border-radius: 0.5rem; cursor: pointer;
+      background: var(--header-bg); color: white;
+      font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-go:hover { background: var(--slate-700); }
+    .btn-go:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-back {
+      background: none; border: none; color: var(--slate-400);
+      font-size: 0.8rem; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      text-align: center; text-decoration: underline; padding: 0;
+    }
+    .btn-back:hover { color: var(--slate-600); }
+    .error-inline { font-size: 0.8rem; color: #dc2626; text-align: center; }
+
+    /* Menu principal */
     .condo-header { text-align: center; margin-bottom: 1.75rem; padding: 0 0.5rem; }
     .condo-label { font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate-400); margin-bottom: 0.4rem; }
     .condo-name-line1 { font-size: 0.9rem; color: var(--slate-500); font-weight: 400; }
@@ -79,6 +114,17 @@
     .card-title { font-size: 0.975rem; font-weight: 600; color: var(--slate-800); margin-bottom: 2px; }
     .card-sub { font-size: 0.78rem; color: var(--slate-500); }
     .card-arrow { color: var(--slate-300); }
+    .profile-badge {
+      text-align: center; margin-bottom: 1rem;
+      font-size: 0.72rem; color: var(--slate-400);
+    }
+    .profile-badge button {
+      background: none; border: none; color: var(--slate-400);
+      font-size: 0.72rem; cursor: pointer; text-decoration: underline;
+      font-family: 'DM Sans', sans-serif; padding: 0;
+    }
+    .profile-badge button:hover { color: var(--slate-600); }
+
     footer { text-align: center; padding: 1rem; font-size: 0.7rem; color: var(--slate-400); border-top: 1px solid var(--slate-100); }
     .error-box { text-align: center; padding: 2rem; color: var(--slate-500); }
     .error-box strong { display: block; color: var(--slate-700); margin-bottom: 0.5rem; font-size: 1rem; }
@@ -90,55 +136,27 @@
          class="logo-img" id="logo" alt="Ímpar"
          onerror="document.getElementById('logo').style.display='none'; document.getElementById('logoFallback').style.display='block'"/>
     <span class="logo-fallback" id="logoFallback">ÍMPAR</span>
-    <span class="version">v3.0</span>
+    <span class="version">v3.1</span>
   </header>
   <main>
-    <div class="wrapper">
-      <div class="condo-header" id="condoHeader">
-        <p class="condo-loading">A carregar...</p>
-      </div>
-      <div class="cards" id="cards" style="display:none;">
-        <a class="card green" id="linkLimpeza" href="#">
-          <div class="card-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </div>
-          <div class="card-text">
-            <p class="card-title">Limpeza</p>
-            <p class="card-sub">Registar check-in de limpeza</p>
-          </div>
-          <svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </a>
-        <a class="card amber" id="linkOcorrencia" href="#">
-          <div class="card-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <div class="card-text">
-            <p class="card-title">Ocorrência</p>
-            <p class="card-sub">Reportar problema ou incidente</p>
-          </div>
-          <svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </a>
-        <a class="card blue" id="linkManutencao" href="#">
-          <div class="card-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          </div>
-          <div class="card-text">
-            <p class="card-title">Manutenção</p>
-            <p class="card-sub">Solicitar intervenção técnica</p>
-          </div>
-          <svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </a>
-      </div>
-      <div id="errorBox" class="error-box" style="display:none;">
-        <strong>Condomínio não identificado</strong>
-        Verifica o QR Code e tenta novamente.
-      </div>
-    </div>
+    <div class="wrapper" id="app"></div>
   </main>
   <footer>App do Condomínio © 2026 · Ímpar</footer>
 
   <script>
-    const WEBHOOK_CONDOMINIOS_URL = 'https://script.google.com/macros/s/AKfycbzhnxJ7ZSpwa4dkYWcYJeEhINVAjJK2BvIwWlU5xjgt2d8B0eaFPfJB3khVg7axSdsd/exec';
+    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzhnxJ7ZSpwa4dkYWcYJeEhINVAjJK2BvIwWlU5xjgt2d8B0eaFPfJB3khVg7axSdsd/exec';
+
+    // Lê params do URL
+    const params = new URLSearchParams(window.location.search);
+    const condominioIdFromUrl = params.get('condominio');
+    const appParam = params.get('app');
+
+    // Perfil guardado em sessionStorage (limpa ao fechar o tab / nova leitura de QR)
+    // condominioId guardado também em sessionStorage para navegação interna
+    function getPerfil() { return sessionStorage.getItem('perfil'); }
+    function setPerfil(p) { sessionStorage.setItem('perfil', p); }
+    function getCondominioId() { return sessionStorage.getItem('condominioId'); }
+    function setCondominioId(id) { sessionStorage.setItem('condominioId', id); }
 
     function splitCondominioName(name) {
       const marker = 'Condomínio Sito na';
@@ -158,39 +176,151 @@
       document.getElementById('linkManutencao').href = 'https://impar.pt';
     }
 
-    async function init() {
-      const params = new URLSearchParams(window.location.search);
-      const condominioId = params.get('condominio');
-      const app = params.get('app');
+    async function loadCondominioName(condominioId) {
+      try {
+        const res = await fetch(WEBHOOK_URL + '?action=getNome&condominio=' + encodeURIComponent(condominioId));
+        const data = await res.json();
+        return data.nome || condominioId;
+      } catch(e) {
+        return condominioId;
+      }
+    }
 
-      if (!condominioId) {
-        document.getElementById('condoHeader').innerHTML = '';
-        document.getElementById('errorBox').style.display = 'block';
+    // ── RENDER FUNCTIONS ──────────────────────────────────────────
+
+    function renderProfileSelect() {
+      document.getElementById('app').innerHTML =
+        '<div class="profile-screen">' +
+          '<div class="profile-title">' +
+            '<p>Bem-vindo</p>' +
+            '<h1>Quem é você?</h1>' +
+          '</div>' +
+          '<div class="profile-buttons">' +
+            '<button class="btn-profile impar" onclick="chooseProfile(\'impar\')">🏢 &nbsp;Ímpar</button>' +
+            '<button class="btn-profile condómino" onclick="chooseProfile(\'condómino\')">🏠 &nbsp;Condómino</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    function renderImparIdInput() {
+      document.getElementById('app').innerHTML =
+        '<div class="id-screen">' +
+          '<h2>Acesso Ímpar</h2>' +
+          '<p>Introduz o ID do condomínio para aceder ao menu.</p>' +
+          '<div class="id-input-group">' +
+            '<input class="id-input" id="condIdInput" type="text" inputmode="numeric" placeholder="Ex: 1234" autocomplete="off"/>' +
+            '<button class="btn-go" id="btnGo" onclick="handleImparIdSubmit()" disabled>Aceder →</button>' +
+          '</div>' +
+          '<p class="error-inline" id="idError" style="display:none;"></p>' +
+          '<button class="btn-back" onclick="renderProfileSelect()">← Voltar</button>' +
+        '</div>';
+      setTimeout(function() {
+        const input = document.getElementById('condIdInput');
+        if (input) {
+          input.addEventListener('input', function() {
+            document.getElementById('btnGo').disabled = input.value.trim().length === 0;
+          });
+          input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') handleImparIdSubmit();
+          });
+          input.focus();
+        }
+      }, 0);
+    }
+
+    async function renderMenu(condominioId, perfil) {
+      document.getElementById('app').innerHTML =
+        '<div class="profile-badge">A aceder como <strong>' + (perfil === 'impar' ? 'Ímpar' : 'Condómino') + '</strong> &nbsp;·&nbsp; <button onclick="resetPerfil()">trocar perfil</button></div>' +
+        '<div class="condo-header" id="condoHeader"><p class="condo-loading">A carregar...</p></div>' +
+        '<div class="cards" id="cards" style="display:none;">' +
+          (perfil === 'impar' ?
+            '<a class="card green" id="linkLimpeza" href="#"><div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="card-text"><p class="card-title">Limpeza</p><p class="card-sub">Registar check-in de limpeza</p></div><svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>' : '') +
+          '<a class="card amber" id="linkOcorrencia" href="#"><div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class="card-text"><p class="card-title">Ocorrência</p><p class="card-sub">Reportar problema ou incidente</p></div><svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>' +
+          (perfil === 'impar' ?
+            '<a class="card blue" id="linkManutencao" href="https://impar.pt"><div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><div class="card-text"><p class="card-title">Manutenção</p><p class="card-sub">Solicitar intervenção técnica</p></div><svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>' : '') +
+        '</div>';
+
+      if (perfil === 'impar') buildLinks(condominioId);
+      else {
+        // Condómino: só link ocorrência
+        const base = '?condominio=' + encodeURIComponent(condominioId);
+        document.getElementById('linkOcorrencia').href = 'ocorrencia.html' + base;
+      }
+
+      const nome = await loadCondominioName(condominioId);
+      const { line1, line2 } = splitCondominioName(nome);
+      document.getElementById('condoHeader').innerHTML =
+        '<p class="condo-label">A sua localização</p>' +
+        '<p class="condo-name-line1">' + line1 + '</p>' +
+        (line2 ? '<p class="condo-name-line2">' + line2 + '</p>' : '');
+      document.getElementById('cards').style.display = 'flex';
+    }
+
+    // ── ACTIONS ───────────────────────────────────────────────────
+
+    function chooseProfile(perfil) {
+      setPerfil(perfil);
+      const condId = getCondominioId();
+      if (perfil === 'impar' && !condId) {
+        renderImparIdInput();
+      } else if (condId) {
+        renderMenu(condId, perfil);
+      } else {
+        // Condómino sem condomínio — não devia acontecer via QR, mas protege
+        document.getElementById('app').innerHTML =
+          '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';
+      }
+    }
+
+    function handleImparIdSubmit() {
+      const input = document.getElementById('condIdInput');
+      const id = input ? input.value.trim() : '';
+      if (!id) return;
+      setCondominioId(id);
+      renderMenu(id, 'impar');
+    }
+
+    function resetPerfil() {
+      sessionStorage.removeItem('perfil');
+      sessionStorage.removeItem('condominioId');
+      renderProfileSelect();
+    }
+
+    // ── INIT ──────────────────────────────────────────────────────
+
+    function init() {
+      // Se vier condomínio pelo URL (QR code), guarda-o e limpa perfil anterior
+      if (condominioIdFromUrl) {
+        setCondominioId(condominioIdFromUrl);
+        sessionStorage.removeItem('perfil'); // nova leitura de QR → volta à seleção de perfil
+      }
+
+      // Redirecionamentos diretos por app param
+      const condId = condominioIdFromUrl || getCondominioId();
+      if (appParam && condId) {
+        if (appParam === 'limpeza') { window.location.href = 'limpeza.html?condominio=' + encodeURIComponent(condId); return; }
+        if (appParam === 'ocorrencia') { window.location.href = 'ocorrencia.html?condominio=' + encodeURIComponent(condId); return; }
+        if (appParam === 'manutencao') { window.location.href = 'https://impar.pt'; return; }
+      }
+
+      const perfil = getPerfil();
+
+      if (!perfil) {
+        // Sem perfil → ecrã de seleção
+        renderProfileSelect();
         return;
       }
 
-      if (app === 'limpeza') { window.location.href = 'limpeza.html?condominio=' + encodeURIComponent(condominioId); return; }
-      if (app === 'ocorrencia') { window.location.href = 'ocorrencia.html?condominio=' + encodeURIComponent(condominioId); return; }
-      if (app === 'manutencao') { window.location.href = 'https://impar.pt'; return; }
-
-      buildLinks(condominioId);
-
-      try {
-        const res = await fetch(WEBHOOK_CONDOMINIOS_URL + '?action=getNome&condominio=' + encodeURIComponent(condominioId));
-        const data = await res.json();
-        const nome = data.nome || condominioId;
-        const { line1, line2 } = splitCondominioName(nome);
-        document.getElementById('condoHeader').innerHTML =
-          '<p class="condo-label">A sua localização</p>' +
-          '<p class="condo-name-line1">' + line1 + '</p>' +
-          (line2 ? '<p class="condo-name-line2">' + line2 + '</p>' : '');
-      } catch (e) {
-        document.getElementById('condoHeader').innerHTML =
-          '<p class="condo-label">Condomínio</p>' +
-          '<p class="condo-name-line2">' + condominioId + '</p>';
+      // Tem perfil — vai ao menu se tiver condomínio
+      const condominioId = getCondominioId();
+      if (condominioId) {
+        renderMenu(condominioId, perfil);
+      } else if (perfil === 'impar') {
+        renderImparIdInput();
+      } else {
+        document.getElementById('app').innerHTML =
+          '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';
       }
-
-      document.getElementById('cards').style.display = 'flex';
     }
 
     init();
