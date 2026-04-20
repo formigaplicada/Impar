@@ -125,6 +125,20 @@
     }
     .profile-badge button:hover { color: var(--slate-600); }
 
+    /* Ecrã de PIN */
+    .pin-screen { display: flex; flex-direction: column; gap: 1.5rem; }
+    .pin-screen h2 { font-size: 1.1rem; font-weight: 600; color: var(--slate-800); text-align: center; }
+    .pin-screen p { font-size: 0.85rem; color: var(--slate-500); text-align: center; }
+    .pin-input {
+      padding: 0.75rem 1rem; font-size: 1.5rem; letter-spacing: 0.3em;
+      border: 2px solid var(--slate-300); border-radius: 0.5rem;
+      font-family: 'DM Sans', sans-serif; outline: none; text-align: center;
+      transition: border-color 0.2s; width: 100%;
+    }
+    .pin-input:focus { border-color: var(--blue); }
+    .pin-input::placeholder { color: var(--slate-400); letter-spacing: normal; font-size: 1rem; }
+    .pin-error { font-size: 0.8rem; color: #dc2626; text-align: center; min-height: 1.2em; }
+
     footer { text-align: center; padding: 1rem; font-size: 0.7rem; color: var(--slate-400); border-top: 1px solid var(--slate-100); }
     .error-box { text-align: center; padding: 2rem; color: var(--slate-500); }
     .error-box strong { display: block; color: var(--slate-700); margin-bottom: 0.5rem; font-size: 1rem; }
@@ -186,7 +200,42 @@
       }
     }
 
-    // ── RENDER FUNCTIONS ──────────────────────────────────────────
+    function generateCorrectPin(condominioId) {
+      const reversed = String(condominioId).split('').reverse().join('');
+      return '9' + reversed;
+    }
+
+    function renderImparPin(condominioId) {
+      document.getElementById('app').innerHTML =
+        '<div class="pin-screen">' +
+          '<h2>🔒 Validação de Acesso</h2>' +
+          '<p>Condomínio: <strong>' + condominioId + '</strong></p>' +
+          '<input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="5" placeholder="PIN" autocomplete="off"/>' +
+          '<p class="pin-error" id="pinError"></p>' +
+          '<button class="btn-back" onclick="renderProfileSelect()">← Voltar</button>' +
+        '</div>';
+      setTimeout(function() {
+        const input = document.getElementById('pinInput');
+        if (input) {
+          input.addEventListener('input', function(e) {
+            const val = e.target.value.replace(/\D/g, '');
+            e.target.value = val;
+            if (val.length === generateCorrectPin(condominioId).length) {
+              if (val === generateCorrectPin(condominioId)) {
+                sessionStorage.setItem('imparPinOk', condominioId);
+                renderMenu(condominioId, 'impar');
+              } else {
+                document.getElementById('pinError').textContent = '❌ PIN inválido. Tenta novamente.';
+                setTimeout(function() { e.target.value = ''; document.getElementById('pinError').textContent = ''; }, 1200);
+              }
+            }
+          });
+          input.focus();
+        }
+      }, 0);
+    }
+
+
 
     function renderProfileSelect() {
       document.getElementById('app').innerHTML =
@@ -261,8 +310,17 @@
     function chooseProfile(perfil) {
       setPerfil(perfil);
       const condId = getCondominioId();
-      if (perfil === 'impar' && !condId) {
-        renderImparIdInput();
+      if (perfil === 'impar') {
+        if (!condId) {
+          renderImparIdInput();
+        } else {
+          // Tem condomínio — pede PIN (a menos que já validado nesta sessão)
+          if (sessionStorage.getItem('imparPinOk') === condId) {
+            renderMenu(condId, 'impar');
+          } else {
+            renderImparPin(condId);
+          }
+        }
       } else if (condId) {
         renderMenu(condId, perfil);
       } else {
@@ -277,22 +335,25 @@
       const id = input ? input.value.trim() : '';
       if (!id) return;
       setCondominioId(id);
-      renderMenu(id, 'impar');
+      // Vai para PIN após introduzir ID
+      renderImparPin(id);
     }
 
     function resetPerfil() {
       sessionStorage.removeItem('perfil');
       sessionStorage.removeItem('condominioId');
+      sessionStorage.removeItem('imparPinOk');
       renderProfileSelect();
     }
 
     // ── INIT ──────────────────────────────────────────────────────
 
     function init() {
-      // Se vier condomínio pelo URL (QR code), guarda-o e limpa perfil anterior
+      // Se vier condomínio pelo URL (QR code), guarda-o e limpa perfil e PIN anteriores
       if (condominioIdFromUrl) {
         setCondominioId(condominioIdFromUrl);
-        sessionStorage.removeItem('perfil'); // nova leitura de QR → volta à seleção de perfil
+        sessionStorage.removeItem('perfil');
+        sessionStorage.removeItem('imparPinOk'); // nova leitura de QR → pede PIN novamente
       }
 
       // Redirecionamentos diretos por app param
@@ -306,15 +367,22 @@
       const perfil = getPerfil();
 
       if (!perfil) {
-        // Sem perfil → ecrã de seleção
         renderProfileSelect();
         return;
       }
 
-      // Tem perfil — vai ao menu se tiver condomínio
       const condominioId = getCondominioId();
       if (condominioId) {
-        renderMenu(condominioId, perfil);
+        if (perfil === 'impar') {
+          // Verifica se PIN já foi validado nesta sessão para este condomínio
+          if (sessionStorage.getItem('imparPinOk') === condominioId) {
+            renderMenu(condominioId, 'impar');
+          } else {
+            renderImparPin(condominioId);
+          }
+        } else {
+          renderMenu(condominioId, perfil);
+        }
       } else if (perfil === 'impar') {
         renderImparIdInput();
       } else {
