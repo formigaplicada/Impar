@@ -158,7 +158,7 @@
   <footer>App do Condomínio © 2026 · Ímpar</footer>
 
   <script>
-    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzhnxJ7ZSpwa4dkYWcYJeEhINVAjJK2BvIwWlU5xjgt2d8B0eaFPfJB3khVg7axSdsd/exec';
+    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzJIsPnMLyUDal_Kn9FQyL9WDMhLSEQ5o-njJ-b5yjkzi2n_VxczPbRd4JwDzcyLBA0/exec';
 
     const params = new URLSearchParams(window.location.search);
     const condominioIdFromUrl = params.get('condominio');
@@ -169,8 +169,6 @@
     function getCondominioId() { return sessionStorage.getItem('condominioId'); }
     function setCondominioId(id) { sessionStorage.setItem('condominioId', id); }
 
-    // PIN da Ímpar: intercala dígitos ímpares (1,3,5,7,...) com cada caracter do ID
-    // Ex: ID "ABC" → "1A3B5C" | ID "ABCD" → "1A3B5C7D"
     function generateImparPin(condominioId) {
       const id = String(condominioId);
       let pin = '';
@@ -181,8 +179,7 @@
       return pin;
     }
 
-    // PIN do Condómino: "9" + ID invertido
-    // Ex: ID "ABCD" → "9DCBA"
+
     function generateCondominoPin(condominioId) {
       const reversed = String(condominioId).split('').reverse().join('');
       return '9' + reversed;
