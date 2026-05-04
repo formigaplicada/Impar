@@ -53,10 +53,12 @@
       transition: all 0.15s; text-align: center;
     }
     .btn-profile:hover { border-color: var(--slate-400); background: var(--slate-50); }
+    .btn-profile.condomino { border-color: var(--amber); color: var(--amber); }
+    .btn-profile.condomino:hover { background: var(--amber-bg); }
+    .btn-profile.limpeza { border-color: var(--green); color: var(--green); }
+    .btn-profile.limpeza:hover { background: var(--green-bg); }
     .btn-profile.impar { border-color: var(--header-bg); color: var(--header-bg); }
     .btn-profile.impar:hover { background: #f1f5f9; }
-    .btn-profile.condómino { border-color: var(--amber); color: var(--amber); }
-    .btn-profile.condómino:hover { background: var(--amber-bg); }
 
     /* Ecrã de inserção de ID (Ímpar sem QR) */
     .id-screen { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -86,7 +88,6 @@
       text-align: center; text-decoration: underline; padding: 0;
     }
     .btn-back:hover { color: var(--slate-600); }
-    .error-inline { font-size: 0.8rem; color: #dc2626; text-align: center; }
 
     /* Menu principal */
     .condo-header { text-align: center; margin-bottom: 1.75rem; padding: 0 0.5rem; }
@@ -138,6 +139,8 @@
     .pin-input:focus { border-color: var(--blue); }
     .pin-input::placeholder { color: var(--slate-400); letter-spacing: normal; font-size: 1rem; }
     .pin-error { font-size: 0.8rem; color: #dc2626; text-align: center; min-height: 1.2em; }
+    .spinner { width: 14px; height: 14px; border: 2px solid var(--slate-200); border-top-color: var(--slate-500); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     footer { text-align: center; padding: 1rem; font-size: 0.7rem; color: var(--slate-400); border-top: 1px solid var(--slate-100); }
     .error-box { text-align: center; padding: 2rem; color: var(--slate-500); }
@@ -150,7 +153,7 @@
          class="logo-img" id="logo" alt="Ímpar"
          onerror="document.getElementById('logo').style.display='none'; document.getElementById('logoFallback').style.display='block'"/>
     <span class="logo-fallback" id="logoFallback">ÍMPAR</span>
-    <span class="version">v3.2</span>
+    <span class="version">v3.3</span>
   </header>
   <main>
     <div class="wrapper" id="app"></div>
@@ -164,25 +167,19 @@
     const condominioIdFromUrl = params.get('condominio');
     const appParam = params.get('app');
 
-    function getPerfil() { return sessionStorage.getItem('perfil'); }
-    function setPerfil(p) { sessionStorage.setItem('perfil', p); }
+    function getPerfil()       { return sessionStorage.getItem('perfil'); }
+    function setPerfil(p)      { sessionStorage.setItem('perfil', p); }
     function getCondominioId() { return sessionStorage.getItem('condominioId'); }
     function setCondominioId(id) { sessionStorage.setItem('condominioId', id); }
 
-    function generateImparPin(condominioId) {
-      const id = String(condominioId);
-      let pin = '';
-      const odds = [1, 3, 5, 7, 9, 11, 13, 15]; // dígitos ímpares sequenciais
-      for (let i = 0; i < id.length; i++) {
-        pin += odds[i] + id[i];
-      }
-      return pin;
+    // PIN Condómino: '9' + ID invertido
+    function generateCondominoPin(condominioId) {
+      return '9' + String(condominioId).split('').reverse().join('');
     }
 
-
-    function generateCondominoPin(condominioId) {
-      const reversed = String(condominioId).split('').reverse().join('');
-      return '9' + reversed;
+    // PIN Limpeza: ID + '3'
+    function generateLimpezaPin(condominioId) {
+      return String(condominioId) + '3';
     }
 
     function splitCondominioName(name) {
@@ -196,72 +193,115 @@
       return { line1: name.substring(0, splitPos).trim(), line2: name.substring(splitPos).trim() };
     }
 
-    function buildLinks(condominioId) {
-      const base = '?condominio=' + encodeURIComponent(condominioId);
-      document.getElementById('linkLimpeza').href = 'limpeza.html' + base;
-      document.getElementById('linkOcorrencia').href = 'ocorrencia.html' + base;
-      document.getElementById('linkManutencao').href = 'https://impar.pt';
-    }
-
     async function loadCondominioName(condominioId) {
       try {
         const res = await fetch(WEBHOOK_URL + '?action=getNome&condominio=' + encodeURIComponent(condominioId));
         const data = await res.json();
         return data.nome || condominioId;
-      } catch(e) {
-        return condominioId;
-      }
+      } catch(e) { return condominioId; }
     }
 
-    // Ecrã de PIN genérico — recebe a função geradora e a chave de sessão
+    async function validarPinImpar(pin) {
+      const res = await fetch(WEBHOOK_URL + '?action=validarPin&pin=' + encodeURIComponent(pin));
+      return await res.json(); // { valido: true/false, user: "..." }
+    }
+
+    // ── RENDER PROFILE SELECT ─────────────────────────────────
+    function renderProfileSelect() {
+      document.getElementById('app').innerHTML =
+        '<div class="profile-screen">' +
+          '<div class="profile-title"><p>Bem-vindo</p><h1>Quem é você?</h1></div>' +
+          '<div class="profile-buttons">' +
+            '<button class="btn-profile condomino" onclick="chooseProfile(\'condomino\')">🏠 &nbsp;Condómino</button>' +
+            '<button class="btn-profile limpeza"   onclick="chooseProfile(\'limpeza\')">🧹 &nbsp;Limpeza</button>' +
+            '<button class="btn-profile impar"     onclick="chooseProfile(\'impar\')">🏢 &nbsp;Ímpar</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    // ── RENDER PIN ────────────────────────────────────────────
     function renderPin(condominioId, perfil) {
-      const generatePin = perfil === 'impar' ? generateImparPin : generateCondominoPin;
-      const sessionKey = perfil === 'impar' ? 'imparPinOk' : 'condomino_PinOk';
-      const expectedPin = generatePin(condominioId);
+      const isImpar = perfil === 'impar';
+      const sessionKey = perfil === 'impar'   ? 'imparPinOk'
+                       : perfil === 'limpeza' ? 'limpezaPinOk'
+                       : 'condomino_PinOk';
+
+      let expectedPin = null;
+      let pinLength = 4;
+      if (perfil === 'condomino') {
+        expectedPin = generateCondominoPin(condominioId);
+        pinLength = expectedPin.length;
+      } else if (perfil === 'limpeza') {
+        expectedPin = generateLimpezaPin(condominioId);
+        pinLength = expectedPin.length;
+      }
+      // Ímpar: sempre 4 dígitos (PIN pessoal da sheet Pins)
 
       document.getElementById('app').innerHTML =
         '<div class="pin-screen">' +
           '<h2>🔒 Validação de Acesso</h2>' +
-          '<p>Condomínio: <strong>' + condominioId + '</strong></p>' +
-          '<input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="' + (expectedPin.length) + '" placeholder="PIN" autocomplete="off"/>' +
+          (isImpar
+            ? '<p>Introduz o teu PIN pessoal</p>'
+            : '<p>Condomínio: <strong>' + condominioId + '</strong></p>'
+          ) +
+          '<input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="' + pinLength + '" placeholder="••••" autocomplete="off"/>' +
           '<p class="pin-error" id="pinError"></p>' +
           '<button class="btn-back" onclick="renderProfileSelect()">← Voltar</button>' +
         '</div>';
+
       setTimeout(function() {
         const input = document.getElementById('pinInput');
-        if (input) {
-          input.addEventListener('input', function(e) {
-            const val = e.target.value.replace(/\D/g, '');
-            e.target.value = val;
-            if (val.length === expectedPin.length) {
-              if (val === expectedPin) {
+        if (!input) return;
+        input.focus();
+
+        input.addEventListener('input', async function(e) {
+          const val = e.target.value.replace(/\D/g, '').slice(0, pinLength);
+          e.target.value = val;
+          if (val.length !== pinLength) return;
+
+          if (isImpar) {
+            // Validação remota via GAS
+            input.disabled = true;
+            document.getElementById('pinError').innerHTML =
+              '<span style="display:flex;align-items:center;justify-content:center;gap:0.4rem;color:var(--slate-400)"><span class="spinner"></span> A validar...</span>';
+            try {
+              const result = await validarPinImpar(val);
+              if (result.valido) {
                 sessionStorage.setItem(sessionKey, condominioId);
-                renderMenu(condominioId, perfil);
+                sessionStorage.setItem('imparUser', result.user || '');
+                renderMenu(condominioId, 'impar');
               } else {
                 document.getElementById('pinError').textContent = '❌ PIN inválido. Tenta novamente.';
-                setTimeout(function() { e.target.value = ''; document.getElementById('pinError').textContent = ''; }, 1200);
+                setTimeout(function() {
+                  input.disabled = false; input.value = '';
+                  document.getElementById('pinError').textContent = ''; input.focus();
+                }, 1200);
               }
+            } catch(err) {
+              document.getElementById('pinError').textContent = '⚠️ Erro de ligação. Tenta novamente.';
+              setTimeout(function() {
+                input.disabled = false; input.value = '';
+                document.getElementById('pinError').textContent = ''; input.focus();
+              }, 1500);
             }
-          });
-          input.focus();
-        }
+          } else {
+            // Validação local (Condómino / Limpeza)
+            if (val === expectedPin) {
+              sessionStorage.setItem(sessionKey, condominioId);
+              renderMenu(condominioId, perfil);
+            } else {
+              document.getElementById('pinError').textContent = '❌ PIN inválido. Tenta novamente.';
+              setTimeout(function() {
+                e.target.value = '';
+                document.getElementById('pinError').textContent = '';
+              }, 1200);
+            }
+          }
+        });
       }, 0);
     }
 
-    function renderProfileSelect() {
-      document.getElementById('app').innerHTML =
-        '<div class="profile-screen">' +
-          '<div class="profile-title">' +
-            '<p>Bem-vindo</p>' +
-            '<h1>Quem é você?</h1>' +
-          '</div>' +
-          '<div class="profile-buttons">' +
-            '<button class="btn-profile impar" onclick="chooseProfile(\'impar\')">🏢 &nbsp;Ímpar</button>' +
-            '<button class="btn-profile condómino" onclick="chooseProfile(\'condómino\')">🏠 &nbsp;Condómino</button>' +
-          '</div>' +
-        '</div>';
-    }
-
+    // ── RENDER ID INPUT (Ímpar sem QR) ────────────────────────
     function renderImparIdInput() {
       document.getElementById('app').innerHTML =
         '<div class="id-screen">' +
@@ -271,7 +311,6 @@
             '<input class="id-input" id="condIdInput" type="text" inputmode="numeric" placeholder="Ex: 1234" autocomplete="off"/>' +
             '<button class="btn-go" id="btnGo" onclick="handleImparIdSubmit()" disabled>Aceder →</button>' +
           '</div>' +
-          '<p class="error-inline" id="idError" style="display:none;"></p>' +
           '<button class="btn-back" onclick="renderProfileSelect()">← Voltar</button>' +
         '</div>';
       setTimeout(function() {
@@ -280,31 +319,46 @@
           input.addEventListener('input', function() {
             document.getElementById('btnGo').disabled = input.value.trim().length === 0;
           });
-          input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') handleImparIdSubmit();
-          });
+          input.addEventListener('keydown', function(e) { if (e.key === 'Enter') handleImparIdSubmit(); });
           input.focus();
         }
       }, 0);
     }
 
+    // ── RENDER MENU ───────────────────────────────────────────
     async function renderMenu(condominioId, perfil) {
-      document.getElementById('app').innerHTML =
-        '<div class="profile-badge">A aceder como <strong>' + (perfil === 'impar' ? 'Ímpar' : 'Condómino') + '</strong> &nbsp;·&nbsp; <button onclick="resetPerfil()">trocar perfil</button></div>' +
-        '<div class="condo-header" id="condoHeader"><p class="condo-loading">A carregar...</p></div>' +
-        '<div class="cards" id="cards" style="display:none;">' +
-          (perfil === 'impar' ?
-            '<a class="card green" id="linkLimpeza" href="#"><div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div><div class="card-text"><p class="card-title">Limpeza</p><p class="card-sub">Registar check-in de limpeza</p></div><svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>' : '') +
-          '<a class="card amber" id="linkOcorrencia" href="#"><div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class="card-text"><p class="card-title">Ocorrência</p><p class="card-sub">Reportar problema ou incidente</p></div><svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>' +
-          (perfil === 'impar' ?
-            '<a class="card blue" id="linkManutencao" href="https://impar.pt"><div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div><div class="card-text"><p class="card-title">Manutenção</p><p class="card-sub">Solicitar intervenção técnica</p></div><svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></a>' : '') +
-        '</div>';
+      const base = '?condominio=' + encodeURIComponent(condominioId);
+      const imparUser = sessionStorage.getItem('imparUser') || '';
+      const badgeLabel = perfil === 'impar'    ? 'Ímpar' + (imparUser ? ' · ' + imparUser : '')
+                       : perfil === 'limpeza'  ? 'Limpeza'
+                       : 'Condómino';
 
-      if (perfil === 'impar') buildLinks(condominioId);
-      else {
-        const base = '?condominio=' + encodeURIComponent(condominioId);
-        document.getElementById('linkOcorrencia').href = 'ocorrencia.html' + base;
-      }
+      const svgArrow = '<svg class="card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>';
+
+      const cardLimpeza =
+        '<a class="card green" href="limpeza.html' + base + '">' +
+          '<div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>' +
+          '<div class="card-text"><p class="card-title">Limpeza</p><p class="card-sub">Registar check-in de limpeza</p></div>' + svgArrow + '</a>';
+
+      const cardOcorrencia =
+        '<a class="card amber" href="ocorrencia.html' + base + '">' +
+          '<div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>' +
+          '<div class="card-text"><p class="card-title">Ocorrência</p><p class="card-sub">Reportar problema ou incidente</p></div>' + svgArrow + '</a>';
+
+      const cardManutencao =
+        '<a class="card blue" href="https://impar.pt">' +
+          '<div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>' +
+          '<div class="card-text"><p class="card-title">Manutenção</p><p class="card-sub">Solicitar intervenção técnica</p></div>' + svgArrow + '</a>';
+
+      // Ímpar vê tudo; Limpeza só vê Limpeza; Condómino só vê Ocorrência
+      const cardsHTML = perfil === 'impar'    ? cardLimpeza + cardOcorrencia + cardManutencao
+                      : perfil === 'limpeza'  ? cardLimpeza
+                      : cardOcorrencia;
+
+      document.getElementById('app').innerHTML =
+        '<div class="profile-badge">A aceder como <strong>' + badgeLabel + '</strong> &nbsp;·&nbsp; <button onclick="resetPerfil()">trocar perfil</button></div>' +
+        '<div class="condo-header" id="condoHeader"><p class="condo-loading">A carregar...</p></div>' +
+        '<div class="cards" id="cards" style="display:none;">' + cardsHTML + '</div>';
 
       const nome = await loadCondominioName(condominioId);
       const { line1, line2 } = splitCondominioName(nome);
@@ -315,30 +369,33 @@
       document.getElementById('cards').style.display = 'flex';
     }
 
-    // ── ACTIONS ───────────────────────────────────────────────────
-
+    // ── ACTIONS ───────────────────────────────────────────────
     function chooseProfile(perfil) {
       setPerfil(perfil);
       const condId = getCondominioId();
 
       if (perfil === 'impar') {
-        if (!condId) {
-          renderImparIdInput();
-        } else if (sessionStorage.getItem('imparPinOk') === condId) {
-          renderMenu(condId, 'impar');
-        } else {
-          renderPin(condId, 'impar');
-        }
+        if (!condId)                                          { renderImparIdInput(); return; }
+        if (sessionStorage.getItem('imparPinOk') === condId) { renderMenu(condId, 'impar'); return; }
+        renderPin(condId, 'impar');
+        return;
+      }
+
+      // Condómino e Limpeza precisam de condomínio no URL/sessão
+      if (!condId) {
+        document.getElementById('app').innerHTML =
+          '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';
+        return;
+      }
+
+      if (perfil === 'limpeza') {
+        sessionStorage.getItem('limpezaPinOk') === condId
+          ? renderMenu(condId, 'limpeza')
+          : renderPin(condId, 'limpeza');
       } else {
-        // Condómino
-        if (!condId) {
-          document.getElementById('app').innerHTML =
-            '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';
-        } else if (sessionStorage.getItem('condomino_PinOk') === condId) {
-          renderMenu(condId, 'condómino');
-        } else {
-          renderPin(condId, 'condómino');
-        }
+        sessionStorage.getItem('condomino_PinOk') === condId
+          ? renderMenu(condId, 'condomino')
+          : renderPin(condId, 'condomino');
       }
     }
 
@@ -351,26 +408,25 @@
     }
 
     function resetPerfil() {
-      sessionStorage.removeItem('perfil');
-      sessionStorage.removeItem('condominioId');
-      sessionStorage.removeItem('imparPinOk');
-      sessionStorage.removeItem('condomino_PinOk');
+      sessionStorage.clear();
       renderProfileSelect();
     }
 
-    // ── INIT ──────────────────────────────────────────────────────
-
+    // ── INIT ──────────────────────────────────────────────────
     function init() {
       if (condominioIdFromUrl) {
         setCondominioId(condominioIdFromUrl);
         sessionStorage.removeItem('perfil');
         sessionStorage.removeItem('imparPinOk');
+        sessionStorage.removeItem('imparUser');
+        sessionStorage.removeItem('limpezaPinOk');
         sessionStorage.removeItem('condomino_PinOk');
       }
 
       const condId = condominioIdFromUrl || getCondominioId();
+
       if (appParam && condId) {
-        if (appParam === 'limpeza') { window.location.href = 'limpeza.html?condominio=' + encodeURIComponent(condId); return; }
+        if (appParam === 'limpeza')    { window.location.href = 'limpeza.html?condominio=' + encodeURIComponent(condId); return; }
         if (appParam === 'ocorrencia') { window.location.href = 'ocorrencia.html?condominio=' + encodeURIComponent(condId); return; }
         if (appParam === 'manutencao') { window.location.href = 'https://impar.pt'; return; }
       }
@@ -379,25 +435,22 @@
       if (!perfil) { renderProfileSelect(); return; }
 
       const condominioId = getCondominioId();
-      if (condominioId) {
-        if (perfil === 'impar') {
-          if (sessionStorage.getItem('imparPinOk') === condominioId) {
-            renderMenu(condominioId, 'impar');
-          } else {
-            renderPin(condominioId, 'impar');
-          }
-        } else {
-          if (sessionStorage.getItem('condomino_PinOk') === condominioId) {
-            renderMenu(condominioId, 'condómino');
-          } else {
-            renderPin(condominioId, 'condómino');
-          }
-        }
-      } else if (perfil === 'impar') {
-        renderImparIdInput();
+
+      if (perfil === 'impar') {
+        if (!condominioId) { renderImparIdInput(); return; }
+        sessionStorage.getItem('imparPinOk') === condominioId
+          ? renderMenu(condominioId, 'impar')
+          : renderPin(condominioId, 'impar');
+      } else if (perfil === 'limpeza') {
+        if (!condominioId) { renderProfileSelect(); return; }
+        sessionStorage.getItem('limpezaPinOk') === condominioId
+          ? renderMenu(condominioId, 'limpeza')
+          : renderPin(condominioId, 'limpeza');
       } else {
-        document.getElementById('app').innerHTML =
-          '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';
+        if (!condominioId) { renderProfileSelect(); return; }
+        sessionStorage.getItem('condomino_PinOk') === condominioId
+          ? renderMenu(condominioId, 'condomino')
+          : renderPin(condominioId, 'condomino');
       }
     }
 
