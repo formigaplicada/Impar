@@ -11,6 +11,24 @@ function generateSessionToken() {
   return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+async function getMicrosoftToken(env) {
+  const res = await fetch(
+    `https://login.microsoftonline.com/${env.MICROSOFT_TENANT_ID}/oauth2/v2.0/token`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id:     env.MICROSOFT_CLIENT_ID,
+        client_secret: env.MICROSOFT_CLIENT_SECRET,
+        scope:         'https://graph.microsoft.com/.default',
+        grant_type:    'client_credentials'
+      })
+    }
+  )
+  const data = await res.json()
+  return data.access_token
+}
+
 // ── CORS ─────────────────────────────────────────────────────
 
 app.use('*', async (c, next) => {
@@ -256,6 +274,106 @@ app.get('/limpezas', requireAuth, async (c) => {
     LIMIT 100
   `
   return c.json({ limpezas: rows })
+})
+
+// ── Workflow de ocorrências ───────────────────────────────────
+
+app.get('/ocorrencias/:id', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const id = c.req.param('id')
+
+  const rows = await sql`
+    SELECT
+      o.id, o.condominio_id, c.n_impar, c.nome as condominio_nome,
+      o.categoria_texto, cat.nome as categoria_nome, cat.emoji as categoria_emoji,
+      o.descricao_final, o.nome_reportante, o.telefone_reportante, o.email_reportante,
+      o.status, o.tem_foto, o.foto_url, o.latitude, o.longitude, o.maps_link,
+      o.criado_em, o.atualizado_em
+    FROM ocorrencias o
+    LEFT JOIN condominios c ON c.id = o.condominio_id
+    LEFT JOIN categorias cat ON cat.id = o.categoria_id
+    WHERE o.id = ${id}
+  `
+  if (rows.length === 0) return c.json({ error: 'Ocorrência não encontrada' }, 404)
+
+  const estados = await sql`
+    SELECT e.id, e.estado_anterior, e.estado_novo, e.notas, e.criado_em,
+           u.nome as utilizador_nome
+    FROM ocorrencia_estados e
+    LEFT JOIN utilizadores u ON u.id = e.utilizador_id
+    WHERE e.ocorrencia_id = ${id}
+    ORDER BY e.criado_em ASC
+  `
+
+  return c.json({ ocorrencia: rows[0], historico: estados })
+})
+
+app.put('/ocorrencias/:id/status', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const id = c.req.param('id')
+  const user = c.get('user')
+  const body = await c.req.json()
+  const { status, notas } = body
+
+  const estados_validos = ['aberta', 'em_curso', 'resolvida', 'cancelada']
+  if (!estados_validos.includes(status)) {
+    return c.json({ error: 'Estado inválido' }, 400)
+  }
+
+  // Buscar estado actual e email do reportante
+  const atual = await sql`
+    SELECT status, email_reportante, nome_reportante, id as oc_id
+    FROM ocorrencias WHERE id = ${id}
+  `
+  if (atual.length === 0) return c.json({ error: 'Ocorrência não encontrada' }, 404)
+
+  const estado_anterior = atual[0].status
+
+  // Actualizar estado
+  await sql`
+    UPDATE ocorrencias SET status = ${status}, atualizado_em = NOW()
+    WHERE id = ${id}
+  `
+
+  // Registar histórico
+  await sql`
+    INSERT INTO ocorrencia_estados (ocorrencia_id, estado_anterior, estado_novo, utilizador_id, notas)
+    VALUES (${id}, ${estado_anterior}, ${status}, ${user.id}, ${notas || null})
+  `
+
+  // Enviar email se tiver email do reportante
+  const email = atual[0].email_reportante
+  if (email && status ==='resolvida') {
+    const STATUS_LABELS = {
+      aberta: 'Aberta', em_curso: 'Em curso',
+      resolvida: 'Resolvida', cancelada: 'Cancelada'
+    }
+    await fetch('https://graph.microsoft.com/v1.0/users/propostas@impar.pt/sendMail', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getMicrosoftToken(c.env)}`
+      },
+      body: JSON.stringify({
+        message: {
+          subject: `Ocorrência ${id} — ${STATUS_LABELS[status]}`,
+          body: {
+            contentType: 'HTML',
+            content: `
+              <p>Caro/a ${atual[0].nome_reportante || 'Condómino'},</p>
+              <p>A sua ocorrência <strong>${id}</strong> foi actualizada para o estado <strong>${STATUS_LABELS[status]}</strong>.</p>
+              ${notas ? `<p><strong>Nota:</strong> ${notas}</p>` : ''}
+              <p>Obrigado,<br>Equipa Ímpar</p>
+            `
+          },
+          toRecipients: [{ emailAddress: { address: email } }]
+        },
+        saveToSentItems: false
+      })
+    })
+  }
+
+  return c.json({ ok: true })
 })
 
 export default app
