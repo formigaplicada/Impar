@@ -451,6 +451,9 @@ app.post('/public/ocorrencias', async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   
   const formData = await c.req.formData()
+    // Log temporário
+  console.log('condominio recebido:', formData.get('condominio'))
+  console.log('ocId recebido:', formData.get('ocId'))
   const ocId        = formData.get('ocId') || ''
   const condominioNImpar = formData.get('condominio') || ''
   const timestamp   = formData.get('timestamp') || ''

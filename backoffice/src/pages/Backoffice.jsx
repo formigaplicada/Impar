@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { auth } from '../lib/auth'
+import Dashboard from './Dashboard'
 import Ocorrencias from './Ocorrencias'
 import Limpezas from './Limpezas'
+import Condominios from './Condominios'
 
 export default function Backoffice({ page }) {
   const [user, setUser] = useState(null)
@@ -29,12 +31,18 @@ export default function Backoffice({ page }) {
   )
 
   const menuItems = [
-    { key: '',            label: '📊 Dashboard',   path: '/backoffice' },
-    { key: 'ocorrencias', label: '⚠️ Ocorrências', path: '/backoffice/ocorrencias' },
-    { key: 'limpezas',    label: '🧹 Limpezas',    path: '/backoffice/limpezas' },
+    { key: '',             label: '📊 Dashboard',    path: '/backoffice' },
+    { key: 'condominios',  label: '🏢 Condomínios',  path: '/backoffice/condominios' },
+    { key: 'ocorrencias',  label: '⚠️ Ocorrências',  path: '/backoffice/ocorrencias' },
+    { key: 'limpezas',     label: '🧹 Limpezas',     path: '/backoffice/limpezas' },
   ]
 
-  const pageTitle = page === 'ocorrencias' ? 'Ocorrências' : page === 'limpezas' ? 'Limpezas' : 'Dashboard'
+  const pageTitle = {
+    '':            'Dashboard',
+    'condominios': 'Condomínios',
+    'ocorrencias': 'Ocorrências',
+    'limpezas':    'Limpezas',
+  }[page] || 'Dashboard'
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'DM Sans, sans-serif' }}>
@@ -77,19 +85,10 @@ export default function Backoffice({ page }) {
           <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '1.5rem' }}>
             {pageTitle}
           </h1>
-          {page === 'ocorrencias' ? (
-            <Ocorrencias />
-          ) : page === 'limpezas' ? (
-            <Limpezas />
-          ) : (
-            <div style={{
-              background: 'white', borderRadius: '1rem', padding: '2rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)', textAlign: 'center', color: '#64748b'
-            }}>
-              <p>🚧 Dashboard em construção</p>
-              <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>Olá, {user?.nome}!</p>
-            </div>
-          )}
+          {page === 'condominios' ? <Condominios /> :
+          page === 'ocorrencias' ? <Ocorrencias /> :
+          page === 'limpezas'    ? <Limpezas /> :
+          <Dashboard />}
         </main>
       </div>
     </div>

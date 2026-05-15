@@ -685,24 +685,44 @@
     }
 
     async function handleSubmitLimpeza() {
-      state.loading = true; render();
-      const timestamp = new Date().toLocaleString('pt-PT');
-      const formData = new FormData();
-      formData.append('condominio', state.condominioId);
-      formData.append('latitude', state.location.latitude);
-      formData.append('longitude', state.location.longitude);
-      formData.append('accuracy', state.location.accuracy);
-      formData.append('timestamp', timestamp);
-      formData.append('photoBase64', state.photoBase64);
-      formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
+  state.loading = true; render();
+  const timestamp = new Date().toLocaleString('pt-PT');
 
-      fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
+  const formData = new FormData();
+  formData.append('condominio', state.condominioId);
+  formData.append('latitude', state.location.latitude);
+  formData.append('longitude', state.location.longitude);
+  formData.append('accuracy', state.location.accuracy);
+  formData.append('timestamp', timestamp);
+  formData.append('photoBase64', state.photoBase64);
 
-      state.successMsg = 'Limpeza registada com sucesso!';
-      state.step = 'success';
-      render();
-    }
+  const emailData = new FormData();
+  emailData.append('condominio', state.condominioId);
+  emailData.append('latitude', state.location.latitude);
+  emailData.append('longitude', state.location.longitude);
+  emailData.append('timestamp', timestamp);
+  emailData.append('temFoto', state.photoBase64 ? 'true' : 'false');
 
+  // GAS (existente)
+  fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
+  fetch(WEBHOOK_EMAIL_URL, { method: 'POST', mode: 'no-cors', body: emailData });
+
+  // Nova API (em paralelo)
+  const formData2 = new FormData();
+  formData2.append('condominio', state.condominioId);
+  formData2.append('latitude', state.location.latitude);
+  formData2.append('longitude', state.location.longitude);
+  formData2.append('accuracy', state.location.accuracy);
+  formData2.append('timestamp', timestamp);
+  formData2.append('temFoto', state.photoBase64 ? 'true' : 'false');
+  fetch('https://impar-api.formigaplicada.workers.dev/public/limpezas', {
+    method: 'POST', body: formData2
+  }).catch(function() {});
+
+  state.successMsg = 'Limpeza registada com sucesso!';
+  state.step = 'success';
+  render();
+}
     init();
   </script>
 </body>

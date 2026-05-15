@@ -554,31 +554,50 @@
 
     function handleBackTo(step) { state.step = step; render(); }
 
-    async function handleSubmit() {
-      state.loading = true; render();
-      const timestamp = new Date().toLocaleString('pt-PT');
-      const categoriaFinal = state.categoriaOutra || state.categoriaSelected;
+   async function handleSubmit() {
+  state.loading = true; render();
+  const timestamp = new Date().toLocaleString('pt-PT');
+  const categoriaFinal = state.categoriaOutra || state.categoriaSelected;
 
-      const formData = new FormData();
-      formData.append('sheet', 'Ocorrencias');
-      formData.append('ocId', state.ocId);
-      formData.append('condominio', state.condominioId);
-      formData.append('timestamp', timestamp);
-      formData.append('latitude', state.location.latitude);
-      formData.append('longitude', state.location.longitude);
-      formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
-      formData.append('photoBase64', state.photoBase64 || '');
-      formData.append('categoria', categoriaFinal);
-      formData.append('descricaoAI', state.descricaoAI);
-      formData.append('descricaoFinal', state.descricaoFinal);
-      formData.append('nome', state.nome);
-      formData.append('telefone', state.telefone);
-      formData.append('email', state.email);
+  const formData = new FormData();
+  formData.append('sheet', 'Ocorrencias');
+  formData.append('ocId', state.ocId);
+  formData.append('condominio', state.condominioId);
+  formData.append('timestamp', timestamp);
+  formData.append('latitude', state.location.latitude);
+  formData.append('longitude', state.location.longitude);
+  formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
+  formData.append('photoBase64', state.photoBase64 || '');
+  formData.append('categoria', categoriaFinal);
+  formData.append('descricaoAI', state.descricaoAI);
+  formData.append('descricaoFinal', state.descricaoFinal);
+  formData.append('nome', state.nome);
+  formData.append('telefone', state.telefone);
+  formData.append('email', state.email);
 
-      fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
+  // GAS (existente)
+  fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
 
-      state.step = 'success'; render();
-    }
+  // Nova API (em paralelo)
+  const formData2 = new FormData();
+  formData2.append('ocId', state.ocId);
+  formData2.append('condominio', state.condominioId);
+  formData2.append('timestamp', timestamp);
+  formData2.append('latitude', state.location.latitude);
+  formData2.append('longitude', state.location.longitude);
+  formData2.append('temFoto', state.photoBase64 ? 'true' : 'false');
+  formData2.append('categoria', categoriaFinal);
+  formData2.append('descricaoAI', state.descricaoAI);
+  formData2.append('descricaoFinal', state.descricaoFinal);
+  formData2.append('nome', state.nome);
+  formData2.append('telefone', state.telefone);
+  formData2.append('email', state.email);
+  fetch('https://impar-api.formigaplicada.workers.dev/public/ocorrencias', {
+    method: 'POST', body: formData2
+  }).catch(function() {});
+
+  state.step = 'success'; render();
+}
 
     init();
   </script>
