@@ -376,4 +376,170 @@ app.put('/ocorrencias/:id/status', requireAuth, async (c) => {
   return c.json({ ok: true })
 })
 
+// ── Dashboard ─────────────────────────────────────────────────
+
+app.get('/dashboard', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const { data_inicio, data_fim } = c.req.query()
+
+  const inicio = data_inicio || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const fim = data_fim || new Date().toISOString()
+
+  const [por_estado, por_categoria, por_loja, limpezas, tempo_medio] = await Promise.all([
+    // Ocorrências por estado
+    sql`
+      SELECT status, COUNT(*) as total
+      FROM ocorrencias
+      WHERE criado_em >= ${inicio} AND criado_em <= ${fim}
+      GROUP BY status
+      ORDER BY status
+    `,
+    // Ocorrências por categoria
+    sql`
+      SELECT 
+        COALESCE(cat.nome, o.categoria_texto, 'Sem categoria') as categoria,
+        COALESCE(cat.emoji, '📦') as emoji,
+        COUNT(*) as total
+      FROM ocorrencias o
+      LEFT JOIN categorias cat ON cat.id = o.categoria_id
+      WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
+      GROUP BY cat.nome, o.categoria_texto, cat.emoji
+      ORDER BY total DESC
+      LIMIT 8
+    `,
+    // Ocorrências por loja
+    sql`
+      SELECT 
+        COALESCE(l.nome, 'Sem loja') as loja,
+        COUNT(*) as total
+      FROM ocorrencias o
+      LEFT JOIN condominios c ON c.id = o.condominio_id
+      LEFT JOIN lojas l ON l.id = c.loja_id
+      WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
+      GROUP BY l.nome
+      ORDER BY total DESC
+    `,
+    // Total de limpezas
+    sql`
+      SELECT COUNT(*) as total
+      FROM limpezas
+      WHERE ts_checkin >= ${inicio} AND ts_checkin <= ${fim}
+    `,
+    // Tempo médio de resolução (em horas)
+    sql`
+      SELECT ROUND(AVG(EXTRACT(EPOCH FROM (e.criado_em - o.criado_em)) / 3600)::numeric, 1) as horas
+      FROM ocorrencias o
+      JOIN ocorrencia_estados e ON e.ocorrencia_id = o.id
+      WHERE e.estado_novo = 'resolvida'
+        AND o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
+    `
+  ])
+
+  return c.json({
+    periodo: { inicio, fim },
+    por_estado,
+    por_categoria,
+    por_loja,
+    total_limpezas: Number(limpezas[0]?.total || 0),
+    tempo_medio_horas: tempo_medio[0]?.horas || null
+  })
+})
+
+// ── Rotas públicas (sem autenticação) ─────────────────────────
+
+app.post('/public/ocorrencias', async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  
+  const formData = await c.req.formData()
+  const ocId        = formData.get('ocId') || ''
+  const condominioNImpar = formData.get('condominio') || ''
+  const timestamp   = formData.get('timestamp') || ''
+  const latitude    = formData.get('latitude') || null
+  const longitude   = formData.get('longitude') || null
+  const temFoto     = formData.get('temFoto') === 'true'
+  const fotoUrl     = formData.get('photoBase64') ? null : null // foto vai para Drive, não aqui
+  const categoria   = formData.get('categoria') || null
+  const descricaoAI = formData.get('descricaoAI') || null
+  const descricaoFinal = formData.get('descricaoFinal') || null
+  const nome        = formData.get('nome') || null
+  const telefone    = formData.get('telefone') || null
+  const email       = formData.get('email') || null
+
+  // Lookup condominio_id a partir do n_impar
+  const cond = await sql`
+    SELECT id FROM condominios WHERE n_impar = ${condominioNImpar} LIMIT 1
+  `
+  if (cond.length === 0) {
+    return c.json({ error: 'Condomínio não encontrado' }, 404)
+  }
+  const condominioId = cond[0].id
+
+  // Lookup categoria
+  const cat = await sql`
+    SELECT id FROM categorias WHERE nome = ${categoria} LIMIT 1
+  `
+  const categoriaId = cat.length > 0 ? cat[0].id : null
+
+  await sql`
+    INSERT INTO ocorrencias (
+      id, condominio_id, categoria_id, categoria_texto,
+      descricao_ai, descricao_final,
+      latitude, longitude,
+      tem_foto,
+      nome_reportante, telefone_reportante, email_reportante,
+      status, ts_registo
+    ) VALUES (
+      ${ocId}, ${condominioId}, ${categoriaId}, ${categoria},
+      ${descricaoAI}, ${descricaoFinal},
+      ${latitude ? parseFloat(latitude) : null},
+      ${longitude ? parseFloat(longitude) : null},
+      ${temFoto},
+      ${nome}, ${telefone}, ${email},
+      'aberta',
+      NOW()
+    )
+    ON CONFLICT (id) DO NOTHING
+  `
+
+  return c.json({ ok: true })
+})
+
+app.post('/public/limpezas', async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+
+  const formData = await c.req.formData()
+  const condominioNImpar = formData.get('condominio') || ''
+  const latitude  = formData.get('latitude') || null
+  const longitude = formData.get('longitude') || null
+  const accuracy  = formData.get('accuracy') || null
+  const temFoto   = formData.get('temFoto') === 'true'
+  const timestamp = formData.get('timestamp') || null
+
+  // Lookup condominio_id a partir do n_impar
+  const cond = await sql`
+    SELECT id, loja_id FROM condominios WHERE n_impar = ${condominioNImpar} LIMIT 1
+  `
+  if (cond.length === 0) {
+    return c.json({ error: 'Condomínio não encontrado' }, 404)
+  }
+
+  await sql`
+    INSERT INTO limpezas (
+      condominio_id, loja_id,
+      latitude, longitude, precisao_m,
+      tem_foto, pin_validado,
+      ts_checkin
+    ) VALUES (
+      ${cond[0].id}, ${cond[0].loja_id},
+      ${latitude ? parseFloat(latitude) : null},
+      ${longitude ? parseFloat(longitude) : null},
+      ${accuracy ? parseFloat(accuracy) : null},
+      ${temFoto}, true,
+      NOW()
+    )
+  `
+
+  return c.json({ ok: true })
+})
+
 export default app
