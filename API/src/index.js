@@ -33,7 +33,7 @@ async function getMicrosoftToken(env) {
 
 app.use('*', async (c, next) => {
   const origin = c.req.header('Origin') || ''
-  const allowed = ['http://localhost:5173', 'https://impar.pages.dev']
+  const allowed = ['http://localhost:5173', 'https://condexpress.pages.dev', 'https://app.condexpress.com']
   if (allowed.includes(origin)) {
     c.header('Access-Control-Allow-Origin', origin)
     c.header('Access-Control-Allow-Credentials', 'true')
@@ -90,24 +90,42 @@ app.get('/auth/callback', async (c) => {
 
   if (!email.endsWith('@impar.pt')) return c.json({ error: 'Acesso restrito a contas @impar.pt' }, 403)
 
-  const sql = neon(c.env.DATABASE_URL)
+const sql = neon(c.env.DATABASE_URL)
+
+// Verifica se utilizador existe
+const existente = await sql`
+  SELECT id, role FROM utilizadores WHERE email = ${email}
+`
+
+if (existente.length > 0) {
+  // Utilizador existe — actualiza último login
+  await sql`
+    UPDATE utilizadores SET ultimo_login = NOW(), nome = ${profile.displayName}
+    WHERE email = ${email}
+  `
+} else {
+  // Não existe — cria com gestor_condominio
   await sql`
     INSERT INTO utilizadores (id, nome, email, email_verificado, role)
-    VALUES (${profile.id}, ${profile.displayName}, ${email}, true, 'gestor')
-    ON CONFLICT (email) DO UPDATE SET nome = EXCLUDED.nome, ultimo_login = NOW()
+    VALUES (${profile.id}, ${profile.displayName}, ${email}, true, 'gestor_condominio')
   `
+}
+
+const userId = existente.length > 0 ? existente[0].id : profile.id
+  
 
   const token = generateSessionToken()
   const expira = new Date(Date.now() + 8 * 60 * 60 * 1000)
   await sql`
-    INSERT INTO sessoes (id, utilizador_id, token, expira_em)
-    VALUES (${generateSessionToken()}, ${profile.id}, ${token}, ${expira.toISOString()})
-  `
+  INSERT INTO sessoes (id, utilizador_id, token, expira_em)
+  VALUES (${generateSessionToken()}, ${userId}, ${token}, ${expira.toISOString()})
+`
+
 
   return new Response(null, {
     status: 302,
     headers: {
-      'Location': `http://localhost:5173/backoffice?token=${token}`,
+      'Location': `https://app.condexpress.com/backoffice?token=${token}`,
       'Set-Cookie': `session=${token}; HttpOnly; Secure; SameSite=Lax; Max-Age=28800; Path=/`
     }
   })
