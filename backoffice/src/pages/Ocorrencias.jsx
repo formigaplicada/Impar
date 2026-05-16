@@ -33,6 +33,16 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
   const [notas, setNotas] = useState('')
   const [alterando, setAlterando] = useState(false)
 
+  // Atribuição de prestador
+  const [prestadores, setPrestadores] = useState([])
+  const [prestadorId, setPrestadorId] = useState('')
+  const [contactos, setContactos] = useState([])
+  const [contactoId, setContactoId] = useState('')
+  const [notasAtribuicao, setNotasAtribuicao] = useState('')
+  const [atribuindo, setAtribuindo] = useState(false)
+  const [atribuicaoErro, setAtribuicaoErro] = useState('')
+  const [atribuicaoSucesso, setAtribuicaoSucesso] = useState('')
+
   async function carregar() {
     setLoading(true)
     const data = await api.get(`/ocorrencias/${ocorrenciaId}`)
@@ -41,7 +51,22 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
     setLoading(false)
   }
 
-  useEffect(() => { carregar() }, [ocorrenciaId])
+  async function carregarPrestadores() {
+    const data = await api.get('/prestadores')
+    setPrestadores(data?.prestadores || [])
+  }
+
+  async function carregarContactos(pid) {
+    if (!pid) { setContactos([]); return }
+    const data = await api.get(`/prestadores/${pid}/contactos`)
+    setContactos(data?.contactos || [])
+    setContactoId('')
+  }
+
+  useEffect(() => {
+    carregar()
+    carregarPrestadores()
+  }, [ocorrenciaId])
 
   async function mudarStatus(novoStatus) {
     setAlterando(true)
@@ -52,15 +77,33 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
     setAlterando(false)
   }
 
+  async function atribuirPrestador() {
+    if (!prestadorId) { setAtribuicaoErro('Selecciona um prestador.'); return }
+    setAtribuindo(true); setAtribuicaoErro(''); setAtribuicaoSucesso('')
+    const res = await api.post(`/ocorrencias/${ocorrenciaId}/prestador`, {
+      prestador_id: parseInt(prestadorId),
+      contacto_id: contactoId ? parseInt(contactoId) : null,
+      notas: notasAtribuicao || null
+    })
+    if (res?.ok) {
+      setAtribuicaoSucesso('Prestador atribuído com sucesso!')
+      setPrestadorId(''); setContactoId(''); setNotasAtribuicao('')
+      await carregar(); onStatusChange()
+    } else {
+      setAtribuicaoErro(res?.error || 'Erro ao atribuir prestador.')
+    }
+    setAtribuindo(false)
+  }
+
   if (loading) return (
     <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>A carregar...</div>
   )
-
   if (!detalhe) return (
     <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Ocorrência não encontrada.</div>
   )
 
   const transicoes = STATUS_TRANSICOES[detalhe.status] || []
+  const podeAtribuir = detalhe.status === 'aberta' || detalhe.status === 'em_curso'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem' }}>
@@ -68,18 +111,11 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '0.25rem' }}>
-            {detalhe.id}
-          </p>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>
-            {detalhe.condominio_nome}
-          </h3>
+          <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '0.25rem' }}>{detalhe.id}</p>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>{detalhe.condominio_nome}</h3>
           <p style={{ fontSize: '0.8rem', color: '#64748b' }}>N Impar: {detalhe.n_impar}</p>
         </div>
-        <button onClick={onClose} style={{
-          background: 'none', border: 'none', fontSize: '1.25rem',
-          cursor: 'pointer', color: '#94a3b8'
-        }}>✕</button>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
       </div>
 
       {/* Estado actual */}
@@ -88,41 +124,24 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
           <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569' }}>Estado actual:</span>
           <Badge status={detalhe.status} />
         </div>
-
         {transicoes.length > 0 && (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.75rem' }}>
-              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#475569' }}>
-                Nota (opcional)
-              </label>
-              <textarea
-                value={notas}
-                onChange={e => setNotas(e.target.value)}
-                placeholder="Adicionar nota sobre esta alteração..."
-                rows={2}
-                style={{
-                  padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0',
-                  borderRadius: '0.5rem', fontSize: '0.875rem',
-                  fontFamily: 'DM Sans, sans-serif', resize: 'vertical'
-                }}
+              <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#475569' }}>Nota (opcional)</label>
+              <textarea value={notas} onChange={e => setNotas(e.target.value)}
+                placeholder="Adicionar nota sobre esta alteração..." rows={2}
+                style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', resize: 'vertical' }}
               />
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               {transicoes.map(s => {
                 const info = STATUS_LABELS[s]
                 return (
-                  <button
-                    key={s}
-                    onClick={() => mudarStatus(s)}
-                    disabled={alterando}
-                    style={{
-                      background: info.bg, color: info.color,
-                      border: `1.5px solid ${info.color}`,
-                      borderRadius: '0.5rem', padding: '0.4rem 0.875rem',
-                      fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
-                      opacity: alterando ? 0.6 : 1
-                    }}
-                  >
+                  <button key={s} onClick={() => mudarStatus(s)} disabled={alterando} style={{
+                    background: info.bg, color: info.color, border: `1.5px solid ${info.color}`,
+                    borderRadius: '0.5rem', padding: '0.4rem 0.875rem',
+                    fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', opacity: alterando ? 0.6 : 1
+                  }}>
                     {alterando ? '...' : `→ ${info.label}`}
                   </button>
                 )
@@ -131,6 +150,46 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
           </>
         )}
       </div>
+
+      {/* Atribuição de prestador */}
+      {podeAtribuir && (
+        <div style={{ background: '#f0fdf4', borderRadius: '0.75rem', padding: '1rem', border: '1px solid #bbf7d0' }}>
+          <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#16a34a', marginBottom: '0.75rem' }}>
+            Atribuir Prestador
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <select value={prestadorId} onChange={e => { setPrestadorId(e.target.value); carregarContactos(e.target.value) }}
+              style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: 'white' }}>
+              <option value="">Seleccionar prestador...</option>
+              {prestadores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+
+            {contactos.length > 0 && (
+              <select value={contactoId} onChange={e => setContactoId(e.target.value)}
+                style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: 'white' }}>
+                <option value="">Contacto principal</option>
+                {contactos.map(c => <option key={c.id} value={c.id}>{c.nome} {c.email ? `(${c.email})` : ''}</option>)}
+              </select>
+            )}
+
+            <textarea value={notasAtribuicao} onChange={e => setNotasAtribuicao(e.target.value)}
+              placeholder="Notas para o prestador (opcional)..." rows={2}
+              style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', resize: 'vertical' }}
+            />
+
+            {atribuicaoErro && <p style={{ color: '#dc2626', fontSize: '0.8rem' }}>❌ {atribuicaoErro}</p>}
+            {atribuicaoSucesso && <p style={{ color: '#16a34a', fontSize: '0.8rem' }}>✓ {atribuicaoSucesso}</p>}
+
+            <button onClick={atribuirPrestador} disabled={atribuindo || !prestadorId} style={{
+              background: '#16a34a', color: 'white', border: 'none', borderRadius: '0.5rem',
+              padding: '0.5rem 1rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+              opacity: atribuindo || !prestadorId ? 0.6 : 1
+            }}>
+              {atribuindo ? 'A atribuir...' : '✓ Atribuir Prestador'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Detalhes */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
@@ -166,18 +225,13 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
 
       {/* Histórico */}
       <div>
-        <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '0.75rem' }}>
-          Histórico
-        </p>
+        <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '0.75rem' }}>Histórico</p>
         {historico.length === 0 ? (
           <p style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Sem alterações registadas.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {historico.map(h => (
-              <div key={h.id} style={{
-                background: '#f8fafc', borderRadius: '0.5rem',
-                padding: '0.75rem', fontSize: '0.8rem'
-              }}>
+              <div key={h.id} style={{ background: '#f8fafc', borderRadius: '0.5rem', padding: '0.75rem', fontSize: '0.8rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                   <Badge status={h.estado_anterior || 'aberta'} />
                   <span style={{ color: '#94a3b8' }}>→</span>
