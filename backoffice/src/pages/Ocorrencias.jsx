@@ -27,6 +27,8 @@ function Badge({ status }) {
 }
 
 function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
+  const [sugestoes, setSugestoes] = useState([])
+  const [modalPrestadorAberto, setModalPrestadorAberto] = useState(false)
   const [detalhe, setDetalhe] = useState(null)
   const [historico, setHistorico] = useState([])
   const [loading, setLoading] = useState(true)
@@ -46,6 +48,8 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
   async function carregar() {
     setLoading(true)
     const data = await api.get(`/ocorrencias/${ocorrenciaId}`)
+    const sugestoesData = await api.get(`/ocorrencias/${ocorrenciaId}/prestadores-sugeridos`)
+    setSugestoes(sugestoesData?.sugestoes || [])
     setDetalhe(data?.ocorrencia || null)
     setHistorico(data?.historico || [])
     setLoading(false)
@@ -153,43 +157,71 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
 
       {/* Atribuição de prestador */}
       {podeAtribuir && (
-        <div style={{ background: '#f0fdf4', borderRadius: '0.75rem', padding: '1rem', border: '1px solid #bbf7d0' }}>
-          <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#16a34a', marginBottom: '0.75rem' }}>
-            Atribuir Prestador
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <select value={prestadorId} onChange={e => { setPrestadorId(e.target.value); carregarContactos(e.target.value) }}
-              style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: 'white' }}>
-              <option value="">Seleccionar prestador...</option>
-              {prestadores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-            </select>
+  <div style={{ background: '#f0fdf4', borderRadius: '0.75rem', padding: '1rem', border: '1px solid #bbf7d0' }}>
+    <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#16a34a', marginBottom: '0.75rem' }}>
+      Atribuir Prestador
+    </p>
 
-            {contactos.length > 0 && (
-              <select value={contactoId} onChange={e => setContactoId(e.target.value)}
-                style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: 'white' }}>
-                <option value="">Contacto principal</option>
-                {contactos.map(c => <option key={c.id} value={c.id}>{c.nome} {c.email ? `(${c.email})` : ''}</option>)}
-              </select>
-            )}
-
-            <textarea value={notasAtribuicao} onChange={e => setNotasAtribuicao(e.target.value)}
-              placeholder="Notas para o prestador (opcional)..." rows={2}
-              style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', resize: 'vertical' }}
-            />
-
-            {atribuicaoErro && <p style={{ color: '#dc2626', fontSize: '0.8rem' }}>❌ {atribuicaoErro}</p>}
-            {atribuicaoSucesso && <p style={{ color: '#16a34a', fontSize: '0.8rem' }}>✓ {atribuicaoSucesso}</p>}
-
-            <button onClick={atribuirPrestador} disabled={atribuindo || !prestadorId} style={{
-              background: '#16a34a', color: 'white', border: 'none', borderRadius: '0.5rem',
-              padding: '0.5rem 1rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
-              opacity: atribuindo || !prestadorId ? 0.6 : 1
+    {/* Sugestões */}
+    {sugestoes.length > 0 && (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '0.75rem' }}>
+        {sugestoes.map(s => (
+          <button key={s.id} type="button"
+            onClick={() => { setPrestadorId(String(s.id)); carregarContactos(String(s.id)) }}
+            style={{
+              background: prestadorId === String(s.id) ? '#dcfce7' : 'white',
+              border: `1.5px solid ${prestadorId === String(s.id) ? '#16a34a' : '#e2e8f0'}`,
+              borderRadius: '0.5rem', padding: '0.625rem 0.875rem',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem'
             }}>
-              {atribuindo ? 'A atribuir...' : '✓ Atribuir Prestador'}
-            </button>
-          </div>
-        </div>
-      )}
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ fontWeight: 600, color: '#0f172a' }}>{s.nome}</p>
+              {s.email && <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{s.email}</p>}
+            </div>
+            <span style={{ fontSize: '0.7rem', color: s.origem === 'condominio' ? '#16a34a' : '#64748b', fontWeight: 600 }}>
+              {s.origem === 'condominio' ? '★ Último usado' : 'Loja'}
+            </span>
+          </button>
+        ))}
+      </div>
+    )}
+
+    {/* Pesquisar outro */}
+    <button type="button" onClick={() => setModalPrestadorAberto(true)} style={{
+      background: 'white', border: '1.5px dashed #cbd5e1', borderRadius: '0.5rem',
+      padding: '0.5rem', width: '100%', fontSize: '0.8rem', color: '#64748b',
+      cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', marginBottom: '0.75rem'
+    }}>
+      🔍 Pesquisar outro prestador
+    </button>
+
+    {/* Contacto */}
+    {contactos.length > 0 && (
+      <select value={contactoId} onChange={e => setContactoId(e.target.value)}
+        style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: 'white', width: '100%', marginBottom: '0.5rem' }}>
+        <option value="">Contacto principal</option>
+        {contactos.map(c => <option key={c.id} value={c.id}>{c.nome} {c.email ? `(${c.email})` : ''}</option>)}
+      </select>
+    )}
+
+    <textarea value={notasAtribuicao} onChange={e => setNotasAtribuicao(e.target.value)}
+      placeholder="Notas para o prestador (opcional)..." rows={2}
+      style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', resize: 'vertical', width: '100%', marginBottom: '0.5rem' }}
+    />
+
+    {atribuicaoErro && <p style={{ color: '#dc2626', fontSize: '0.8rem', marginBottom: '0.5rem' }}>❌ {atribuicaoErro}</p>}
+    {atribuicaoSucesso && <p style={{ color: '#16a34a', fontSize: '0.8rem', marginBottom: '0.5rem' }}>✓ {atribuicaoSucesso}</p>}
+
+    <button onClick={atribuirPrestador} disabled={atribuindo || !prestadorId} style={{
+      background: '#16a34a', color: 'white', border: 'none', borderRadius: '0.5rem',
+      padding: '0.5rem 1rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+      opacity: atribuindo || !prestadorId ? 0.6 : 1, width: '100%'
+    }}>
+      {atribuindo ? 'A atribuir...' : '✓ Atribuir Prestador'}
+    </button>
+  </div>
+)}
 
       {/* Detalhes */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>

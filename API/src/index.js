@@ -838,4 +838,55 @@ app.get('/nif/:nif', requireAuth, async (c) => {
   }
 })
 
+// Sugestões de prestadores para uma ocorrência
+app.get('/ocorrencias/:id/prestadores-sugeridos', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const ocorrencia_id = c.req.param('id')
+
+  // Obter condominio e loja da ocorrência
+  const oc = await sql`
+    SELECT o.condominio_id, c.loja_id
+    FROM ocorrencias o
+    JOIN condominios c ON c.id = o.condominio_id
+    WHERE o.id = ${ocorrencia_id}
+  `
+  if (oc.length === 0) return c.json({ sugestoes: [] })
+
+  const { condominio_id, loja_id } = oc[0]
+
+  // Último prestador usado neste condomínio
+  const ultimo = await sql`
+    SELECT DISTINCT ON (op.prestador_id)
+      p.id, p.nome, p.email, p.telefone,
+      op.criado_em,
+      'condominio' as origem
+    FROM ocorrencia_prestadores op
+    JOIN ocorrencias o ON o.id = op.ocorrencia_id
+    JOIN prestadores p ON p.id = op.prestador_id
+    WHERE o.condominio_id = ${condominio_id}
+    ORDER BY op.prestador_id, op.criado_em DESC
+    LIMIT 1
+  `
+
+  const ultimoId = ultimo.length > 0 ? ultimo[0].id : null
+
+  // Outros prestadores usados nesta loja (excluindo o último do condomínio)
+  const outros = await sql`
+    SELECT DISTINCT ON (op.prestador_id)
+      p.id, p.nome, p.email, p.telefone,
+      op.criado_em,
+      'loja' as origem
+    FROM ocorrencia_prestadores op
+    JOIN ocorrencias o ON o.id = op.ocorrencia_id
+    JOIN condominios c ON c.id = o.condominio_id
+    JOIN prestadores p ON p.id = op.prestador_id
+    WHERE c.loja_id = ${loja_id}
+      AND op.prestador_id != ${ultimoId || 0}
+    ORDER BY op.prestador_id, op.criado_em DESC
+    LIMIT 4
+  `
+
+  return c.json({ sugestoes: [...ultimo, ...outros] })
+})
+
 export default app
