@@ -790,4 +790,52 @@ app.post('/intervencao/:token', async (c) => {
   return c.json({ ok: true })
 })
 
+// ── NIF.PT ───────────────────────────────────────────────────
+
+app.get('/nif/:nif', requireAuth, async (c) => {
+  const nif = c.req.param('nif')
+
+  if (!nif || nif.length < 9) {
+    return c.json({ error: 'NIF inválido' }, 400)
+  }
+
+  try {
+    const url = `https://www.nif.pt/?json=1&q=${nif}&key=${c.env.NIF_API_KEY}`
+    const res = await fetch(url)
+    const json = await res.json()
+
+    if (json.result !== 'success' || !json.records || !json.records[nif]) {
+      return c.json({ error: 'NIF não encontrado' }, 404)
+    }
+
+    const r = json.records[nif]
+    const cp = r.pc4 && r.pc3 ? `${r.pc4}-${r.pc3}` : null
+    const cae = Array.isArray(r.cae) ? r.cae.join(', ') : (r.cae || null)
+
+    return c.json({
+      ok: true,
+      dados: {
+        nome:          r.title      || null,
+        morada:        r.address    || null,
+        cidade:        r.city       || null,
+        codigo_postal: cp,
+        actividade:    r.activity   || null,
+        estado:        r.status     || 'active',
+        cae,
+        data_inicio:   r.start_date || null,
+        natureza:      r.structure  ? (r.structure.nature   || null) : null,
+        capital:       r.structure  ? (r.structure.capital  ? `${r.structure.capital} ${r.structure.capital_currency || 'EUR'}` : null) : null,
+        email:         r.contacts   ? (r.contacts.email     || null) : null,
+        telefone:      r.contacts   ? (r.contacts.phone     || null) : null,
+        website:       r.contacts   ? (r.contacts.website   || null) : null,
+        regiao:        r.geo        ? (r.geo.region         || null) : null,
+        concelho:      r.geo        ? (r.geo.county         || null) : null,
+        freguesia:     r.geo        ? (r.geo.parish         || null) : null
+      }
+    })
+  } catch (err) {
+    return c.json({ error: 'Erro ao consultar NIF: ' + err.message }, 500)
+  }
+})
+
 export default app
