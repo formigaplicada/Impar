@@ -4,6 +4,8 @@ import Backoffice from './pages/Backoffice'
 import Ocorrencias from './pages/Ocorrencias'
 import Limpezas from './pages/Limpezas'
 import Condominios from './pages/Condominios'
+import Dashboard from './pages/Dashboard'
+import Prestadores from './pages/Prestadores'
 
 export default function App() {
   return (
@@ -14,6 +16,7 @@ export default function App() {
         <Route path="/backoffice/ocorrencias" element={<Backoffice page="ocorrencias" />} />
         <Route path="/backoffice/limpezas" element={<Backoffice page="limpezas" />} />
         <Route path="/backoffice/condominios" element={<Backoffice page="condominios" />} />
+        <Route path="/backoffice/prestadores" element={<Backoffice page="prestadores" />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>

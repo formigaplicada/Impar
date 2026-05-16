@@ -563,4 +563,231 @@ app.post('/public/limpezas', async (c) => {
   return c.json({ ok: true })
 })
 
+// ── Prestadores ───────────────────────────────────────────────
+
+app.get('/prestadores', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const { nome, nif } = c.req.query()
+
+  const rows = await sql`
+    SELECT id, nif, nome, natureza, estado, cidade, email, telefone, website
+    FROM prestadores
+    WHERE ativo = true
+      ${nome ? sql`AND nome ILIKE ${'%' + nome + '%'}` : sql``}
+      ${nif ? sql`AND nif = ${nif}` : sql``}
+    ORDER BY nome ASC
+    LIMIT 100
+  `
+  return c.json({ prestadores: rows })
+})
+
+app.post('/prestadores', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const body = await c.req.json()
+  const { nif, nome, natureza, capital, estado, data_inicio, cae, actividade,
+          morada, cidade, codigo_postal, regiao, concelho, freguesia,
+          email, telefone, website } = body
+
+  if (!nome) return c.json({ error: 'Nome é obrigatório' }, 400)
+
+  const res = await sql`
+    INSERT INTO prestadores (nif, nome, natureza, capital, estado, data_inicio, cae, actividade,
+      morada, cidade, codigo_postal, regiao, concelho, freguesia, email, telefone, website)
+    VALUES (
+      ${nif || null}, ${nome}, ${natureza || null}, ${capital || null},
+      ${estado || 'active'}, ${data_inicio || null}, ${cae || null}, ${actividade || null},
+      ${morada || null}, ${cidade || null}, ${codigo_postal || null}, ${regiao || null},
+      ${concelho || null}, ${freguesia || null}, ${email || null}, ${telefone || null},
+      ${website || null}
+    )
+    RETURNING id
+  `
+  return c.json({ ok: true, id: res[0].id })
+})
+
+app.get('/prestadores/:id/contactos', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const id = c.req.param('id')
+
+  const rows = await sql`
+    SELECT pc.id, pc.nome, pc.email, pc.telefone, pc.notas, pc.principal,
+           l.nome as loja_nome, pc.condominio_id
+    FROM prestador_contactos pc
+    LEFT JOIN lojas l ON l.id = pc.loja_id
+    WHERE pc.prestador_id = ${id} AND pc.ativo = true
+    ORDER BY pc.principal DESC, pc.id ASC
+  `
+  return c.json({ contactos: rows })
+})
+
+app.post('/prestadores/:id/contactos', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const prestador_id = c.req.param('id')
+  const body = await c.req.json()
+  const { nome, email, telefone, loja_id, condominio_id, notas, principal } = body
+
+  const res = await sql`
+    INSERT INTO prestador_contactos (prestador_id, nome, email, telefone, loja_id, condominio_id, notas, principal)
+    VALUES (
+      ${prestador_id}, ${nome || null}, ${email || null}, ${telefone || null},
+      ${loja_id || null}, ${condominio_id || null}, ${notas || null}, ${principal || false}
+    )
+    RETURNING id
+  `
+  return c.json({ ok: true, id: res[0].id })
+})
+
+// ── Atribuição de prestadores a ocorrências ───────────────────
+
+app.post('/ocorrencias/:id/prestador', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const ocorrencia_id = c.req.param('id')
+  const user = c.get('user')
+  const body = await c.req.json()
+  const { prestador_id, contacto_id, notas } = body
+
+  // Gerar token de acesso para o prestador
+  const token_acesso = generateSessionToken()
+  const token_expira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dias
+
+  await sql`
+    INSERT INTO ocorrencia_prestadores (ocorrencia_id, prestador_id, contacto_id, utilizador_id, notas, token_acesso, token_expira)
+    VALUES (${ocorrencia_id}, ${prestador_id}, ${contacto_id || null}, ${user.id}, ${notas || null}, ${token_acesso}, ${token_expira.toISOString()})
+  `
+
+  // Mudar estado para em_curso
+  const estado_anterior = await sql`SELECT status FROM ocorrencias WHERE id = ${ocorrencia_id}`
+  await sql`UPDATE ocorrencias SET status = 'em_curso', atualizado_em = NOW() WHERE id = ${ocorrencia_id}`
+  await sql`
+    INSERT INTO ocorrencia_estados (ocorrencia_id, estado_anterior, estado_novo, utilizador_id, notas)
+    VALUES (${ocorrencia_id}, ${estado_anterior[0].status}, 'em_curso', ${user.id}, ${'Prestador atribuído'})
+  `
+
+  // Enviar email ao prestador com link
+  const contacto = contacto_id ? await sql`SELECT email, nome FROM prestador_contactos WHERE id = ${contacto_id}` : []
+  const prestador = await sql`SELECT email, nome FROM prestadores WHERE id = ${prestador_id}`
+  const emailDestino = contacto.length > 0 ? contacto[0].email : prestador[0]?.email
+
+  if (emailDestino) {
+    const link = `https://app.condexpress.com/intervencao?token=${token_acesso}`
+    await fetch(`https://graph.microsoft.com/v1.0/users/propostas@impar.pt/sendMail`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getMicrosoftToken(c.env)}`
+      },
+      body: JSON.stringify({
+        message: {
+          subject: `Ocorrência ${ocorrencia_id} — Intervenção necessária`,
+          body: {
+            contentType: 'HTML',
+            content: `
+              <p>Caro/a ${contacto.length > 0 ? contacto[0].nome : prestador[0]?.nome},</p>
+              <p>Foi-lhe atribuída uma ocorrência que requer a sua intervenção.</p>
+              <p><strong>Referência:</strong> ${ocorrencia_id}</p>
+              ${notas ? `<p><strong>Notas:</strong> ${notas}</p>` : ''}
+              <p>Por favor, após a intervenção, registe-a através do link:</p>
+              <p><a href="${link}">${link}</a></p>
+              <p>O link é válido por 7 dias.</p>
+              <p>Obrigado,<br>Equipa Ímpar</p>
+            `
+          },
+          toRecipients: [{ emailAddress: { address: emailDestino } }]
+        },
+        saveToSentItems: false
+      })
+    })
+  }
+
+  return c.json({ ok: true, token_acesso })
+})
+
+// ── Registo de intervenção (via token — público) ──────────────
+
+app.get('/intervencao/:token', async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const token = c.req.param('token')
+
+  const rows = await sql`
+    SELECT op.id, op.ocorrencia_id, op.prestador_id, op.token_expira,
+           o.condominio_id, c.nome as condominio_nome, c.morada,
+           p.nome as prestador_nome
+    FROM ocorrencia_prestadores op
+    JOIN ocorrencias o ON o.id = op.ocorrencia_id
+    JOIN condominios c ON c.id = o.condominio_id
+    JOIN prestadores p ON p.id = op.prestador_id
+    WHERE op.token_acesso = ${token}
+      AND op.token_expira > NOW()
+  `
+
+  if (rows.length === 0) return c.json({ error: 'Link inválido ou expirado' }, 404)
+  return c.json({ atribuicao: rows[0] })
+})
+
+app.post('/intervencao/:token', async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const token = c.req.param('token')
+  const formData = await c.req.formData()
+
+  const atribuicao = await sql`
+    SELECT op.id, op.ocorrencia_id, op.prestador_id
+    FROM ocorrencia_prestadores op
+    WHERE op.token_acesso = ${token} AND op.token_expira > NOW()
+  `
+  if (atribuicao.length === 0) return c.json({ error: 'Link inválido ou expirado' }, 404)
+
+  const { ocorrencia_id, prestador_id, id: atribuicao_id } = atribuicao[0]
+
+  const latitude  = formData.get('latitude') || null
+  const longitude = formData.get('longitude') || null
+  const notas     = formData.get('notas') || null
+  const temFoto   = formData.get('temFoto') === 'true'
+
+  await sql`
+    INSERT INTO intervencoes (ocorrencia_id, prestador_id, atribuicao_id, latitude, longitude, tem_foto, notas, registado_por)
+    VALUES (
+      ${ocorrencia_id}, ${prestador_id}, ${atribuicao_id},
+      ${latitude ? parseFloat(latitude) : null},
+      ${longitude ? parseFloat(longitude) : null},
+      ${temFoto}, ${notas}, 'prestador'
+    )
+  `
+
+  // Mudar estado para resolvida
+  await sql`UPDATE ocorrencias SET status = 'resolvida', atualizado_em = NOW() WHERE id = ${ocorrencia_id}`
+  await sql`
+    INSERT INTO ocorrencia_estados (ocorrencia_id, estado_anterior, estado_novo, notas)
+    VALUES (${ocorrencia_id}, 'em_curso', 'resolvida', 'Intervenção registada pelo prestador')
+  `
+
+  // Enviar email ao condómino
+  const oc = await sql`SELECT email_reportante, nome_reportante, id FROM ocorrencias WHERE id = ${ocorrencia_id}`
+  if (oc[0]?.email_reportante) {
+    await fetch(`https://graph.microsoft.com/v1.0/users/propostas@impar.pt/sendMail`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getMicrosoftToken(c.env)}`
+      },
+      body: JSON.stringify({
+        message: {
+          subject: `Ocorrência ${ocorrencia_id} — Resolvida`,
+          body: {
+            contentType: 'HTML',
+            content: `
+              <p>Caro/a ${oc[0].nome_reportante || 'Condómino'},</p>
+              <p>A sua ocorrência <strong>${ocorrencia_id}</strong> foi resolvida.</p>
+              <p>Obrigado,<br>Equipa Ímpar</p>
+            `
+          },
+          toRecipients: [{ emailAddress: { address: oc[0].email_reportante } }]
+        },
+        saveToSentItems: false
+      })
+    })
+  }
+
+  return c.json({ ok: true })
+})
+
 export default app

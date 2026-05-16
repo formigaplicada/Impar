@@ -5,6 +5,7 @@ import Dashboard from './Dashboard'
 import Ocorrencias from './Ocorrencias'
 import Limpezas from './Limpezas'
 import Condominios from './Condominios'
+import Prestadores from './Prestadores'
 
 export default function Backoffice({ page }) {
   const [user, setUser] = useState(null)
@@ -35,6 +36,7 @@ export default function Backoffice({ page }) {
     { key: 'condominios',  label: '🏢 Condomínios',  path: '/backoffice/condominios' },
     { key: 'ocorrencias',  label: '⚠️ Ocorrências',  path: '/backoffice/ocorrencias' },
     { key: 'limpezas',     label: '🧹 Limpezas',     path: '/backoffice/limpezas' },
+    { key: 'prestadores', label: '🔧 Prestadores', path: '/backoffice/prestadores' },
   ]
 
   const pageTitle = {
@@ -42,6 +44,7 @@ export default function Backoffice({ page }) {
     'condominios': 'Condomínios',
     'ocorrencias': 'Ocorrências',
     'limpezas':    'Limpezas',
+    'prestadores': 'Prestadores',
   }[page] || 'Dashboard'
 
   return (
@@ -85,9 +88,10 @@ export default function Backoffice({ page }) {
           <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '1.5rem' }}>
             {pageTitle}
           </h1>
-          {page === 'condominios' ? <Condominios /> :
-          page === 'ocorrencias' ? <Ocorrencias /> :
-          page === 'limpezas'    ? <Limpezas /> :
+          {page === 'condominios'  ? <Condominios /> :
+           page === 'ocorrencias'  ? <Ocorrencias /> :
+           page === 'limpezas'     ? <Limpezas /> :
+           page === 'prestadores'  ? <Prestadores /> :
           <Dashboard />}
         </main>
       </div>
