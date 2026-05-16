@@ -252,6 +252,7 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
   const [loading, setLoading] = useState(true)
   const [notas, setNotas] = useState('')
   const [alterando, setAlterando] = useState(false)
+  const [prestadorNome, setPrestadorNome] = useState('')
 
   // Atribuição de prestador
   const [prestadores, setPrestadores] = useState([])
@@ -415,7 +416,14 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
     }}>
       🔍 Pesquisar outro prestador
     </button>
-
+    {prestadorId && prestadorNome && (
+      <div style={{ background: '#eff6ff', border: '1.5px solid #2563eb', borderRadius: '0.5rem', padding: '0.625rem 0.875rem', marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+        <span style={{ color: '#64748b' }}>Seleccionado: </span>
+        <strong style={{ color: '#0f172a' }}>{prestadorNome}</strong>
+        <button onClick={() => { setPrestadorId(''); setPrestadorNome(''); setContactos([]) }}
+          style={{ float: 'right', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+      </div>
+    )}
     {/* Contacto */}
     {contactos.length > 0 && (
       <select value={contactoId} onChange={e => setContactoId(e.target.value)}
@@ -503,6 +511,7 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
           onClose={() => setModalPrestadorAberto(false)}
           onSelect={p => {
             setPrestadorId(String(p.id))
+            setPrestadorNome(p.nome)
             carregarContactos(String(p.id))
             setModalPrestadorAberto(false)
           }}
@@ -519,6 +528,7 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
           onSave={async (novoPrestador) => {
             setModalNovoPrestador(false)
             setPrestadorId(String(novoPrestador.id))
+            setPrestadorNome(novoPrestador.nome)
             setAtribuicaoSucesso('')
             setAtribuicaoErro('')
             await carregarContactos(String(novoPrestador.id))
