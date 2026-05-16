@@ -519,6 +519,8 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
           onSave={async (novoPrestador) => {
             setModalNovoPrestador(false)
             setPrestadorId(String(novoPrestador.id))
+            setAtribuicaoSucesso('')
+            setAtribuicaoErro('')
             await carregarContactos(String(novoPrestador.id))
           }}
         />
