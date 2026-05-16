@@ -262,6 +262,7 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
   const [atribuindo, setAtribuindo] = useState(false)
   const [atribuicaoErro, setAtribuicaoErro] = useState('')
   const [atribuicaoSucesso, setAtribuicaoSucesso] = useState('')
+  const [modalNovoPrestador, setModalNovoPrestador] = useState(false)
 
   async function carregar() {
     setLoading(true)
@@ -326,7 +327,7 @@ function PainelDetalhe({ ocorrenciaId, onClose, onStatusChange }) {
 
   const transicoes = STATUS_TRANSICOES[detalhe.status] || []
   const podeAtribuir = detalhe.status === 'aberta' || detalhe.status === 'em_curso'
-  const [modalNovoPrestador, setModalNovoPrestador] = useState(false)
+  
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '1.5rem' }}>
