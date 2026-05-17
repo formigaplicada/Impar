@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const STATUS_LABELS = {
