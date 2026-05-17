@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
 
 const STATUS_LABELS = {
   aberta:    { label: 'Aberta',    color: '#dc2626', bg: '#fee2e2' },
