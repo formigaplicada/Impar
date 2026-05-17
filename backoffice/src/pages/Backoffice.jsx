@@ -6,6 +6,7 @@ import Ocorrencias from './Ocorrencias'
 import Limpezas from './Limpezas'
 import Condominios from './Condominios'
 import Prestadores from './Prestadores'
+import OcorrenciaDetalhe from './OcorrenciaDetalhe'
 
 export default function Backoffice({ page }) {
   const [user, setUser] = useState(null)
@@ -37,7 +38,7 @@ export default function Backoffice({ page }) {
     { key: 'ocorrencias',  label: '⚠️ Ocorrências',  path: '/backoffice/ocorrencias' },
     { key: 'limpezas',     label: '🧹 Limpezas',     path: '/backoffice/limpezas' },
     { key: 'prestadores', label: '🔧 Prestadores', path: '/backoffice/prestadores' },
-  ]
+    ]
 
   const pageTitle = {
     '':            'Dashboard',
@@ -45,6 +46,7 @@ export default function Backoffice({ page }) {
     'ocorrencias': 'Ocorrências',
     'limpezas':    'Limpezas',
     'prestadores': 'Prestadores',
+    'ocorrencia_detalhe': 'Ocorrência',
   }[page] || 'Dashboard'
 
   return (
@@ -90,6 +92,7 @@ export default function Backoffice({ page }) {
           </h1>
           {page === 'condominios'  ? <Condominios /> :
            page === 'ocorrencias'  ? <Ocorrencias /> :
+           page === 'ocorrencia_detalhe'? <OcorrenciaDetalhe /> :
            page === 'limpezas'     ? <Limpezas /> :
            page === 'prestadores'  ? <Prestadores /> :
           <Dashboard />}
