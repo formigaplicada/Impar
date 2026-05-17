@@ -291,9 +291,10 @@ export default function OcorrenciaDetalhe() {
         )}
 
         {detalhe.foto_url && (
-          <div style={{ marginTop: '1rem' }}>
-            <img src={detalhe.foto_url} alt="Foto" style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '0.5rem', objectFit: 'cover' }} />
-          </div>
+        <div>
+            <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: '#94a3b8', marginBottom: '0.25rem' }}>Foto</p>
+            <a href={detalhe.foto_url} target="_blank" rel="noreferrer" style={{ color: '#2563eb', fontSize: '0.875rem' }}>📷 Ver foto</a>
+        </div>
         )}
       </div>
 
