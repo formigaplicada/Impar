@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { auth } from '../lib/auth'
+import { api } from '../lib/api'
 import Dashboard from './Dashboard'
 import Ocorrencias from './Ocorrencias'
 import Limpezas from './Limpezas'
