@@ -256,8 +256,7 @@ export default function OcorrenciaDetalhe() {
           <div>
             <p style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8', marginBottom: '0.25rem' }}>{detalhe.id}</p>
             <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.25rem' }}>{detalhe.condominio_nome}</h1>
-            <p style={{ fontSize: '0.875rem', color: '#64748b' }}>N Impar: {detalhe.n_impar}</p>
-          </div>
+           </div>
           <Badge status={detalhe.status} />
         </div>
 
