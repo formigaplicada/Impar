@@ -58,39 +58,6 @@ useEffect(() => {
     'ocorrencia_detalhe': 'Ocorrência',
   }[page] || 'Dashboard'
 
-{modalImpersonate && (
-  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
-    <div style={{ background: 'white', borderRadius: '1rem', width: '100%', maxWidth: '28rem', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-      <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>Entrar como...</h2>
-        <button onClick={() => setModalImpersonate(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
-      </div>
-      <div style={{ padding: '0.5rem 0' }}>
-        {utilizadores.map(u => (
-          <button key={u.id} onClick={async () => { setModalImpersonate(false); await auth.startImpersonate(u.id) }} style={{
-            width: '100%', background: 'none', border: 'none', padding: '0.875rem 1.5rem',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', borderBottom: '1px solid #f1f5f9',
-            textAlign: 'left'
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-          >
-            <div>
-              <p style={{ fontWeight: 600, fontSize: '0.875rem', color: '#0f172a' }}>{u.nome}</p>
-              <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{u.email}</p>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{u.loja_nome || '—'}</p>
-              <p style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{u.role}</p>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>
-)}
-
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'DM Sans, sans-serif' }}>
       <header style={{
@@ -175,6 +142,38 @@ useEffect(() => {
           <Dashboard />}
         </main>
       </div>
+{modalImpersonate && (
+  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}>
+    <div style={{ background: 'white', borderRadius: '1rem', width: '100%', maxWidth: '28rem', maxHeight: '80vh', overflow: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+      <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 700, color: '#0f172a' }}>Entrar como...</h2>
+        <button onClick={() => setModalImpersonate(false)} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+      </div>
+      <div style={{ padding: '0.5rem 0' }}>
+        {utilizadores.map(u => (
+          <button key={u.id} onClick={async () => { setModalImpersonate(false); await auth.startImpersonate(u.id) }} style={{
+            width: '100%', background: 'none', border: 'none', padding: '0.875rem 1.5rem',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', borderBottom: '1px solid #f1f5f9',
+            textAlign: 'left'
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <div>
+              <p style={{ fontWeight: 600, fontSize: '0.875rem', color: '#0f172a' }}>{u.nome}</p>
+              <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{u.email}</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{u.loja_nome || '—'}</p>
+              <p style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{u.role}</p>
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
+  </div>
+)}
+  </div>
   )
 }
