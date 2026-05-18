@@ -150,7 +150,7 @@ async function requireAuth(c, next) {
 
   const sql = neon(c.env.DATABASE_URL)
   const rows = await sql`
-    SELECT u.id, u.nome, u.email, u.role, u.loja_id
+    SELECT u.id, u.nome, u.email, u.role, u.loja_id, s.impersonator_id
     FROM sessoes s
     JOIN utilizadores u ON u.id = s.utilizador_id
     WHERE s.token = ${token} AND s.expira_em > NOW()
@@ -170,8 +170,17 @@ app.get('/health', async (c) => {
 
 // ── /me ───────────────────────────────────────────────────────
 
-app.get('/me', requireAuth, (c) => {
-  return c.json({ user: c.get('user') })
+app.get('/me', requireAuth, async (c) => {
+  const user = c.get('user')
+  const sql = neon(c.env.DATABASE_URL)
+
+  let impersonator = null
+  if (user.impersonator_id) {
+    const rows = await sql`SELECT nome FROM utilizadores WHERE id = ${user.impersonator_id}`
+    impersonator = rows[0]?.nome || null
+  }
+
+  return c.json({ user: { ...user, impersonator_nome: impersonator } })
 })
 
 // ── Lojas ─────────────────────────────────────────────────────
@@ -889,4 +898,85 @@ app.get('/ocorrencias/:id/prestadores-sugeridos', requireAuth, async (c) => {
   return c.json({ sugestoes: [...ultimo, ...outros] })
 })
 
+// ── Utilizadores (listagem para impersonate) ──────────────────
+
+app.get('/utilizadores', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const rows = await sql`
+    SELECT u.id, u.nome, u.email, u.role, l.nome as loja_nome
+    FROM utilizadores u
+    LEFT JOIN lojas l ON l.id = u.loja_id
+    WHERE u.role != 'admin' AND u.ativo = true
+    ORDER BY u.nome ASC
+  `
+  return c.json({ utilizadores: rows })
+})
+
+// ── Impersonate ───────────────────────────────────────────────
+
+app.post('/admin/impersonate/:utilizador_id', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const utilizador_id = c.req.param('utilizador_id')
+
+  // Verifica que o utilizador existe e não é admin
+  const target = await sql`
+    SELECT id, nome, email, role, loja_id FROM utilizadores
+    WHERE id = ${utilizador_id} AND role != 'admin' AND ativo = true
+  `
+  if (target.length === 0) return c.json({ error: 'Utilizador não encontrado' }, 404)
+
+  // Obtém o token actual do admin (para guardar e poder voltar)
+  const authHeader = c.req.header('Authorization') || ''
+  const adminToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+  // Cria sessão de impersonate
+  const token = generateSessionToken()
+  const expira = new Date(Date.now() + 8 * 60 * 60 * 1000)
+
+  await sql`
+    INSERT INTO sessoes (id, utilizador_id, token, expira_em, impersonator_id)
+    VALUES (${generateSessionToken()}, ${utilizador_id}, ${token}, ${expira.toISOString()}, ${user.id})
+  `
+
+  // Log no audit
+  await sql`
+    INSERT INTO audit_log (utilizador_id, acao, tabela, registo_id, payload)
+    VALUES (${user.id}, 'impersonate.start', 'utilizadores', ${utilizador_id}, ${JSON.stringify({ target_nome: target[0].nome, target_email: target[0].email })})
+  `
+
+  return c.json({ ok: true, token, admin_token: adminToken })
+})
+
+app.post('/admin/impersonate/stop', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
+
+  // Verifica se está em impersonate
+  const authHeader = c.req.header('Authorization') || ''
+  const currentToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+  const sessao = await sql`
+    SELECT impersonator_id FROM sessoes WHERE token = ${currentToken}
+  `
+  if (!sessao[0]?.impersonator_id) return c.json({ error: 'Não está em modo impersonate' }, 400)
+
+  const impersonator_id = sessao[0].impersonator_id
+
+  // Log
+  await sql`
+    INSERT INTO audit_log (utilizador_id, acao, tabela, registo_id)
+    VALUES (${impersonator_id}, 'impersonate.stop', 'utilizadores', ${user.id})
+  `
+
+  // Apaga sessão de impersonate
+  await sql`DELETE FROM sessoes WHERE token = ${currentToken}`
+
+  return c.json({ ok: true })
+})
 export default app
