@@ -200,6 +200,7 @@ app.get('/lojas', requireAuth, async (c) => {
 
 app.get('/condominios', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
   const { n_impar, nome } = c.req.query()
 
   const rows = await sql`
@@ -211,6 +212,7 @@ app.get('/condominios', requireAuth, async (c) => {
     FROM condominios c
     LEFT JOIN lojas l ON l.id = c.loja_id
     WHERE c.ativo = true
+      ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
       ${n_impar ? sql`AND c.n_impar = ${n_impar}` : sql``}
       ${nome ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
     ORDER BY c.n_impar ASC
@@ -257,6 +259,7 @@ app.post('/condominios', requireAuth, async (c) => {
 
 app.get('/ocorrencias', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
   const { n_impar, categoria, status, data_inicio, data_fim } = c.req.query()
 
   const rows = await sql`
@@ -269,6 +272,7 @@ app.get('/ocorrencias', requireAuth, async (c) => {
     LEFT JOIN condominios c ON c.id = o.condominio_id
     LEFT JOIN categorias cat ON cat.id = o.categoria_id
     WHERE 1=1
+      ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
       ${n_impar ? sql`AND c.n_impar = ${n_impar}` : sql``}
       ${categoria ? sql`AND (cat.nome = ${categoria} OR o.categoria_texto = ${categoria})` : sql``}
       ${status ? sql`AND o.status = ${status}` : sql``}
@@ -284,6 +288,7 @@ app.get('/ocorrencias', requireAuth, async (c) => {
 
 app.get('/limpezas', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
   const { n_impar, data_inicio, data_fim } = c.req.query()
 
   const rows = await sql`
@@ -294,6 +299,7 @@ app.get('/limpezas', requireAuth, async (c) => {
     FROM limpezas l
     LEFT JOIN condominios c ON c.id = l.condominio_id
     WHERE 1=1
+      ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
       ${n_impar ? sql`AND c.n_impar = ${n_impar}` : sql``}
       ${data_inicio ? sql`AND l.ts_checkin >= ${data_inicio}` : sql``}
       ${data_fim ? sql`AND l.ts_checkin <= ${data_fim}` : sql``}
@@ -407,58 +413,59 @@ app.put('/ocorrencias/:id/status', requireAuth, async (c) => {
 
 app.get('/dashboard', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
   const { data_inicio, data_fim } = c.req.query()
 
   const inicio = data_inicio || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const fim = data_fim || new Date().toISOString()
+  const lojaFilter = user.role !== 'admin' && user.loja_id ? user.loja_id : null
 
   const [por_estado, por_categoria, por_loja, limpezas, tempo_medio] = await Promise.all([
-    // Ocorrências por estado
     sql`
-      SELECT status, COUNT(*) as total
-      FROM ocorrencias
-      WHERE criado_em >= ${inicio} AND criado_em <= ${fim}
-      GROUP BY status
-      ORDER BY status
+      SELECT o.status, COUNT(*) as total
+      FROM ocorrencias o
+      LEFT JOIN condominios c ON c.id = o.condominio_id
+      WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
+        ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
+      GROUP BY o.status ORDER BY o.status
     `,
-    // Ocorrências por categoria
     sql`
-      SELECT 
+      SELECT
         COALESCE(cat.nome, o.categoria_texto, 'Sem categoria') as categoria,
         COALESCE(cat.emoji, '📦') as emoji,
         COUNT(*) as total
       FROM ocorrencias o
       LEFT JOIN categorias cat ON cat.id = o.categoria_id
+      LEFT JOIN condominios c ON c.id = o.condominio_id
       WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
+        ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
       GROUP BY cat.nome, o.categoria_texto, cat.emoji
-      ORDER BY total DESC
-      LIMIT 8
+      ORDER BY total DESC LIMIT 8
     `,
-    // Ocorrências por loja
     sql`
-      SELECT 
-        COALESCE(l.nome, 'Sem loja') as loja,
-        COUNT(*) as total
+      SELECT COALESCE(l.nome, 'Sem loja') as loja, COUNT(*) as total
       FROM ocorrencias o
       LEFT JOIN condominios c ON c.id = o.condominio_id
       LEFT JOIN lojas l ON l.id = c.loja_id
       WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
-      GROUP BY l.nome
-      ORDER BY total DESC
+        ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
+      GROUP BY l.nome ORDER BY total DESC
     `,
-    // Total de limpezas
     sql`
       SELECT COUNT(*) as total
-      FROM limpezas
-      WHERE ts_checkin >= ${inicio} AND ts_checkin <= ${fim}
+      FROM limpezas l
+      LEFT JOIN condominios c ON c.id = l.condominio_id
+      WHERE l.ts_checkin >= ${inicio} AND l.ts_checkin <= ${fim}
+        ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
     `,
-    // Tempo médio de resolução (em horas)
     sql`
       SELECT ROUND(AVG(EXTRACT(EPOCH FROM (e.criado_em - o.criado_em)) / 3600)::numeric, 1) as horas
       FROM ocorrencias o
       JOIN ocorrencia_estados e ON e.ocorrencia_id = o.id
+      LEFT JOIN condominios c ON c.id = o.condominio_id
       WHERE e.estado_novo = 'resolvida'
         AND o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
+        ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
     `
   ])
 
