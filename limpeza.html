@@ -710,8 +710,8 @@
   formData2.append('latitude', state.location.latitude);
   formData2.append('longitude', state.location.longitude);
   formData2.append('accuracy', state.location.accuracy);
+  formData2.append('temFoto', 'true');
   formData2.append('timestamp', timestamp);
-  formData2.append('temFoto', state.photoBase64 ? 'true' : 'false');
   fetch('https://impar-api.formigaplicada.workers.dev/public/limpezas', {
     method: 'POST', body: formData2
   }).then(function(r) { console.log('limpeza ok', r.status); })
