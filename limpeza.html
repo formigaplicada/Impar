@@ -717,7 +717,8 @@
   formData2.append('temFoto', state.photoBase64 ? 'true' : 'false');
   fetch('https://impar-api.formigaplicada.workers.dev/public/limpezas', {
     method: 'POST', body: formData2
-  }).catch(function() {});
+  }).then(function(r) { console.log('limpeza ok', r.status); })
+    .catch(function(e) { console.error('limpeza erro', e); });
 
   state.successMsg = 'Limpeza registada com sucesso!';
   state.step = 'success';
