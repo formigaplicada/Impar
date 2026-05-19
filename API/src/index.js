@@ -33,7 +33,13 @@ async function getMicrosoftToken(env) {
 
 app.use('*', async (c, next) => {
   const origin = c.req.header('Origin') || ''
-  const allowed = ['http://localhost:5173', 'https://condexpress.pages.dev', 'https://app.condexpress.com']
+const allowed = [
+  'http://localhost:5173',
+  'https://condexpress.pages.dev',
+  'https://app.condexpress.com',
+  'https://impar.formigaplicada.work',
+  'https://jovial-otter-0ad2b9.netlify.app'
+]
   if (allowed.includes(origin)) {
     c.header('Access-Control-Allow-Origin', origin)
     c.header('Access-Control-Allow-Credentials', 'true')
@@ -485,31 +491,34 @@ app.post('/public/ocorrencias', async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   
   const formData = await c.req.formData()
-    // Log temporário
   console.log('condominio recebido:', formData.get('condominio'))
   console.log('ocId recebido:', formData.get('ocId'))
-  const ocId        = formData.get('ocId') || ''
-  const condominioNImpar = formData.get('condominio') || ''
-  const timestamp   = formData.get('timestamp') || ''
-  const latitude    = formData.get('latitude') || null
-  const longitude   = formData.get('longitude') || null
-  const temFoto     = formData.get('temFoto') === 'true'
-  const fotoUrl     = formData.get('photoBase64') ? null : null // foto vai para Drive, não aqui
-  const categoria   = formData.get('categoria') || null
-  const descricaoAI = formData.get('descricaoAI') || null
-  const descricaoFinal = formData.get('descricaoFinal') || null
-  const nome        = formData.get('nome') || null
-  const telefone    = formData.get('telefone') || null
-  const email       = formData.get('email') || null
 
-  // Lookup condominio_id a partir do n_impar
+  const ocId           = formData.get('ocId') || ''
+  const condominioNImpar = formData.get('condominio') || ''
+  const timestamp      = formData.get('timestamp') || ''
+  const latitude       = formData.get('latitude') || null
+  const longitude      = formData.get('longitude') || null
+  const temFoto        = formData.get('temFoto') === 'true'
+  const fotoUrl        = formData.get('fotoUrl') || null
+  const mapsLink       = formData.get('mapsLink') || null
+  const morada         = formData.get('morada') || null
+  const categoria      = formData.get('categoria') || null
+  const descricaoAI    = formData.get('descricaoAI') || null
+  const descricaoFinal = formData.get('descricaoFinal') || null
+  const nome           = formData.get('nome') || null
+  const telefone       = formData.get('telefone') || null
+  const email          = formData.get('email') || null
+
+  // Lookup condominio_id e loja_id a partir do n_impar
   const cond = await sql`
-    SELECT id FROM condominios WHERE n_impar = ${condominioNImpar} LIMIT 1
+    SELECT id, loja_id FROM condominios WHERE n_impar = ${condominioNImpar} LIMIT 1
   `
   if (cond.length === 0) {
     return c.json({ error: 'Condomínio não encontrado' }, 404)
   }
   const condominioId = cond[0].id
+  const lojaId       = cond[0].loja_id
 
   // Lookup categoria
   const cat = await sql`
@@ -519,18 +528,21 @@ app.post('/public/ocorrencias', async (c) => {
 
   await sql`
     INSERT INTO ocorrencias (
-      id, condominio_id, categoria_id, categoria_texto,
+      id, condominio_id, loja_id, morada,
+      categoria_id, categoria_texto,
       descricao_ai, descricao_final,
-      latitude, longitude,
-      tem_foto,
+      latitude, longitude, maps_link,
+      tem_foto, foto_url,
       nome_reportante, telefone_reportante, email_reportante,
       status, ts_registo
     ) VALUES (
-      ${ocId}, ${condominioId}, ${categoriaId}, ${categoria},
+      ${ocId}, ${condominioId}, ${lojaId}, ${morada},
+      ${categoriaId}, ${categoria},
       ${descricaoAI}, ${descricaoFinal},
       ${latitude ? parseFloat(latitude) : null},
       ${longitude ? parseFloat(longitude) : null},
-      ${temFoto},
+      ${mapsLink},
+      ${temFoto}, ${fotoUrl},
       ${nome}, ${telefone}, ${email},
       'aberta',
       NOW()
@@ -545,12 +557,20 @@ app.post('/public/limpezas', async (c) => {
   const sql = neon(c.env.DATABASE_URL)
 
   const formData = await c.req.formData()
+  console.log('limpeza recebida:', {
+    condominio: formData.get('condominio'),
+    latitude: formData.get('latitude'),
+    temFoto: formData.get('temFoto')
+  })
+
   const condominioNImpar = formData.get('condominio') || ''
   const latitude  = formData.get('latitude') || null
   const longitude = formData.get('longitude') || null
   const accuracy  = formData.get('accuracy') || null
   const temFoto   = formData.get('temFoto') === 'true'
   const timestamp = formData.get('timestamp') || null
+  const mapsLink  = formData.get('mapsLink') || null
+  const fotoUrl   = formData.get('fotoUrl') || null
 
   // Lookup condominio_id a partir do n_impar
   const cond = await sql`
@@ -564,14 +584,17 @@ app.post('/public/limpezas', async (c) => {
     INSERT INTO limpezas (
       condominio_id, loja_id,
       latitude, longitude, precisao_m,
-      tem_foto, pin_validado,
-      ts_checkin
+      maps_link, tem_foto, foto_url,
+      pin_validado, ts_checkin
     ) VALUES (
       ${cond[0].id}, ${cond[0].loja_id},
       ${latitude ? parseFloat(latitude) : null},
       ${longitude ? parseFloat(longitude) : null},
       ${accuracy ? parseFloat(accuracy) : null},
-      ${temFoto}, true,
+      ${mapsLink},
+      ${temFoto},
+      ${fotoUrl},
+      true,
       NOW()
     )
   `
