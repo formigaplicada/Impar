@@ -714,8 +714,11 @@
   formData2.append('timestamp', timestamp);
   fetch('https://impar-api.formigaplicada.workers.dev/public/limpezas', {
     method: 'POST', body: formData2
-  }).then(function(r) { console.log('limpeza ok', r.status); })
-    .catch(function(e) { console.error('limpeza erro', e); });
+  }).then(function(r) {
+    r.json().then(function(body) {
+      console.log('limpeza status:', r.status, 'body:', JSON.stringify(body));
+    });
+  }).catch(function(e) { console.error('limpeza erro', e); });
 
   state.successMsg = 'Limpeza registada com sucesso!';
   state.step = 'success';
