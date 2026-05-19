@@ -695,23 +695,7 @@
 
   // GAS (existente)
   fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
-  
-  // Nova API (em paralelo)
-  const formData2 = new FormData();
-  formData2.append('condominio', state.condominioId);
-  formData2.append('latitude', state.location.latitude);
-  formData2.append('longitude', state.location.longitude);
-  formData2.append('accuracy', state.location.accuracy);
-  formData2.append('temFoto', 'true');
-  formData2.append('timestamp', timestamp);
-  fetch('https://impar-api.formigaplicada.workers.dev/public/limpezas', {
-    method: 'POST', body: formData2
-  }).then(function(r) {
-    r.json().then(function(body) {
-      console.log('limpeza status:', r.status, 'body:', JSON.stringify(body));
-    });
-  }).catch(function(e) { console.error('limpeza erro', e); });
-
+ 
   state.successMsg = 'Limpeza registada com sucesso!';
   state.step = 'success';
   render();
