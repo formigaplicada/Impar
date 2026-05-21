@@ -1181,4 +1181,23 @@ app.get('/propostas', requireAuth, async (c) => {
   return c.json({ propostas: rows })
 })
 
+app.put('/propostas/:id/estado', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const id = c.req.param('id')
+  const { estado, notas } = await c.req.json()
+
+  const estados_validos = ['adjudicada', 'recusada', 'cancelada']
+  if (!estados_validos.includes(estado)) return c.json({ error: 'Estado inválido' }, 400)
+
+  const atual = await sql`SELECT estado FROM propostas WHERE id = ${parseInt(id)}`
+  if (atual.length === 0) return c.json({ error: 'Proposta não encontrada' }, 404)
+
+  await sql`UPDATE propostas SET estado = ${estado}, atualizado_em = NOW() WHERE id = ${parseInt(id)}`
+
+  return c.json({ ok: true, estado })
+})
+
 export default app

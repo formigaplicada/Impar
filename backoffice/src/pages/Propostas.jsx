@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 
 const ESTADO_CONFIG = {
-  enviada:   { label: 'Enviada',   bg: '#eff6ff', color: '#2563eb' },
-  adjudicada:{ label: 'Adjudicada',bg: '#f0fdf4', color: '#16a34a' },
-  recusada:  { label: 'Recusada',  bg: '#fef2f2', color: '#dc2626' },
-  cancelada: { label: 'Cancelada', bg: '#f8fafc', color: '#94a3b8' },
+  enviada:    { label: 'Enviada',    bg: '#eff6ff', color: '#2563eb' },
+  adjudicada: { label: 'Adjudicada', bg: '#f0fdf4', color: '#16a34a' },
+  recusada:   { label: 'Recusada',   bg: '#fef2f2', color: '#dc2626' },
+  cancelada:  { label: 'Cancelada',  bg: '#f8fafc', color: '#94a3b8' },
 }
 
 function Badge({ estado }) {
@@ -42,6 +42,11 @@ export default function Propostas() {
   const [filtroSearch, setFiltroSearch] = useState('')
   const [detalhe, setDetalhe] = useState(null)
 
+  const [novoEstado, setNovoEstado] = useState('')
+  const [notas, setNotas] = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+
   useEffect(() => {
     api.get('/lojas').then(d => setLojas(d?.lojas || []))
   }, [])
@@ -59,7 +64,36 @@ export default function Propostas() {
     })
   }, [filtroLoja, filtroEstado, filtroSearch])
 
-  // ── Painel de detalhe ──────────────────────────────────────────────────────
+  function abrirDetalhe(p) {
+    setDetalhe(p)
+    setNovoEstado('')
+    setNotas('')
+    setErro('')
+  }
+
+  async function confirmarEstado() {
+    if (!novoEstado) return
+    setSalvando(true)
+    setErro('')
+    try {
+      const res = await api.put(`/propostas/${detalhe.id}/estado`, { estado: novoEstado, notas: notas || null })
+      if (res?.ok) {
+        const atualizado = { ...detalhe, estado: novoEstado }
+        setDetalhe(atualizado)
+        setPropostas(prev => prev.map(p => p.id === detalhe.id ? atualizado : p))
+        setNovoEstado('')
+        setNotas('')
+      } else {
+        setErro(res?.error || 'Erro ao actualizar estado.')
+      }
+    } catch {
+      setErro('Erro ao actualizar estado.')
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  // ── Painel de detalhe ────────────────────────────────────────────────────
 
   if (detalhe) return (
     <div>
@@ -73,30 +107,27 @@ export default function Propostas() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
 
-        {/* Identificação */}
-        <div style={{ background: 'white', borderRadius: '0.75rem', border: '1px solid #e2e8f0', padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Identificação</h3>
-          <Row label="Código"       value={detalhe.codigo} />
-          <Row label="Estado"       value={<Badge estado={detalhe.estado} />} />
-          <Row label="Loja"         value={detalhe.loja_nome || '—'} />
+        <div style={card}>
+          <SectionTitle>Identificação</SectionTitle>
+          <Row label="Código"        value={detalhe.codigo} />
+          <Row label="Estado"        value={<Badge estado={detalhe.estado} />} />
+          <Row label="Loja"          value={detalhe.loja_nome || '—'} />
           <Row label="Data proposta" value={formatDate(detalhe.data_proposta)} />
-          <Row label="Data envio"   value={formatDate(detalhe.data_envio)} />
+          <Row label="Data envio"    value={formatDate(detalhe.data_envio)} />
         </div>
 
-        {/* Lead */}
-        <div style={{ background: 'white', borderRadius: '0.75rem', border: '1px solid #e2e8f0', padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Lead</h3>
-          <Row label="Nome"     value={detalhe.nome} />
-          <Row label="Email"    value={detalhe.email} />
-          <Row label="Telefone" value={detalhe.telefone} />
-          <Row label="Morada"   value={[detalhe.morada, detalhe.n_porta].filter(Boolean).join(' ')} />
-          <Row label="Localidade" value={detalhe.localidade} />
+        <div style={card}>
+          <SectionTitle>Lead</SectionTitle>
+          <Row label="Nome"        value={detalhe.nome} />
+          <Row label="Email"       value={detalhe.email} />
+          <Row label="Telefone"    value={detalhe.telefone} />
+          <Row label="Morada"      value={[detalhe.morada, detalhe.n_porta].filter(Boolean).join(' ')} />
+          <Row label="Localidade"  value={detalhe.localidade} />
           <Row label="Cód. Postal" value={detalhe.codigo_postal} />
         </div>
 
-        {/* Condomínio */}
-        <div style={{ background: 'white', borderRadius: '0.75rem', border: '1px solid #e2e8f0', padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Condomínio</h3>
+        <div style={card}>
+          <SectionTitle>Condomínio</SectionTitle>
           <Row label="Frações"    value={detalhe.n_fracoes ?? '—'} />
           <Row label="Limpeza"    value={detalhe.limpeza || '—'} />
           <Row label="Jardinagem" value={detalhe.jardinagem || '—'} />
@@ -104,32 +135,29 @@ export default function Propostas() {
           {detalhe.comentarios && <Row label="Comentários" value={detalhe.comentarios} />}
         </div>
 
-        {/* Preços */}
-        <div style={{ background: 'white', borderRadius: '0.75rem', border: '1px solid #e2e8f0', padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Preços</h3>
-          <Row label="Gestão"      value={formatEur(detalhe.preco_gestao)} />
-          <Row label="Limpeza"     value={formatEur(detalhe.preco_limpeza)} />
-          <Row label="Jardinagem"  value={formatEur(detalhe.preco_jardinagem)} />
-          <Row label="Outros"      value={formatEur(detalhe.preco_outros)} />
+        <div style={card}>
+          <SectionTitle>Preços</SectionTitle>
+          <Row label="Gestão"     value={formatEur(detalhe.preco_gestao)} />
+          <Row label="Limpeza"    value={formatEur(detalhe.preco_limpeza)} />
+          <Row label="Jardinagem" value={formatEur(detalhe.preco_jardinagem)} />
+          <Row label="Outros"     value={formatEur(detalhe.preco_outros)} />
           <div style={{ borderTop: '1px solid #e2e8f0', marginTop: '0.75rem', paddingTop: '0.75rem' }}>
             <Row label="Total s/IVA" value={<strong>{formatEur(detalhe.total_sem_iva)}</strong>} />
           </div>
         </div>
 
-        {/* Links */}
-        <div style={{ background: 'white', borderRadius: '0.75rem', border: '1px solid #e2e8f0', padding: '1.5rem', gridColumn: '1 / -1' }}>
-          <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Links</h3>
+        <div style={{ ...card, gridColumn: '1 / -1' }}>
+          <SectionTitle>Links</SectionTitle>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            {detalhe.link_pdf && <a href={detalhe.link_pdf} target="_blank" rel="noreferrer" style={linkStyle}>📄 PDF Proposta</a>}
-            {detalhe.link_gm  && <a href={detalhe.link_gm}  target="_blank" rel="noreferrer" style={linkStyle}>📍 Google Maps</a>}
+            {detalhe.link_pdf         && <a href={detalhe.link_pdf}         target="_blank" rel="noreferrer" style={linkStyle}>📄 PDF Proposta</a>}
+            {detalhe.link_gm          && <a href={detalhe.link_gm}          target="_blank" rel="noreferrer" style={linkStyle}>📍 Google Maps</a>}
             {detalhe.link_street_view && <a href={detalhe.link_street_view} target="_blank" rel="noreferrer" style={linkStyle}>🏙 Street View</a>}
           </div>
         </div>
 
-        {/* UTM */}
         {(detalhe.utm_source || detalhe.pagina_origem) && (
-          <div style={{ background: 'white', borderRadius: '0.75rem', border: '1px solid #e2e8f0', padding: '1.5rem', gridColumn: '1 / -1' }}>
-            <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>Origem</h3>
+          <div style={{ ...card, gridColumn: '1 / -1' }}>
+            <SectionTitle>Origem</SectionTitle>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
               <Row label="Source"   value={detalhe.utm_source} />
               <Row label="Medium"   value={detalhe.utm_medium} />
@@ -140,11 +168,55 @@ export default function Propostas() {
             </div>
           </div>
         )}
+
+        {/* Mudar estado — só visível se estado for "enviada" */}
+        {detalhe.estado === 'enviada' && (
+          <div style={{ ...card, gridColumn: '1 / -1' }}>
+            <SectionTitle>Actualizar Estado</SectionTitle>
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              <select
+                value={novoEstado}
+                onChange={e => setNovoEstado(e.target.value)}
+                style={{ ...selectStyle, minWidth: '160px' }}
+              >
+                <option value="">Seleccionar estado...</option>
+                <option value="adjudicada">Adjudicada</option>
+                <option value="recusada">Recusada</option>
+                <option value="cancelada">Cancelada</option>
+              </select>
+
+              <input
+                placeholder="Notas (opcional)"
+                value={notas}
+                onChange={e => setNotas(e.target.value)}
+                style={{ ...inputStyle, flex: 1, minWidth: '200px', width: 'auto' }}
+              />
+
+              <button
+                onClick={confirmarEstado}
+                disabled={!novoEstado || salvando}
+                style={{
+                  background: novoEstado ? '#2563eb' : '#e2e8f0',
+                  color: novoEstado ? 'white' : '#94a3b8',
+                  border: 'none', borderRadius: '0.375rem',
+                  padding: '0.5rem 1.25rem', fontSize: '0.875rem',
+                  fontWeight: 600, cursor: novoEstado ? 'pointer' : 'default',
+                  fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+                  transition: 'background 0.15s'
+                }}
+              >
+                {salvando ? 'A guardar...' : 'Confirmar'}
+              </button>
+            </div>
+            {erro && <p style={{ color: '#dc2626', fontSize: '0.8rem', marginTop: '0.5rem', margin: '0.5rem 0 0' }}>{erro}</p>}
+          </div>
+        )}
+
       </div>
     </div>
   )
 
-  // ── Listagem ───────────────────────────────────────────────────────────────
+  // ── Listagem ─────────────────────────────────────────────────────────────
 
   const totais = {
     count: propostas.length,
@@ -153,7 +225,6 @@ export default function Propostas() {
 
   return (
     <div>
-      {/* Filtros */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input
           placeholder="Pesquisar nome, email, código..."
@@ -172,8 +243,6 @@ export default function Propostas() {
           <option value="recusada">Recusada</option>
           <option value="cancelada">Cancelada</option>
         </select>
-
-        {/* Totais */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
             <strong style={{ color: '#0f172a' }}>{totais.count}</strong> propostas
@@ -184,21 +253,16 @@ export default function Propostas() {
         </div>
       </div>
 
-      {/* Tabela */}
       <div style={{ background: 'white', borderRadius: '0.75rem', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>
-            A carregar...
-          </div>
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>A carregar...</div>
         ) : propostas.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>
-            Nenhuma proposta encontrada.
-          </div>
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.875rem' }}>Nenhuma proposta encontrada.</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                {['Código','Data envio','Localidade','Loja','Frações','Total s/IVA','Estado'].map(h => (
+                {['Código', 'Data envio', 'Nome', 'Localidade', 'Loja', 'Frações', 'Total s/IVA', 'Estado'].map(h => (
                   <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -207,18 +271,14 @@ export default function Propostas() {
               {propostas.map((p, i) => (
                 <tr
                   key={p.id}
-                  onClick={() => setDetalhe(p)}
-                  style={{
-                    borderBottom: '1px solid #f1f5f9',
-                    background: i % 2 === 0 ? 'white' : '#fafafa',
-                    cursor: 'pointer',
-                    transition: 'background 0.1s'
-                  }}
+                  onClick={() => abrirDetalhe(p)}
+                  style={{ borderBottom: '1px solid #f1f5f9', background: i % 2 === 0 ? 'white' : '#fafafa', cursor: 'pointer' }}
                   onMouseEnter={e => e.currentTarget.style.background = '#eff6ff'}
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'white' : '#fafafa'}
                 >
                   <td style={td}><code style={{ fontSize: '0.78rem', color: '#2563eb' }}>{p.codigo}</code></td>
                   <td style={td}>{formatDate(p.data_envio)}</td>
+                  <td style={td}>{p.nome}</td>
                   <td style={td}>{p.localidade || '—'}</td>
                   <td style={td}>{p.loja_nome || '—'}</td>
                   <td style={{ ...td, textAlign: 'center' }}>{p.n_fracoes ?? '—'}</td>
@@ -234,7 +294,18 @@ export default function Propostas() {
   )
 }
 
-// ── Helpers de estilo ──────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function SectionTitle({ children }) {
+  return (
+    <h3 style={{
+      fontSize: '0.875rem', fontWeight: 700, color: '#64748b',
+      textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem'
+    }}>
+      {children}
+    </h3>
+  )
+}
 
 function Row({ label, value }) {
   return (
@@ -243,6 +314,11 @@ function Row({ label, value }) {
       <span style={{ fontSize: '0.8rem', color: '#0f172a', textAlign: 'right' }}>{value ?? '—'}</span>
     </div>
   )
+}
+
+const card = {
+  background: 'white', borderRadius: '0.75rem',
+  border: '1px solid #e2e8f0', padding: '1.5rem'
 }
 
 const td = { padding: '0.75rem 1rem', color: '#334155', whiteSpace: 'nowrap' }
