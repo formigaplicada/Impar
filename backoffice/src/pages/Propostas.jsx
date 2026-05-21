@@ -198,7 +198,7 @@ export default function Propostas() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                {['Código','Data envio','Nome','Localidade','Loja','Frações','Total s/IVA','Estado'].map(h => (
+                {['Código','Data envio','Localidade','Loja','Frações','Total s/IVA','Estado'].map(h => (
                   <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
