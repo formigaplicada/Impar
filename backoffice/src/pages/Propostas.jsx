@@ -219,7 +219,6 @@ export default function Propostas() {
                 >
                   <td style={td}><code style={{ fontSize: '0.78rem', color: '#2563eb' }}>{p.codigo}</code></td>
                   <td style={td}>{formatDate(p.data_envio)}</td>
-                  <td style={td}>{p.nome}</td>
                   <td style={td}>{p.localidade || '—'}</td>
                   <td style={td}>{p.loja_nome || '—'}</td>
                   <td style={{ ...td, textAlign: 'center' }}>{p.n_fracoes ?? '—'}</td>
