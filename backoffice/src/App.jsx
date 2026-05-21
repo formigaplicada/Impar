@@ -14,6 +14,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/backoffice" element={<Backoffice page="" />} />
+        <Route path="/backoffice/propostas" element={<Backoffice page="propostas" />} />
         <Route path="/backoffice/ocorrencias" element={<Backoffice page="ocorrencias" />} />
         <Route path="/backoffice/ocorrencias/:id" element={<Backoffice page="ocorrencia_detalhe" />} />
         <Route path="/backoffice/limpezas" element={<Backoffice page="limpezas" />} />

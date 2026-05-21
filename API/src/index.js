@@ -1134,4 +1134,51 @@ app.post('/public/propostas/sync', async (c) => {
   return c.json({ ok: true, codigo })
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /propostas
+//
+// Listagem de propostas — apenas acessível a admins.
+// Suporta filtros: loja_id, estado, search (nome/email/codigo).
+// Adicionar ao ficheiro principal do Worker Hono, junto dos outros routes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.get('/propostas', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const { loja_id, estado, search } = c.req.query()
+
+  const rows = await sql`
+    SELECT
+      p.id, p.codigo, p.estado,
+      p.data_proposta, p.data_envio,
+      p.nome, p.email, p.telefone,
+      p.localidade, p.morada, p.n_porta, p.codigo_postal,
+      p.n_fracoes, p.limpeza, p.jardinagem, p.comentarios,
+      p.preco_gestao, p.preco_limpeza, p.preco_jardinagem,
+      p.total_sem_iva, p.outros_servicos, p.preco_outros,
+      p.link_gm, p.link_street_view, p.link_pdf,
+      p.utm_source, p.utm_medium, p.utm_campaign,
+      p.utm_content, p.utm_term, p.pagina_origem,
+      p.criado_em, p.atualizado_em,
+      l.id as loja_id, l.nome as loja_nome
+    FROM propostas p
+    LEFT JOIN lojas l ON l.id = p.loja_id
+    WHERE 1=1
+      ${loja_id ? sql`AND p.loja_id = ${parseInt(loja_id)}` : sql``}
+      ${estado   ? sql`AND p.estado = ${estado}` : sql``}
+      ${search   ? sql`AND (
+        p.nome     ILIKE ${'%' + search + '%'} OR
+        p.email    ILIKE ${'%' + search + '%'} OR
+        p.codigo   ILIKE ${'%' + search + '%'} OR
+        p.localidade ILIKE ${'%' + search + '%'}
+      )` : sql``}
+    ORDER BY p.data_envio DESC NULLS LAST
+    LIMIT 200
+  `
+
+  return c.json({ propostas: rows })
+})
+
 export default app
