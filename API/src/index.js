@@ -512,7 +512,9 @@ app.post('/public/ocorrencias', async (c) => {
 
   // Lookup condominio_id e loja_id a partir do n_impar
   const cond = await sql`
-    SELECT id, loja_id FROM condominios WHERE n_impar = ${condominioNImpar} LIMIT 1
+    SELECT id, loja_id FROM condominios
+    WHERE n_impar = ${condominioNImpar} OR old_n_impar = ${condominioNImpar}
+    LIMIT 1
   `
   if (cond.length === 0) {
     return c.json({ error: 'Condomínio não encontrado' }, 404)
@@ -574,7 +576,9 @@ app.post('/public/limpezas', async (c) => {
 
   // Lookup condominio_id a partir do n_impar
   const cond = await sql`
-    SELECT id, loja_id FROM condominios WHERE n_impar = ${condominioNImpar} LIMIT 1
+    SELECT id, loja_id FROM condominios
+    WHERE n_impar = ${condominioNImpar} OR old_n_impar = ${condominioNImpar}
+    LIMIT 1
   `
   if (cond.length === 0) {
     return c.json({ error: 'Condomínio não encontrado' }, 404)
@@ -1071,7 +1075,7 @@ app.post('/public/propostas/sync', async (c) => {
   let loja_id = null
   if (loja_nome) {
     const lojaRes = await sql`
-      SELECT id FROM lojas WHERE LOWER(nome) = LOWER(${loja_nome}) AND ativo = true LIMIT 1
+     SELECT id FROM lojas WHERE LOWER(nome_comercial) = LOWER(${loja_nome}) AND ativo = true LIMIT 1
     `
     loja_id = lojaRes.length > 0 ? lojaRes[0].id : null
   }
