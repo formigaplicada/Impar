@@ -219,7 +219,7 @@ app.get('/condominios', requireAuth, async (c) => {
     LEFT JOIN lojas l ON l.id = c.loja_id
     WHERE c.ativo = true
       ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
-      ${n_impar ? sql`AND c.n_impar = ${n_impar}` : sql``}
+      ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
       ${nome ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
     ORDER BY c.n_impar ASC
     LIMIT 100
@@ -244,9 +244,8 @@ app.post('/condominios', requireAuth, async (c) => {
   `
   if (lojaRes.length === 0) return c.json({ error: 'Loja não encontrada' }, 404)
 
-  const n_impar = String(lojaRes[0].n_impar)
-  const cond_id = String(lojaRes[0].n_impar).padStart(6, '0')
-
+  const n_impar = lojaRes[0].n_impar
+  const cond_id = String(n_impar).padStart(6, '0')
   await sql`
     INSERT INTO condominios (id, n_impar, loja_id, nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2)
     VALUES (
@@ -279,8 +278,7 @@ app.get('/ocorrencias', requireAuth, async (c) => {
     LEFT JOIN categorias cat ON cat.id = o.categoria_id
     WHERE 1=1
       ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
-      ${n_impar ? sql`AND c.n_impar = ${n_impar}` : sql``}
-      ${categoria ? sql`AND (cat.nome = ${categoria} OR o.categoria_texto = ${categoria})` : sql``}
+      ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
       ${status ? sql`AND o.status = ${status}` : sql``}
       ${data_inicio ? sql`AND o.criado_em >= ${data_inicio}` : sql``}
       ${data_fim ? sql`AND o.criado_em <= ${data_fim}` : sql``}
@@ -308,7 +306,7 @@ app.get('/limpezas', requireAuth, async (c) => {
       ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
       ${n_impar ? sql`AND c.n_impar = ${n_impar}` : sql``}
       ${data_inicio ? sql`AND l.ts_checkin >= ${data_inicio}` : sql``}
-      ${data_fim ? sql`AND l.ts_checkin <= ${data_fim}` : sql``}
+     ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
     ORDER BY l.ts_checkin DESC
     LIMIT 100
   `
@@ -513,7 +511,7 @@ app.post('/public/ocorrencias', async (c) => {
   // Lookup condominio_id e loja_id a partir do n_impar
   const cond = await sql`
     SELECT id, loja_id FROM condominios
-    WHERE n_impar = ${condominioNImpar} OR old_n_impar = ${condominioNImpar}
+    WHERE n_impar = ${parseInt(condominioNImpar)} OR old_n_impar = ${condominioNImpar}
     LIMIT 1
   `
   if (cond.length === 0) {
@@ -577,7 +575,7 @@ app.post('/public/limpezas', async (c) => {
   // Lookup condominio_id a partir do n_impar
   const cond = await sql`
     SELECT id, loja_id FROM condominios
-    WHERE n_impar = ${condominioNImpar} OR old_n_impar = ${condominioNImpar}
+    WHERE n_impar = ${parseInt(condominioNImpar)} OR old_n_impar = ${condominioNImpar}
     LIMIT 1
   `
   if (cond.length === 0) {
