@@ -274,7 +274,7 @@ app.get('/ocorrencias', requireAuth, async (c) => {
       o.descricao_final, o.nome_reportante, o.telefone_reportante, o.email_reportante,
       o.status, o.tem_foto, o.foto_url, o.latitude, o.longitude, o.maps_link, o.criado_em
     FROM ocorrencias o
-    LEFT JOIN condominios c ON c.id = o.condominio_id
+    LEFT JOIN condominios c ON c.n_impar = o.condominio_id
     LEFT JOIN categorias cat ON cat.id = o.categoria_id
     WHERE 1=1
       ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
@@ -301,12 +301,12 @@ app.get('/limpezas', requireAuth, async (c) => {
       l.latitude, l.longitude, l.precisao_m, l.maps_link,
       l.tem_foto, l.foto_url, l.ts_checkin
     FROM limpezas l
-    LEFT JOIN condominios c ON c.id = l.condominio_id
+    LEFT JOIN condominios c ON c.n_impar = l.condominio_id
     WHERE 1=1
       ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
-      ${n_impar ? sql`AND c.n_impar = ${n_impar}` : sql``}
+      ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
       ${data_inicio ? sql`AND l.ts_checkin >= ${data_inicio}` : sql``}
-     ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
+      ${data_fim ? sql`AND l.ts_checkin <= ${data_fim}` : sql``}
     ORDER BY l.ts_checkin DESC
     LIMIT 100
   `
@@ -327,7 +327,7 @@ app.get('/ocorrencias/:id', requireAuth, async (c) => {
       o.status, o.tem_foto, o.foto_url, o.latitude, o.longitude, o.maps_link,
       o.criado_em, o.atualizado_em
     FROM ocorrencias o
-    LEFT JOIN condominios c ON c.id = o.condominio_id
+    LEFT JOIN condominios c ON c.n_impar = o.condominio_id
     LEFT JOIN categorias cat ON cat.id = o.categoria_id
     WHERE o.id = ${id}
   `
@@ -428,7 +428,7 @@ app.get('/dashboard', requireAuth, async (c) => {
     sql`
       SELECT o.status, COUNT(*) as total
       FROM ocorrencias o
-      LEFT JOIN condominios c ON c.id = o.condominio_id
+      LEFT JOIN condominios c ON c.n_impar = o.condominio_id
       WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
         ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
       GROUP BY o.status ORDER BY o.status
@@ -440,7 +440,7 @@ app.get('/dashboard', requireAuth, async (c) => {
         COUNT(*) as total
       FROM ocorrencias o
       LEFT JOIN categorias cat ON cat.id = o.categoria_id
-      LEFT JOIN condominios c ON c.id = o.condominio_id
+      LEFT JOIN condominios c ON c.n_impar = o.condominio_id
       WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
         ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
       GROUP BY cat.nome, o.categoria_texto, cat.emoji
@@ -449,7 +449,7 @@ app.get('/dashboard', requireAuth, async (c) => {
     sql`
       SELECT COALESCE(l.nome, 'Sem loja') as loja, COUNT(*) as total
       FROM ocorrencias o
-      LEFT JOIN condominios c ON c.id = o.condominio_id
+      LEFT JOIN condominios c ON c.n_impar = o.condominio_id
       LEFT JOIN lojas l ON l.id = c.loja_id
       WHERE o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
         ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
@@ -458,7 +458,7 @@ app.get('/dashboard', requireAuth, async (c) => {
     sql`
       SELECT COUNT(*) as total
       FROM limpezas l
-      LEFT JOIN condominios c ON c.id = l.condominio_id
+      LEFT JOIN condominios c ON c.n_impar = l.condominio_id
       WHERE l.ts_checkin >= ${inicio} AND l.ts_checkin <= ${fim}
         ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
     `,
@@ -466,7 +466,7 @@ app.get('/dashboard', requireAuth, async (c) => {
       SELECT ROUND(AVG(EXTRACT(EPOCH FROM (e.criado_em - o.criado_em)) / 3600)::numeric, 1) as horas
       FROM ocorrencias o
       JOIN ocorrencia_estados e ON e.ocorrencia_id = o.id
-      LEFT JOIN condominios c ON c.id = o.condominio_id
+      LEFT JOIN condominios c ON c.n_impar = o.condominio_id
       WHERE e.estado_novo = 'resolvida'
         AND o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
         ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
@@ -755,7 +755,7 @@ app.get('/intervencao/:token', async (c) => {
            p.nome as prestador_nome
     FROM ocorrencia_prestadores op
     JOIN ocorrencias o ON o.id = op.ocorrencia_id
-    JOIN condominios c ON c.id = o.condominio_id
+    JOIN condominios c ON c.n_impar = o.condominio_id
     JOIN prestadores p ON p.id = op.prestador_id
     WHERE op.token_acesso = ${token}
       AND op.token_expira > NOW()
@@ -888,7 +888,7 @@ app.get('/ocorrencias/:id/prestadores-sugeridos', requireAuth, async (c) => {
   const oc = await sql`
     SELECT o.condominio_id, c.loja_id
     FROM ocorrencias o
-    JOIN condominios c ON c.id = o.condominio_id
+    JOIN condominios c ON c.n_impar = o.condominio_id
     WHERE o.id = ${ocorrencia_id}
   `
   if (oc.length === 0) return c.json({ sugestoes: [] })
@@ -919,7 +919,7 @@ app.get('/ocorrencias/:id/prestadores-sugeridos', requireAuth, async (c) => {
       'loja' as origem
     FROM ocorrencia_prestadores op
     JOIN ocorrencias o ON o.id = op.ocorrencia_id
-    JOIN condominios c ON c.id = o.condominio_id
+    JOIN condominios c ON c.n_impar = o.condominio_id
     JOIN prestadores p ON p.id = op.prestador_id
     WHERE c.loja_id = ${loja_id}
       AND op.prestador_id != ${ultimoId || 0}
