@@ -355,14 +355,21 @@ export default function Propostas() {
         {(detalhe.utm_source || detalhe.pagina_origem) && (
           <div style={{ gridColumn: '1 / -1' }}>
             <DetailCard title="Origem">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0 1rem' }}>
-                <Row label="Source"   value={detalhe.utm_source} />
-                <Row label="Medium"   value={detalhe.utm_medium} />
-                <Row label="Campaign" value={detalhe.utm_campaign} />
-                <Row label="Content"  value={detalhe.utm_content} />
-                <Row label="Term"     value={detalhe.utm_term} />
-                <Row label="Página"   value={detalhe.pagina_origem} />
-              </div>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0 1rem' }}>
+  <Row label="Source"   value={detalhe.utm_source} />
+  <Row label="Medium"   value={detalhe.utm_medium} />
+  <Row label="Campaign" value={detalhe.utm_campaign} />
+  <Row label="Content"  value={detalhe.utm_content} />
+  <Row label="Term"     value={detalhe.utm_term} />
+</div>
+{detalhe.pagina_origem && (
+  <div style={{ borderTop: `1px solid ${C.borderL}`, marginTop: '0.25rem', paddingTop: '0.25rem' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '0.3rem 0', gap: '1rem' }}>
+      <span style={{ fontSize: '0.78rem', color: C.subtle, whiteSpace: 'nowrap', flexShrink: 0 }}>Página</span>
+      <span style={{ fontSize: '0.78rem', color: C.text, wordBreak: 'break-all', textAlign: 'right' }}>{detalhe.pagina_origem}</span>
+    </div>
+  </div>
+)}
             </DetailCard>
           </div>
         )}
