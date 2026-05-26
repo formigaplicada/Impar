@@ -141,13 +141,12 @@ export default function Dashboard() {
   const maxCategoria      = Math.max(...(dados?.por_categoria?.map(c => Number(c.total)) || [1]))
   const maxLojaOcorrencia = Math.max(...(dados?.por_loja?.map(l => Number(l.total)) || [1]))
   const maxLojaPropostas  = Math.max(...(dados?.propostas_por_loja?.map(l => Number(l.count)) || [1]))
-  const maxLojaEntCond    = Math.max(...(dados?.entidades_por_loja?.map(l => Number(l.condominios)) || [1]))
-  const maxLojaEntPrest   = Math.max(...(dados?.entidades_por_loja?.map(l => Number(l.prestadores)) || [1]))
+
 
   const totalPropostas    = dados?.propostas_por_loja?.reduce((s, l) => s + Number(l.count), 0) || 0
   const totalValor        = dados?.propostas_por_loja?.reduce((s, l) => s + Number(l.total_sem_iva), 0) || 0
-  const totalCondominios  = dados?.entidades_por_loja?.reduce((s, l) => s + Number(l.condominios), 0) || 0
-  const totalPrestadores  = dados?.entidades_por_loja?.reduce((s, l) => s + Number(l.prestadores), 0) || 0
+  const totalCondominios  = dados?.condominios_por_loja?.reduce((s, l) => s + Number(l.total), 0) || 0
+  const novosCondominios  = dados?.condominios_por_loja?.reduce((s, l) => s + Number(l.novos), 0) || 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -288,34 +287,53 @@ export default function Dashboard() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
 
-            {/* KPIs entidades */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignContent: 'start' }}>
-              <KPI label="Condomínios criados"  value={totalCondominios}  color="#7c3aed" />
-              <KPI label="Prestadores criados"  value={totalPrestadores}  color="#0891b2" />
-            </div>
+            {/* Condomínios por loja */}
+            <Card title="Condomínios" empty={!dados?.condominios_por_loja?.length}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1.5px solid ${C.border}` }}>
+                    <th style={thStyle}>Loja</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Total activos</th>
+                    <th style={{ ...thStyle, textAlign: 'right' }}>Novos no período</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dados?.condominios_por_loja?.map((l, i) => (
+                    <tr key={l.loja} style={{ borderBottom: `1px solid ${C.borderL}`, background: i % 2 === 0 ? C.white : '#fafbfc' }}>
+                      <td style={tdStyle}>{l.loja}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: C.navy }}>{Number(l.total)}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: Number(l.novos) > 0 ? 700 : 400, color: Number(l.novos) > 0 ? '#7c3aed' : C.subtle }}>
+                        {Number(l.novos) > 0 ? `+${Number(l.novos)}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Totais */}
+                  <tr style={{ borderTop: `1.5px solid ${C.border}`, background: '#f7f9fc' }}>
+                    <td style={{ ...tdStyle, fontWeight: 700, color: C.text }}>Total</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: C.navy }}>{totalCondominios}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: novosCondominios > 0 ? '#7c3aed' : C.subtle }}>
+                      {novosCondominios > 0 ? `+${novosCondominios}` : '—'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </Card>
 
-            {/* Entidades por loja */}
-            <Card title="Entidades por loja" empty={!dados?.entidades_por_loja?.length}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-                {dados?.entidades_por_loja?.map(l => (
-                  <div key={l.loja}>
-                    <p style={{ fontSize: '0.78rem', fontWeight: 600, color: C.text, margin: '0 0 0.375rem' }}>{l.loja}</p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', paddingLeft: '0.5rem' }}>
-                      <BarraHorizontal
-                        label="Condomínios"
-                        value={Number(l.condominios)}
-                        max={maxLojaEntCond}
-                        color="#7c3aed"
-                      />
-                      <BarraHorizontal
-                        label="Prestadores"
-                        value={Number(l.prestadores)}
-                        max={maxLojaEntPrest}
-                        color="#0891b2"
-                      />
-                    </div>
-                  </div>
-                ))}
+            {/* Prestadores */}
+            <Card title="Prestadores">
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <KPI
+                  label="Total activos"
+                  value={Number(dados?.prestadores_resumo?.total || 0)}
+                  color={C.navy}
+                />
+                <KPI
+                  label="Novos no período"
+                  value={Number(dados?.prestadores_resumo?.novos || 0) > 0
+                    ? `+${Number(dados?.prestadores_resumo?.novos)}`
+                    : '0'}
+                  color={Number(dados?.prestadores_resumo?.novos || 0) > 0 ? '#0891b2' : C.subtle}
+                />
               </div>
             </Card>
 
@@ -324,4 +342,20 @@ export default function Dashboard() {
       )}
     </div>
   )
+}
+
+const thStyle = {
+  padding: '0.5rem 0.75rem',
+  textAlign: 'left',
+  fontWeight: 600,
+  fontSize: '0.75rem',
+  color: '#6b7a90',
+  letterSpacing: '0.03em',
+  whiteSpace: 'nowrap',
+}
+
+const tdStyle = {
+  padding: '0.5rem 0.75rem',
+  color: '#334155',
+  whiteSpace: 'nowrap',
 }
