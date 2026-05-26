@@ -536,10 +536,10 @@ export default function Propostas() {
                     onClick={() => abrirDetalhe(p)}
                     style={{ borderBottom: `1px solid ${C.borderL}`, cursor: 'pointer' }}
                   >
-                    <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>
+                    <td style={{ ...td, textAlign: 'left', fontVariantNumeric: 'tabular-nums' }}>
                       {formatEnvio(p.data_envio)}
                     </td>
-                    <td style={{ ...td, maxWidth: 140, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
+                    <td style={{ ...td, textAlign: 'left', maxWidth: 140, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
                       {truncate(p.localidade, 30)}
                     </td>
                     <td style={td}>{p.loja_nome || '—'}</td>
