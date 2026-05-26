@@ -424,7 +424,7 @@ app.get('/dashboard', requireAuth, async (c) => {
   const fim = data_fim || new Date().toISOString()
   const lojaFilter = user.role !== 'admin' && user.loja_id ? user.loja_id : null
 
-  const [por_estado, por_categoria, por_loja, limpezas, tempo_medio] = await Promise.all([
+  const [por_estado, por_categoria, por_loja, limpezas, tempo_medio, propostas_por_loja, entidades_por_loja] = await Promise.all([
     sql`
       SELECT o.status, COUNT(*) as total
       FROM ocorrencias o
@@ -470,6 +470,30 @@ app.get('/dashboard', requireAuth, async (c) => {
       WHERE e.estado_novo = 'resolvida'
         AND o.criado_em >= ${inicio} AND o.criado_em <= ${fim}
         ${lojaFilter ? sql`AND c.loja_id = ${lojaFilter}` : sql``}
+    `,
+    sql`
+      SELECT COALESCE(l.nome, 'Sem loja') as loja,
+             COUNT(*) as count,
+             COALESCE(SUM(p.total_sem_iva), 0) as total_sem_iva
+      FROM propostas p
+      LEFT JOIN lojas l ON l.id = p.loja_id
+      WHERE p.data_envio >= ${inicio} AND p.data_envio <= ${fim}
+        ${lojaFilter ? sql`AND p.loja_id = ${lojaFilter}` : sql``}
+      GROUP BY l.nome ORDER BY count DESC
+    `,
+    sql`
+      SELECT COALESCE(l.nome, 'Sem loja') as loja,
+             COUNT(DISTINCT c.id) as condominios,
+             COUNT(DISTINCT p.id) as prestadores
+      FROM lojas l
+      LEFT JOIN condominios c ON c.loja_id = l.id
+        AND c.criado_em >= ${inicio} AND c.criado_em <= ${fim}
+        AND c.ativo = true
+      LEFT JOIN prestadores p ON p.criado_em >= ${inicio} AND p.criado_em <= ${fim}
+        AND p.ativo = true
+      WHERE l.ativo = true
+        ${lojaFilter ? sql`AND l.id = ${lojaFilter}` : sql``}
+      GROUP BY l.nome ORDER BY l.nome ASC
     `
   ])
 
@@ -479,7 +503,9 @@ app.get('/dashboard', requireAuth, async (c) => {
     por_categoria,
     por_loja,
     total_limpezas: Number(limpezas[0]?.total || 0),
-    tempo_medio_horas: tempo_medio[0]?.horas || null
+    tempo_medio_horas: tempo_medio[0]?.horas || null,
+    propostas_por_loja,
+    entidades_por_loja
   })
 })
 
