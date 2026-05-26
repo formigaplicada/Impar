@@ -540,7 +540,7 @@ export default function Propostas() {
                       {formatEnvio(p.data_envio)}
                     </td>
                     <td style={{ ...td, maxWidth: 140, whiteSpace: 'normal', wordBreak: 'break-word', lineHeight: 1.35 }}>
-                      {truncate(p.localidade, 18)}
+                      {truncate(p.localidade, 30)}
                     </td>
                     <td style={td}>{p.loja_nome || '—'}</td>
                     <td style={{ ...td, textAlign: 'center', fontWeight: 600, color: C.navy }}>
