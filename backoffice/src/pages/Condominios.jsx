@@ -316,7 +316,7 @@ function TabDocumentos({ condominioId }) {
       ) : (
         <div style={{ background: C.surface, borderRadius: '0.75rem', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-            <thead>
+             <thead>
               <tr style={{ background: '#f7f9fc', borderBottom: `1.5px solid ${C.border}` }}>
                 <th style={{ ...thDoc, textAlign: 'left' }}>Nome</th>
                 <th style={{ ...thDoc, textAlign: 'right' }}>Tamanho</th>
@@ -397,7 +397,11 @@ function DetalheCondominio({ condominio, onVoltar }) {
 
   return (
     <div style={{ animation: 'fadeIn 0.18s ease' }}>
-      <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }`}</style>
+      <style>{`
+              @keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }
+              #tabela-documentos td { text-align: left; }
+            `}
+      </style>
 
       {/* Voltar */}
       <button onClick={onVoltar} style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.blue, fontSize: '0.875rem', marginBottom: '1.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.4rem 0.75rem', borderRadius: '0.375rem', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, transition: 'background 0.12s' }}
