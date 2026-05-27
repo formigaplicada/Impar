@@ -318,7 +318,7 @@ function TabDocumentos({ condominioId }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ background: '#f7f9fc', borderBottom: `1.5px solid ${C.border}` }}>
-                <th style={thDoc}>Nome</th>
+                <th style={{ ...thDoc, textAlign: 'left' }}>Nome</th>
                 <th style={{ ...thDoc, textAlign: 'right' }}>Tamanho</th>
                 <th style={{ ...thDoc, textAlign: 'right' }}>Modificado</th>
                 <th style={{ ...thDoc, textAlign: 'center' }}></th>
