@@ -288,7 +288,7 @@ function TabDocumentos({ condominioId }) {
                   onMouseEnter={e => e.currentTarget.style.background = C.blueL}
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? C.white : '#fafbfc'}
                 >
-                  <td style={{ padding: '0.625rem 1rem', color: item.type === 'folder' ? C.navy : C.text }}>
+                 <td style={{ padding: '0.625rem 1rem', textAlign: 'left', color: item.type === 'folder' ? C.navy : C.text }}>
                     <span style={{ marginRight: '0.5rem' }}>{fileIcon(item)}</span>
                     <span style={{ fontWeight: item.type === 'folder' ? 600 : 400 }}>{item.name}</span>
                     {item.type === 'folder' && item.children > 0 && (
