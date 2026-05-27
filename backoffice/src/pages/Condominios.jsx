@@ -188,6 +188,49 @@ function TabInfo({ c }) {
   )
 }
 
+// ── Sync Button ───────────────────────────────────────────────────────────────
+
+function SyncButton({ condominioId, onSuccess }) {
+  const [syncing, setSyncing] = useState(false)
+  const [resultado, setResultado] = useState(null)
+
+  async function handleSync() {
+    setSyncing(true)
+    setResultado(null)
+    const res = await api.post(`/admin/onedrive/sync/${condominioId}`, {})
+    setSyncing(false)
+    if (res?.ok) {
+      setResultado({ ok: true, msg: `Pasta ligada: ${res.folder_name}` })
+      setTimeout(() => onSuccess(), 1000)
+    } else {
+      const msgs = {
+        not_found:         'Pasta não encontrada no OneDrive.',
+        no_activos_folder: 'Loja sem pasta de activos configurada.',
+        api_error:         `Erro API: ${res.error || 'desconhecido'}`,
+      }
+      setResultado({ ok: false, msg: msgs[res.reason] || 'Erro desconhecido.' })
+    }
+  }
+
+  return (
+    <div>
+      <button onClick={handleSync} disabled={syncing} style={{
+        background: syncing ? C.border : C.navy, color: syncing ? C.muted : C.white,
+        border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1.25rem',
+        fontSize: '0.875rem', fontWeight: 600, cursor: syncing ? 'default' : 'pointer',
+        fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s'
+      }}>
+        {syncing ? '⏳ A sincronizar…' : '🔗 Ligar OneDrive'}
+      </button>
+      {resultado && (
+        <p style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: resultado.ok ? '#16a34a' : '#dc2626', fontWeight: 500 }}>
+          {resultado.ok ? '✅' : '❌'} {resultado.msg}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Tab Documentos ────────────────────────────────────────────────────────────
 
 function TabDocumentos({ condominioId }) {
@@ -241,7 +284,8 @@ function TabDocumentos({ condominioId }) {
   if (!available) return (
     <div style={{ padding: '3rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>
       <span style={{ display: 'block', fontSize: '1.5rem', marginBottom: '0.5rem' }}>📂</span>
-      Pasta OneDrive não configurada para este condomínio.
+      <p style={{ margin: '0 0 1.25rem', color: C.muted }}>Pasta OneDrive não configurada para este condomínio.</p>
+      <SyncButton condominioId={condominioId} onSuccess={() => carregar()} />
     </div>
   )
 
@@ -288,7 +332,7 @@ function TabDocumentos({ condominioId }) {
                   onMouseEnter={e => e.currentTarget.style.background = C.blueL}
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? C.white : '#fafbfc'}
                 >
-                 <td style={{ padding: '0.625rem 1rem', textAlign: 'left', color: item.type === 'folder' ? C.navy : C.text }}>
+                  <td style={{ padding: '0.625rem 1rem', color: item.type === 'folder' ? C.navy : C.text }}>
                     <span style={{ marginRight: '0.5rem' }}>{fileIcon(item)}</span>
                     <span style={{ fontWeight: item.type === 'folder' ? 600 : 400 }}>{item.name}</span>
                     {item.type === 'folder' && item.children > 0 && (

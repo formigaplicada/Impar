@@ -1307,4 +1307,206 @@ app.put('/propostas/:id/estado', requireAuth, async (c) => {
   return c.json({ ok: true, estado })
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// OneDrive Sync — adicionar ao index.js
+//
+// Função core + dois endpoints:
+//   POST /admin/onedrive/sync              — sincroniza todos sem onedrive_folder_id
+//   POST /admin/onedrive/sync/:condominio_id — sincroniza um condomínio específico
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Função core ───────────────────────────────────────────────────────────────
+//
+// Recebe:
+//   token       — Microsoft Graph Bearer token
+//   loja        — { id, nome, onedrive_activos_folder_id }
+//   condominio  — { id, n_impar, old_n_impar }
+//   pastaCache  — Map<loja_id, DriveItem[]> para evitar chamadas repetidas
+//   sql         — instância neon para gravar o resultado
+//
+// Devolve:
+//   { ok: true,  folder_id, folder_name }   — match encontrado e gravado
+//   { ok: false, reason: 'not_found' | 'no_activos_folder' | 'api_error', error? }
+
+async function syncCondominioOneDrive({ token, loja, condominio, pastaCache, sql }) {
+
+  // Loja sem pasta de activos configurada
+  if (!loja?.onedrive_activos_folder_id) {
+    return { ok: false, reason: 'no_activos_folder' }
+  }
+
+  // Buscar lista de pastas da loja (com cache)
+  let pastas = pastaCache.get(loja.id)
+  if (!pastas) {
+    try {
+      const res = await fetch(
+        `https://graph.microsoft.com/v1.0/users/vitor.lopes@impar.pt/drive/items/${loja.onedrive_activos_folder_id}/children?$top=500&$select=id,name,folder`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!res.ok) {
+        const err = await res.json()
+        return { ok: false, reason: 'api_error', error: err?.error?.message || `HTTP ${res.status}` }
+      }
+      const data = await res.json()
+      // Guardar só as pastas (não ficheiros)
+      pastas = (data.value || []).filter(i => i.folder)
+      pastaCache.set(loja.id, pastas)
+    } catch (err) {
+      return { ok: false, reason: 'api_error', error: err.message }
+    }
+  }
+
+  // Extrair prefixo numérico do nome da pasta
+  // Ex: "12510 - Rua Virgílio Ferreira 37" → 12510
+  // Ex: "008 - Rua Júlio Dinis 75"         → 8
+  function extractPrefix(name) {
+    const match = name.match(/^(\d+)\s*-/)
+    if (!match) return null
+    return Number(match[1])
+  }
+
+  const nImpar    = Number(condominio.n_impar)
+  const oldNImpar = condominio.old_n_impar != null ? Number(condominio.old_n_impar) : null
+
+  // Primeira passagem — match por n_impar
+  let match = pastas.find(p => extractPrefix(p.name) === nImpar)
+
+  // Segunda passagem — match por old_n_impar (só se existir e for válido)
+  if (!match && oldNImpar != null && !isNaN(oldNImpar)) {
+    match = pastas.find(p => extractPrefix(p.name) === oldNImpar)
+  }
+
+  if (!match) {
+    return { ok: false, reason: 'not_found' }
+  }
+
+  // Gravar na BD
+  await sql`
+    UPDATE condominios
+    SET onedrive_folder_id = ${match.id}
+    WHERE id = ${condominio.id}
+  `
+
+  return { ok: true, folder_id: match.id, folder_name: match.name }
+}
+
+// ── Endpoint em massa ─────────────────────────────────────────────────────────
+// POST /admin/onedrive/sync
+// Sincroniza todos os condomínios que ainda não têm onedrive_folder_id
+
+app.post('/admin/onedrive/sync', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+
+  // Buscar todos os condomínios sem onedrive_folder_id, com dados da loja
+  const condominios = await sql`
+    SELECT
+      c.id, c.n_impar, c.old_n_impar, c.nome,
+      l.id           AS loja_id,
+      l.nome         AS loja_nome,
+      l.onedrive_activos_folder_id
+    FROM condominios c
+    JOIN lojas l ON l.id = c.loja_id
+    WHERE c.onedrive_folder_id IS NULL
+      AND c.ativo = true
+    ORDER BY l.id, c.n_impar
+  `
+
+  if (condominios.length === 0) {
+    return c.json({ ok: true, message: 'Nenhum condomínio por sincronizar.', mapeados: 0, nao_encontrados: 0, erros: 0, detalhes: [] })
+  }
+
+  const token      = await getMicrosoftToken(c.env)
+  const pastaCache = new Map()
+
+  const resultados = {
+    mapeados:       0,
+    nao_encontrados: 0,
+    erros:          0,
+    sem_pasta_loja: 0,
+    detalhes:       []
+  }
+
+  for (const cond of condominios) {
+    const loja = {
+      id:                        cond.loja_id,
+      nome:                      cond.loja_nome,
+      onedrive_activos_folder_id: cond.onedrive_activos_folder_id
+    }
+    const condominio = {
+      id:          cond.id,
+      n_impar:     cond.n_impar,
+      old_n_impar: cond.old_n_impar
+    }
+
+    const res = await syncCondominioOneDrive({ token, loja, condominio, pastaCache, sql })
+
+    if (res.ok) {
+      resultados.mapeados++
+    } else if (res.reason === 'no_activos_folder') {
+      resultados.sem_pasta_loja++
+    } else if (res.reason === 'not_found') {
+      resultados.nao_encontrados++
+    } else {
+      resultados.erros++
+    }
+
+    resultados.detalhes.push({
+      n_impar:     cond.n_impar,
+      nome:        cond.nome,
+      loja:        cond.loja_nome,
+      resultado:   res.ok ? 'mapeado' : res.reason,
+      folder_name: res.folder_name || null,
+      error:       res.error || null,
+    })
+  }
+
+  return c.json({ ok: true, ...resultados })
+})
+
+// ── Endpoint unitário ─────────────────────────────────────────────────────────
+// POST /admin/onedrive/sync/:condominio_id
+// Sincroniza um condomínio específico (útil para novos condomínios e botão no frontend)
+// Funciona mesmo que já tenha onedrive_folder_id (força re-sync)
+
+app.post('/admin/onedrive/sync/:condominio_id', requireAuth, async (c) => {
+  const sql          = neon(c.env.DATABASE_URL)
+  const condominioId = c.req.param('condominio_id')
+
+  const rows = await sql`
+    SELECT
+      c.id, c.n_impar, c.old_n_impar, c.nome,
+      l.id           AS loja_id,
+      l.nome         AS loja_nome,
+      l.onedrive_activos_folder_id
+    FROM condominios c
+    JOIN lojas l ON l.id = c.loja_id
+    WHERE c.id = ${condominioId}
+  `
+
+  if (rows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+
+  const cond = rows[0]
+  const loja = {
+    id:                        cond.loja_id,
+    nome:                      cond.loja_nome,
+    onedrive_activos_folder_id: cond.onedrive_activos_folder_id
+  }
+  const condominio = {
+    id:          cond.id,
+    n_impar:     cond.n_impar,
+    old_n_impar: cond.old_n_impar
+  }
+
+  const token      = await getMicrosoftToken(c.env)
+  const pastaCache = new Map()
+
+  const res = await syncCondominioOneDrive({ token, loja, condominio, pastaCache, sql })
+
+  if (res.ok) {
+    return c.json({ ok: true, folder_id: res.folder_id, folder_name: res.folder_name })
+  } else {
+    return c.json({ ok: false, reason: res.reason, error: res.error || null }, res.reason === 'api_error' ? 502 : 200)
+  }
+})
+
 export default app
