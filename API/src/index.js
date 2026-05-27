@@ -227,6 +227,79 @@ app.get('/condominios', requireAuth, async (c) => {
   return c.json({ condominios: rows })
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /condominios/:id/documentos
+//
+// Devolve lista de ficheiros/pastas do OneDrive para um condomínio.
+// Suporta navegação via query param ?folder_id=xxx
+//
+// Adicionar ao index.js junto dos outros routes de /condominios
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.get('/condominios/:id/documentos', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const id = c.req.param('id')
+  const { folder_id } = c.req.query()
+
+  // Buscar onedrive_folder_id do condomínio
+  const cond = await sql`
+    SELECT id, n_impar, nome, onedrive_folder_id
+    FROM condominios
+    WHERE id = ${id}
+  `
+  if (cond.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+
+  const onedrive_folder_id = cond[0].onedrive_folder_id
+  if (!onedrive_folder_id) return c.json({ available: false, items: [] })
+
+  // Se vier folder_id na query, navega para essa subpasta
+  // Caso contrário usa a pasta raiz do condomínio
+  const targetFolderId = folder_id || onedrive_folder_id
+
+  try {
+    const token = await getMicrosoftToken(c.env)
+
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/users/vitor.lopes@impar.pt/drive/items/${targetFolderId}/children?$orderby=name asc&$select=id,name,size,lastModifiedDateTime,webUrl,folder,file`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    )
+
+    if (!res.ok) {
+      const err = await res.json()
+      return c.json({ available: false, error: err?.error?.message || 'Erro Graph API' }, 502)
+    }
+
+    const data = await res.json()
+
+    const items = (data.value || []).map(item => ({
+      id:       item.id,
+      name:     item.name,
+      type:     item.folder ? 'folder' : 'file',
+      size:     item.size || 0,
+      modified: item.lastModifiedDateTime,
+      webUrl:   item.webUrl,
+      mimeType: item.file?.mimeType || null,
+      children: item.folder?.childCount || 0,
+    }))
+
+    // Separar pastas e ficheiros, pastas primeiro
+    const folders = items.filter(i => i.type === 'folder')
+    const files   = items.filter(i => i.type === 'file')
+
+    return c.json({
+      available: true,
+      folder_id: targetFolderId,
+      root_folder_id: onedrive_folder_id,
+      items: [...folders, ...files]
+    })
+
+  } catch (err) {
+    return c.json({ available: false, error: err.message }, 500)
+  }
+})
+
 app.post('/condominios', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const body = await c.req.json()
