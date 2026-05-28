@@ -1509,4 +1509,26 @@ app.post('/admin/onedrive/sync/:condominio_id', requireAuth, async (c) => {
   }
 })
 
+app.get('/condominios/:id/financeiro', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const id  = c.req.param('id')
+
+  const mandatos = await sql`
+    SELECT
+      m.id, m.adc, m.iban, m.data_assinatura, m.estado,
+      b.nome AS banco_nome, b.bic AS banco_bic
+    FROM mandatos_dd m
+    LEFT JOIN bancos b ON b.id = m.banco_id
+    WHERE m.condominio_id = ${id}
+    ORDER BY m.estado = 'activo' DESC, m.criado_em DESC
+    LIMIT 5
+  `
+
+  return c.json({
+    mandato:   mandatos.find(m => m.estado === 'activo') || null,
+    historico: mandatos,
+    cobranças: []
+  })
+})
+
 export default app
