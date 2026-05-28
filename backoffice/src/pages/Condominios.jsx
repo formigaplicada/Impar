@@ -392,6 +392,46 @@ const TABS = [
   { key: 'financeiro', label: 'Info. Financeira' },
 ]
 
+function TabFinanceiro({ condominioId }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+      {/* Débito Directo */}
+      <div style={{ background: C.surface, borderRadius: '0.75rem', border: `1px solid ${C.border}`, padding: '1.25rem 1.5rem', boxShadow: '0 1px 3px rgba(1,22,64,0.05)' }}>
+        <h3 style={{ fontSize: '0.7rem', fontWeight: 700, color: C.subtle, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 1rem' }}>Débito Directo</h3>
+        <div style={{ padding: '2.5rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>
+          <span style={{ display: 'block', fontSize: '1.5rem', marginBottom: '0.5rem' }}>🏦</span>
+          Dados do mandato em desenvolvimento.
+        </div>
+      </div>
+
+      {/* Cobranças */}
+      <div style={{ background: C.surface, borderRadius: '0.75rem', border: `1px solid ${C.border}`, overflow: 'hidden', boxShadow: '0 1px 3px rgba(1,22,64,0.05)' }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: `1px solid ${C.borderL}` }}>
+          <h3 style={{ fontSize: '0.7rem', fontWeight: 700, color: C.subtle, textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>Cobranças</h3>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <thead>
+            <tr style={{ background: '#f7f9fc', borderBottom: `1.5px solid ${C.border}` }}>
+              {['Data', 'Ficheiro', 'Montante', 'Estado'].map(h => (
+                <th key={h} style={{ padding: '0.6rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.75rem', color: C.muted, letterSpacing: '0.03em', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colSpan={4} style={{ padding: '2.5rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>
+                Sem cobranças registadas.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  )
+}
+
 function DetalheCondominio({ condominio, onVoltar }) {
   const [tab, setTab] = useState('info')
 
@@ -449,7 +489,7 @@ function DetalheCondominio({ condominio, onVoltar }) {
       {tab === 'documentos' && <TabDocumentos condominioId={condominio.id} />}
       {tab === 'fracoes'    && <TabPlaceholder icon="🏠" title="Frações e Condóminos" description="Em desenvolvimento." />}
       {tab === 'contratos'  && <TabPlaceholder icon="📋" title="Contratos" description="Em desenvolvimento." />}
-      {tab === 'financeiro' && <TabPlaceholder icon="💶" title="Informação Financeira" description="Em desenvolvimento." />}
+      {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} />}
     </div>
   )
 }
