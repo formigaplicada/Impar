@@ -424,31 +424,31 @@ function TabFinanceiro({ condominioId }) {
             Sem mandato DD configurado.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0' }}>
-            {[
-              { label: 'Banco',           value: mandato.banco_nome || '—' },
-              { label: 'BIC',             value: mandato.banco_bic  || '—' },
-              { label: 'ADC',             value: mandato.adc        || '—' },
-              { label: 'IBAN',            value: mandato.iban       || '—' },
-              { label: 'Data assinatura', value: mandato.data_assinatura ? new Date(mandato.data_assinatura).toLocaleDateString('pt-PT') : '—' },
-              { label: 'Estado', value: (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                  background: ESTADO_MANDATO[mandato.estado]?.bg || '#f1f5f9',
-                  color: ESTADO_MANDATO[mandato.estado]?.color || '#64748b',
-                  borderRadius: '0.375rem', padding: '0.2rem 0.6rem',
-                  fontSize: '0.72rem', fontWeight: 600
-                }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: ESTADO_MANDATO[mandato.estado]?.dot || '#94a3b8' }} />
-                  {ESTADO_MANDATO[mandato.estado]?.label || mandato.estado}
-                </span>
-              )},
-            ].map(({ label, value }) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', borderBottom: `1px solid ${C.borderL}`, gap: '1rem', gridColumn: label === 'IBAN' ? '1 / -1' : 'auto' }}>
-                <span style={{ fontSize: '0.78rem', color: C.subtle, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</span>
-                <span style={{ fontSize: '0.78rem', color: C.text, textAlign: 'right' }}>{value}</span>
-              </div>
-            ))}
+          <div>
+       {[
+            { label: 'Banco',           value: mandato.banco_nome || '—' },
+            { label: 'BIC',             value: mandato.banco_bic  || '—' },
+            { label: 'ADC',             value: mandato.adc        || '—' },
+            { label: 'IBAN',            value: mandato.iban       || '—' },
+            { label: 'Data assinatura', value: mandato.data_assinatura ? new Date(mandato.data_assinatura).toLocaleDateString('pt-PT') : '—' },
+            { label: 'Estado',          value: (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                background: ESTADO_MANDATO[mandato.estado]?.bg || '#f1f5f9',
+                color: ESTADO_MANDATO[mandato.estado]?.color || '#64748b',
+                borderRadius: '0.375rem', padding: '0.2rem 0.6rem',
+                fontSize: '0.72rem', fontWeight: 600
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: ESTADO_MANDATO[mandato.estado]?.dot || '#94a3b8' }} />
+                {ESTADO_MANDATO[mandato.estado]?.label || mandato.estado}
+              </span>
+            )},
+          ].map(({ label, value }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', borderBottom: `1px solid ${C.borderL}`, gap: '1rem' }}>
+              <span style={{ fontSize: '0.78rem', color: C.subtle, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</span>
+              <span style={{ fontSize: '0.78rem', color: C.text, textAlign: 'right' }}>{value}</span>
+            </div>
+          ))}
           </div>
         )}
       </div>
