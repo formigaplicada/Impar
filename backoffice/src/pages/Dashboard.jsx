@@ -22,8 +22,15 @@ const STATUS_LABELS = {
   cancelada: { label: 'Cancelada', color: '#64748b', bg: '#f1f5f9' },
 }
 
-// ── KPI ───────────────────────────────────────────────────────────────────────
+// Origem config — label, cor de fundo, cor de texto
+const ORIGENS = [
+  { key: 'ads',      label: 'Google Ads', bg: '#eff6ff', color: '#2563eb', dot: '#2563eb' },
+  { key: 'organico', label: 'Orgânico',   bg: '#f0fdf4', color: '#16a34a', dot: '#16a34a' },
+  { key: 'direto',   label: 'Direto',     bg: '#fafafa', color: '#64748b', dot: '#94a3b8' },
+  { key: 'outros',   label: 'Outros',     bg: '#fdf4ff', color: '#9333ea', dot: '#a855f7' },
+]
 
+// ── KPI ───────────────────────────────────────────────────────────────────────
 function KPI({ label, value, sub, color }) {
   return (
     <div style={{
@@ -39,7 +46,6 @@ function KPI({ label, value, sub, color }) {
 }
 
 // ── Barra Horizontal ──────────────────────────────────────────────────────────
-
 function BarraHorizontal({ label, value, max, color, sub }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0
   return (
@@ -56,7 +62,6 @@ function BarraHorizontal({ label, value, max, color, sub }) {
 }
 
 // ── Section Header ────────────────────────────────────────────────────────────
-
 function SectionHeader({ title }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.5rem 0 0.25rem' }}>
@@ -70,12 +75,12 @@ function SectionHeader({ title }) {
 }
 
 // ── Card ──────────────────────────────────────────────────────────────────────
-
-function Card({ title, children, empty }) {
+function Card({ title, children, empty, style }) {
   return (
     <div style={{
       background: C.surface, borderRadius: '0.875rem', padding: '1.25rem 1.5rem',
-      border: `1px solid ${C.border}`, boxShadow: '0 1px 4px rgba(1,22,64,0.06)'
+      border: `1px solid ${C.border}`, boxShadow: '0 1px 4px rgba(1,22,64,0.06)',
+      ...style
     }}>
       {title && <p style={{ fontSize: '0.82rem', fontWeight: 700, color: C.text, margin: '0 0 1rem', fontFamily: 'DM Sans, sans-serif' }}>{title}</p>}
       {empty
@@ -87,20 +92,218 @@ function Card({ title, children, empty }) {
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-
 function formatEurInt(val) {
   if (val == null || val === '') return '—'
   return Math.round(Number(val)).toLocaleString('pt-PT') + ' €'
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Célula de origem (quantidade + valor) ─────────────────────────────────────
+function CelulaOrigem({ total, valor, cfg }) {
+  if (!total || Number(total) === 0) {
+    return <td style={{ ...tdStyle, textAlign: 'center', color: C.border }}>—</td>
+  }
+  return (
+    <td style={{ ...tdStyle, textAlign: 'center' }}>
+      <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+        <span style={{
+          fontWeight: 700, fontSize: '0.88rem',
+          color: cfg.color,
+          background: cfg.bg,
+          borderRadius: '0.25rem',
+          padding: '0.1rem 0.5rem',
+          lineHeight: 1.5,
+        }}>
+          {Number(total)}
+        </span>
+        <span style={{ fontSize: '0.68rem', color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
+          {formatEurInt(valor)}
+        </span>
+      </div>
+    </td>
+  )
+}
 
+// ── Matriz Leads por Loja × Origem ───────────────────────────────────────────
+function MatrizLeads({ dados }) {
+  if (!dados?.leads_por_loja_origem?.length) {
+    return <p style={{ color: C.subtle, fontSize: '0.82rem', margin: 0 }}>Sem dados para o período.</p>
+  }
+
+  // Construir estrutura: { loja: { origem: { total, valor } } }
+  const mapa = {}
+  const totaisPorOrigem = {}
+
+  for (const row of dados.leads_por_loja_origem) {
+    if (!mapa[row.loja]) mapa[row.loja] = {}
+    mapa[row.loja][row.origem] = { total: Number(row.total), valor: Number(row.valor) }
+
+    if (!totaisPorOrigem[row.origem]) totaisPorOrigem[row.origem] = { total: 0, valor: 0 }
+    totaisPorOrigem[row.origem].total += Number(row.total)
+    totaisPorOrigem[row.origem].valor += Number(row.valor)
+  }
+
+  const lojas = Object.keys(mapa).sort()
+
+  // Totais por loja
+  const totaisPorLoja = {}
+  for (const loja of lojas) {
+    totaisPorLoja[loja] = { total: 0, valor: 0 }
+    for (const o of ORIGENS) {
+      const d = mapa[loja][o.key]
+      if (d) {
+        totaisPorLoja[loja].total += d.total
+        totaisPorLoja[loja].valor += d.valor
+      }
+    }
+  }
+
+  // Total global
+  const totalGlobal = Object.values(totaisPorLoja).reduce((s, l) => s + l.total, 0)
+  const valorGlobal = Object.values(totaisPorLoja).reduce((s, l) => s + l.valor, 0)
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 480 }}>
+        <thead>
+          <tr style={{ background: '#f7f9fc', borderBottom: `1.5px solid ${C.border}` }}>
+            <th style={{ ...thStyle, textAlign: 'left' }}>Loja</th>
+            {ORIGENS.map(o => (
+              <th key={o.key} style={{ ...thStyle, textAlign: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: o.dot, flexShrink: 0 }} />
+                  {o.label}
+                </span>
+              </th>
+            ))}
+            <th style={{ ...thStyle, textAlign: 'center' }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lojas.map((loja, i) => (
+            <tr key={loja} style={{ borderBottom: `1px solid ${C.borderL}`, background: i % 2 === 0 ? C.white : '#fafbfc' }}>
+              <td style={{ ...tdStyle, fontWeight: 600, color: C.navy, whiteSpace: 'nowrap' }}>{loja}</td>
+              {ORIGENS.map(o => (
+                <CelulaOrigem
+                  key={o.key}
+                  total={mapa[loja][o.key]?.total}
+                  valor={mapa[loja][o.key]?.valor}
+                  cfg={o}
+                />
+              ))}
+              <td style={{ ...tdStyle, textAlign: 'center' }}>
+                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.88rem', color: C.navy }}>{totaisPorLoja[loja].total}</span>
+                  <span style={{ fontSize: '0.68rem', color: C.muted }}>{formatEurInt(totaisPorLoja[loja].valor)}</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {/* Linha de totais */}
+          <tr style={{ borderTop: `1.5px solid ${C.border}`, background: '#f7f9fc' }}>
+            <td style={{ ...tdStyle, fontWeight: 700, color: C.text }}>Total</td>
+            {ORIGENS.map(o => {
+              const d = totaisPorOrigem[o.key]
+              return (
+                <td key={o.key} style={{ ...tdStyle, textAlign: 'center' }}>
+                  {d ? (
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem', color: o.color }}>{d.total}</span>
+                      <span style={{ fontSize: '0.68rem', color: C.muted }}>{formatEurInt(d.valor)}</span>
+                    </div>
+                  ) : '—'}
+                </td>
+              )
+            })}
+            <td style={{ ...tdStyle, textAlign: 'center' }}>
+              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+                <span style={{ fontWeight: 800, fontSize: '0.88rem', color: C.navy }}>{totalGlobal}</span>
+                <span style={{ fontSize: '0.68rem', color: C.muted }}>{formatEurInt(valorGlobal)}</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Tabela Google Ads por Campanha ────────────────────────────────────────────
+function TabelaAds({ dados }) {
+  if (!dados?.leads_por_campanha?.length) {
+    return <p style={{ color: C.subtle, fontSize: '0.82rem', margin: 0 }}>Sem leads de Google Ads no período.</p>
+  }
+
+  // Agrupar por campanha
+  const mapaC = {}
+  for (const row of dados.leads_por_campanha) {
+    if (!mapaC[row.campanha]) mapaC[row.campanha] = { lojas: {}, total: 0, valor: 0 }
+    mapaC[row.campanha].lojas[row.loja] = { total: Number(row.total), valor: Number(row.valor) }
+    mapaC[row.campanha].total += Number(row.total)
+    mapaC[row.campanha].valor += Number(row.valor)
+  }
+
+  const campanhas = Object.entries(mapaC).sort((a, b) => b[1].total - a[1].total)
+  const maxTotal = Math.max(...campanhas.map(([, v]) => v.total), 1)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {campanhas.map(([campanha, data]) => (
+        <div key={campanha} style={{
+          padding: '0.75rem 1rem',
+          background: '#f8faff',
+          border: `1px solid ${C.border}`,
+          borderLeft: `3px solid #2563eb`,
+          borderRadius: '0.5rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', gap: '1rem', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: C.navy, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {campanha}
+            </span>
+            <div style={{ display: 'flex', gap: '1rem', flexShrink: 0 }}>
+              <span style={{
+                fontSize: '0.82rem', fontWeight: 800, color: '#2563eb',
+                background: '#eff6ff', borderRadius: '0.25rem', padding: '0.1rem 0.5rem'
+              }}>
+                {data.total} lead{data.total !== 1 ? 's' : ''}
+              </span>
+              <span style={{ fontSize: '0.78rem', color: C.muted, fontWeight: 500 }}>
+                {formatEurInt(data.valor)}
+              </span>
+            </div>
+          </div>
+          {/* Barra de progresso */}
+          <div style={{ background: '#e8f0fe', borderRadius: '9999px', height: '5px', marginBottom: '0.5rem' }}>
+            <div style={{
+              width: `${Math.round((data.total / maxTotal) * 100)}%`,
+              background: '#2563eb', borderRadius: '9999px', height: '5px',
+              transition: 'width 0.4s ease'
+            }} />
+          </div>
+          {/* Lojas */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+            {Object.entries(data.lojas).sort((a, b) => b[1].total - a[1].total).map(([loja, d]) => (
+              <span key={loja} style={{
+                fontSize: '0.7rem', color: '#1d4ed8',
+                background: '#dbeafe', borderRadius: '0.25rem',
+                padding: '0.1rem 0.5rem', fontWeight: 500, whiteSpace: 'nowrap'
+              }}>
+                {loja} · {d.total}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const [dados, setDados]         = useState(null)
-  const [loading, setLoading]     = useState(true)
-  const [periodo, setPeriodo]     = useState('semana')
+  const [dados, setDados]           = useState(null)
+  const [loading, setLoading]       = useState(true)
+  const [periodo, setPeriodo]       = useState('semana')
   const [dataInicio, setDataInicio] = useState('')
-  const [dataFim, setDataFim]     = useState('')
+  const [dataFim, setDataFim]       = useState('')
 
   function calcularPeriodo(p) {
     const agora = new Date()
@@ -136,17 +339,19 @@ export default function Dashboard() {
   useEffect(() => { carregar() }, [])
 
   // ── Derivados ───────────────────────────────────────────────────────────────
-
   const totalOcorrencias  = dados?.por_estado?.reduce((acc, s) => acc + Number(s.total), 0) || 0
   const maxCategoria      = Math.max(...(dados?.por_categoria?.map(c => Number(c.total)) || [1]))
   const maxLojaOcorrencia = Math.max(...(dados?.por_loja?.map(l => Number(l.total)) || [1]))
-  const maxLojaPropostas  = Math.max(...(dados?.propostas_por_loja?.map(l => Number(l.count)) || [1]))
-
-
   const totalPropostas    = dados?.propostas_por_loja?.reduce((s, l) => s + Number(l.count), 0) || 0
   const totalValor        = dados?.propostas_por_loja?.reduce((s, l) => s + Number(l.total_sem_iva), 0) || 0
   const totalCondominios  = dados?.condominios_por_loja?.reduce((s, l) => s + Number(l.total), 0) || 0
   const novosCondominios  = dados?.condominios_por_loja?.reduce((s, l) => s + Number(l.novos), 0) || 0
+
+  // Total de leads com origem conhecida
+  const totalLeads = dados?.leads_por_loja_origem?.reduce((s, r) => s + Number(r.total), 0) || 0
+  const totalLeadsAds = dados?.leads_por_loja_origem
+    ?.filter(r => r.origem === 'ads')
+    ?.reduce((s, r) => s + Number(r.total), 0) || 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -199,34 +404,25 @@ export default function Dashboard() {
           {/* ── COMERCIAL ─────────────────────────────────────────────────── */}
           <SectionHeader title="Comercial" />
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-
-            {/* KPIs comercial */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', alignContent: 'start' }}>
-              <KPI label="Propostas enviadas" value={totalPropostas} color={C.navy} />
-              <KPI label="Valor total s/IVA"  value={formatEurInt(totalValor)} color="#2563eb" />
-            </div>
-
-            {/* Propostas por loja */}
-            <Card
-              title="Propostas por loja"
-              empty={!dados?.propostas_por_loja?.length}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-                {dados?.propostas_por_loja?.map(l => (
-                  <BarraHorizontal
-                    key={l.loja}
-                    label={l.loja}
-                    value={Number(l.count)}
-                    max={maxLojaPropostas}
-                    color="#2563eb"
-                    sub={formatEurInt(l.total_sem_iva)}
-                  />
-                ))}
-              </div>
-            </Card>
-
+          {/* KPIs comercial */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem' }}>
+            <KPI label="Propostas enviadas" value={totalPropostas} color={C.navy} />
+            <KPI label="Valor total s/IVA"  value={formatEurInt(totalValor)} color="#2563eb" />
+            <KPI label="Total leads"        value={totalLeads} color="#7c3aed" sub="no período" />
+            <KPI label="Leads Google Ads"   value={totalLeadsAds} color="#2563eb"
+              sub={totalLeads > 0 ? `${Math.round(totalLeadsAds / totalLeads * 100)}% do total` : null}
+            />
           </div>
+
+          {/* Matriz leads por loja × origem */}
+          <Card title="Leads por loja e origem">
+            <MatrizLeads dados={dados} />
+          </Card>
+
+          {/* Google Ads por campanha */}
+          <Card title="Google Ads — leads por campanha">
+            <TabelaAds dados={dados} />
+          </Card>
 
           {/* ── OPERACIONAL ───────────────────────────────────────────────── */}
           <SectionHeader title="Operacional" />
@@ -287,7 +483,6 @@ export default function Dashboard() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
 
-            {/* Condomínios por loja */}
             <Card title="Condomínios" empty={!dados?.condominios_por_loja?.length}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                 <thead>
@@ -307,7 +502,6 @@ export default function Dashboard() {
                       </td>
                     </tr>
                   ))}
-                  {/* Totais */}
                   <tr style={{ borderTop: `1.5px solid ${C.border}`, background: '#f7f9fc' }}>
                     <td style={{ ...tdStyle, fontWeight: 700, color: C.text }}>Total</td>
                     <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: C.navy }}>{totalCondominios}</td>
@@ -319,7 +513,6 @@ export default function Dashboard() {
               </table>
             </Card>
 
-            {/* Prestadores */}
             <Card title="Prestadores">
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <KPI
@@ -343,6 +536,8 @@ export default function Dashboard() {
     </div>
   )
 }
+
+// ── Shared styles ─────────────────────────────────────────────────────────────
 
 const thStyle = {
   padding: '0.5rem 0.75rem',

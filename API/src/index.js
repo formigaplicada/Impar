@@ -566,6 +566,47 @@ app.get('/dashboard', requireAuth, async (c) => {
         ${lojaFilter ? sql`AND l.id = ${lojaFilter}` : sql``}
       GROUP BY l.nome ORDER BY l.nome ASC
     `,
+    // ── QUERY 1 — Leads por loja × origem ────────────────────────────────────────
+// Agrupa todas as propostas do período por loja e por origem (utm)
+// Usa criado_em (data de entrada do pedido) em vez de data_envio
+ 
+sql`
+  SELECT
+    COALESCE(l.nome, 'Sem loja') AS loja,
+    CASE
+      WHEN p.utm_medium = 'cpc'                                        THEN 'ads'
+      WHEN p.utm_source = 'google' AND p.utm_medium = 'organic'        THEN 'organico'
+      WHEN p.utm_source = '(direct)' OR p.utm_source IS NULL           THEN 'direto'
+      ELSE 'outros'
+    END AS origem,
+    COUNT(*)                                    AS total,
+    COALESCE(SUM(p.total_sem_iva), 0)           AS valor
+  FROM propostas p
+  LEFT JOIN lojas l ON l.id = p.loja_id
+  WHERE p.criado_em >= ${inicio} AND p.criado_em <= ${fim}
+    ${lojaFilter ? sql`AND p.loja_id = ${lojaFilter}` : sql``}
+  GROUP BY l.nome, origem
+  ORDER BY l.nome ASC, origem ASC
+`,
+
+// ── QUERY 2 — Leads Google Ads por campanha ───────────────────────────────────
+// Só registos com utm_medium = 'cpc'
+// Mostra campanha × loja com quantidade e valor
+ 
+sql`
+  SELECT
+    COALESCE(p.utm_campaign, '(não definido)')  AS campanha,
+    COALESCE(l.nome, 'Sem loja')                AS loja,
+    COUNT(*)                                    AS total,
+    COALESCE(SUM(p.total_sem_iva), 0)           AS valor
+  FROM propostas p
+  LEFT JOIN lojas l ON l.id = p.loja_id
+  WHERE p.utm_medium = 'cpc'
+    AND p.criado_em >= ${inicio} AND p.criado_em <= ${fim}
+    ${lojaFilter ? sql`AND p.loja_id = ${lojaFilter}` : sql``}
+  GROUP BY p.utm_campaign, l.nome
+  ORDER BY total DESC, campanha ASC
+`,
     // prestadores_resumo
     sql`
       SELECT
@@ -584,6 +625,8 @@ app.get('/dashboard', requireAuth, async (c) => {
     tempo_medio_horas: tempo_medio[0]?.horas || null,
     propostas_por_loja,
     condominios_por_loja,
+    leads_por_loja_origem,
+    leads_por_campanha,
     prestadores_resumo: prestadores_resumo[0] || { total: 0, novos: 0 }
   })
 })
@@ -1291,20 +1334,77 @@ app.get('/propostas', requireAuth, async (c) => {
 app.put('/propostas/:id/estado', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
-
+ 
   const sql = neon(c.env.DATABASE_URL)
   const id = c.req.param('id')
   const { estado, notas } = await c.req.json()
-
-  const estados_validos = ['adjudicada', 'recusada', 'cancelada']
+ 
+  const estados_validos = [
+    'em_elaboracao', 'enviada', 'recusada', 'cancelada',
+    'adjudicada', 'ativa', 'recebida', 'pedido_reuniao', 'duvida'
+  ]
   if (!estados_validos.includes(estado)) return c.json({ error: 'Estado inválido' }, 400)
-
+ 
   const atual = await sql`SELECT estado FROM propostas WHERE id = ${parseInt(id)}`
   if (atual.length === 0) return c.json({ error: 'Proposta não encontrada' }, 404)
-
-  await sql`UPDATE propostas SET estado = ${estado}, atualizado_em = NOW() WHERE id = ${parseInt(id)}`
-
+ 
+  const estado_anterior = atual[0].estado
+ 
+  await sql`
+    UPDATE propostas SET estado = ${estado}, atualizado_em = NOW()
+    WHERE id = ${parseInt(id)}
+  `
+ 
+  await sql`
+    INSERT INTO proposta_estados (proposta_id, estado_anterior, estado_novo, notas, utilizador_id, origem)
+    VALUES (${parseInt(id)}, ${estado_anterior}, ${estado}, ${notas || null}, ${user.id}, 'backoffice')
+  `
+ 
   return c.json({ ok: true, estado })
+})
+
+app.post('/public/propostas/:codigo/estado', async (c) => {
+  // Verificar API key
+  const apiKey = c.req.header('X-API-Key')
+  if (!apiKey || apiKey !== c.env.POWER_AUTOMATE_API_KEY) {
+    return c.json({ error: 'Não autorizado' }, 401)
+  }
+ 
+  const sql = neon(c.env.DATABASE_URL)
+  const codigo = c.req.param('codigo')
+ 
+  let body
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Payload JSON inválido' }, 400)
+  }
+ 
+  const { estado, notas } = body
+ 
+  const estados_validos = [
+    'em_elaboracao', 'enviada', 'recusada', 'cancelada',
+    'adjudicada', 'ativa', 'recebida', 'pedido_reuniao', 'duvida'
+  ]
+  if (!estados_validos.includes(estado)) return c.json({ error: 'Estado inválido' }, 400)
+ 
+  const atual = await sql`SELECT id, estado FROM propostas WHERE codigo = ${codigo}`
+  if (atual.length === 0) return c.json({ error: 'Proposta não encontrada' }, 404)
+ 
+  const proposta_id    = atual[0].id
+  const estado_anterior = atual[0].estado
+ 
+  await sql`
+    UPDATE propostas SET estado = ${estado}, atualizado_em = NOW()
+    WHERE id = ${proposta_id}
+  `
+ 
+  await sql`
+    INSERT INTO proposta_estados (proposta_id, estado_anterior, estado_novo, notas, utilizador_id, origem)
+    VALUES (${proposta_id}, ${estado_anterior}, ${estado}, ${notas || null}, NULL, 'power_automate')
+  `
+ 
+  return c.json({ ok: true, codigo, estado })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
