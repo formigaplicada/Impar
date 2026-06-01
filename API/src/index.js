@@ -497,7 +497,7 @@ app.get('/dashboard', requireAuth, async (c) => {
   const fim = data_fim || new Date().toISOString()
   const lojaFilter = user.role !== 'admin' && user.loja_id ? user.loja_id : null
 
-  const [por_estado, por_categoria, por_loja, limpezas, tempo_medio, propostas_por_loja, condominios_por_loja, leads_por_loja_origem, leads_por_campanha, prestadores_resumo] = await Promise.all([
+  const [por_estado, por_categoria, por_loja, limpezas, tempo_medio, propostas_por_loja, condominios_por_loja, leads_por_loja_origem, leads_por_campanha, propostas_estados_loja, prestadores_resumo] = await Promise.all([
     sql`
       SELECT o.status, COUNT(*) as total
       FROM ocorrencias o
@@ -607,13 +607,30 @@ sql`
   GROUP BY p.utm_campaign, l.nome
   ORDER BY total DESC, campanha ASC
 `,
+sql`
+  SELECT
+    COALESCE(l.nome, 'Sem loja') AS loja,
+    CASE
+      WHEN p.estado IN ('duvida', 'pedido_reuniao') THEN 'em_analise'
+      ELSE p.estado
+    END AS estado_agrupado,
+    COUNT(*)                        AS total,
+    COALESCE(SUM(p.total_sem_iva), 0) AS valor
+  FROM propostas p
+  LEFT JOIN lojas l ON l.id = p.loja_id
+  WHERE p.estado IN ('enviada', 'recebida', 'duvida', 'pedido_reuniao', 'adjudicada', 'ativa')
+    ${lojaFilter ? sql`AND p.loja_id = ${lojaFilter}` : sql``}
+  GROUP BY l.nome, estado_agrupado
+  ORDER BY l.nome ASC, estado_agrupado ASC
+  `
+  ,
     // prestadores_resumo
     sql`
       SELECT
         COUNT(*) FILTER (WHERE ativo = true) as total,
         COUNT(*) FILTER (WHERE ativo = true AND criado_em >= ${inicio} AND criado_em <= ${fim}) as novos
       FROM prestadores
-    `
+      `
   ])
 
   return c.json({
@@ -627,6 +644,7 @@ sql`
     condominios_por_loja,
     leads_por_loja_origem,
     leads_por_campanha,
+    propostas_estados_loja,
     prestadores_resumo: prestadores_resumo[0] || { total: 0, novos: 0 }
   })
 })
@@ -1361,6 +1379,50 @@ app.put('/propostas/:id/estado', requireAuth, async (c) => {
   `
  
   return c.json({ ok: true, estado })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Adicionar a seguir ao PUT /propostas/:id/estado
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.get('/propostas/:id', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const id = parseInt(c.req.param('id'))
+
+  const rows = await sql`
+    SELECT
+      p.id, p.codigo, p.estado,
+      p.data_proposta, p.data_envio,
+      p.nome, p.email, p.telefone,
+      p.localidade, p.morada, p.n_porta, p.codigo_postal,
+      p.n_fracoes, p.limpeza, p.jardinagem, p.comentarios,
+      p.preco_gestao, p.preco_limpeza, p.preco_jardinagem,
+      p.total_sem_iva, p.outros_servicos, p.preco_outros,
+      p.link_gm, p.link_street_view, p.link_pdf,
+      p.utm_source, p.utm_medium, p.utm_campaign,
+      p.utm_content, p.utm_term, p.pagina_origem,
+      p.criado_em, p.atualizado_em,
+      l.id as loja_id, l.nome as loja_nome
+    FROM propostas p
+    LEFT JOIN lojas l ON l.id = p.loja_id
+    WHERE p.id = ${id}
+  `
+  if (rows.length === 0) return c.json({ error: 'Proposta não encontrada' }, 404)
+
+  const historico = await sql`
+    SELECT
+      e.id, e.estado_anterior, e.estado_novo, e.notas, e.origem, e.criado_em,
+      u.nome as utilizador_nome
+    FROM proposta_estados e
+    LEFT JOIN utilizadores u ON u.id = e.utilizador_id
+    WHERE e.proposta_id = ${id}
+    ORDER BY e.criado_em ASC
+  `
+
+  return c.json({ proposta: rows[0], historico })
 })
 
 app.post('/public/propostas/:codigo/estado', async (c) => {

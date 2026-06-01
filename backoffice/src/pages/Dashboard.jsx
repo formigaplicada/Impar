@@ -297,6 +297,130 @@ function TabelaAds({ dados }) {
   )
 }
 
+const ESTADOS_PROPOSTAS = [
+  { key: 'enviada',    label: 'Enviada',    dot: '#2563eb', bg: '#eff6ff', color: '#1d4ed8' },
+  { key: 'recebida',   label: 'Recebida',   dot: '#7c3aed', bg: '#f5f3ff', color: '#6d28d9' },
+  { key: 'em_analise', label: 'Em Análise', dot: '#d97706', bg: '#fffbeb', color: '#b45309' },
+  { key: 'adjudicada', label: 'Adjudicada', dot: '#16a34a', bg: '#f0fdf4', color: '#15803d' },
+  { key: 'ativa',      label: 'Ativa',      dot: '#059669', bg: '#ecfdf5', color: '#047857' },
+]
+
+function MatrizPropostasEstados({ dados }) {
+  if (!dados?.propostas_estados_loja?.length) {
+    return <p style={{ color: C.subtle, fontSize: '0.82rem', margin: 0 }}>Sem dados para o período.</p>
+  }
+
+  // Construir mapa: { loja: { estado: { total, valor } } }
+  const mapa = {}
+  const totaisPorEstado = {}
+
+  for (const row of dados.propostas_estados_loja) {
+    if (!mapa[row.loja]) mapa[row.loja] = {}
+    mapa[row.loja][row.estado_agrupado] = { total: Number(row.total), valor: Number(row.valor) }
+
+    if (!totaisPorEstado[row.estado_agrupado]) totaisPorEstado[row.estado_agrupado] = { total: 0, valor: 0 }
+    totaisPorEstado[row.estado_agrupado].total += Number(row.total)
+    totaisPorEstado[row.estado_agrupado].valor += Number(row.valor)
+  }
+
+  const lojas = Object.keys(mapa).sort()
+
+  const totaisPorLoja = {}
+  for (const loja of lojas) {
+    totaisPorLoja[loja] = { total: 0, valor: 0 }
+    for (const e of ESTADOS_PROPOSTAS) {
+      const d = mapa[loja][e.key]
+      if (d) {
+        totaisPorLoja[loja].total += d.total
+        totaisPorLoja[loja].valor += d.valor
+      }
+    }
+  }
+
+  const totalGlobal = Object.values(totaisPorLoja).reduce((s, l) => s + l.total, 0)
+  const valorGlobal = Object.values(totaisPorLoja).reduce((s, l) => s + l.valor, 0)
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', minWidth: 480 }}>
+        <thead>
+          <tr style={{ background: '#f7f9fc', borderBottom: `1.5px solid ${C.border}` }}>
+            <th style={{ ...thStyle, textAlign: 'left' }}>Loja</th>
+            {ESTADOS_PROPOSTAS.map(e => (
+              <th key={e.key} style={{ ...thStyle, textAlign: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: e.dot, flexShrink: 0 }} />
+                  {e.label}
+                </span>
+              </th>
+            ))}
+            <th style={{ ...thStyle, textAlign: 'center' }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lojas.map((loja, i) => (
+            <tr key={loja} style={{ borderBottom: `1px solid ${C.borderL}`, background: i % 2 === 0 ? C.white : '#fafbfc' }}>
+              <td style={{ ...tdStyle, fontWeight: 600, color: C.navy, whiteSpace: 'nowrap' }}>{loja}</td>
+              {ESTADOS_PROPOSTAS.map(e => {
+                const d = mapa[loja][e.key]
+                if (!d || d.total === 0) {
+                  return <td key={e.key} style={{ ...tdStyle, textAlign: 'center', color: C.border }}>—</td>
+                }
+                return (
+                  <td key={e.key} style={{ ...tdStyle, textAlign: 'center' }}>
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+                      <span style={{
+                        fontWeight: 700, fontSize: '0.88rem',
+                        color: e.color, background: e.bg,
+                        borderRadius: '0.25rem', padding: '0.1rem 0.5rem', lineHeight: 1.5,
+                      }}>
+                        {d.total}
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: C.muted, fontVariantNumeric: 'tabular-nums' }}>
+                        {formatEurInt(d.valor)}
+                      </span>
+                    </div>
+                  </td>
+                )
+              })}
+              <td style={{ ...tdStyle, textAlign: 'center' }}>
+                <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '0.88rem', color: C.navy }}>{totaisPorLoja[loja].total}</span>
+                  <span style={{ fontSize: '0.68rem', color: C.muted }}>{formatEurInt(totaisPorLoja[loja].valor)}</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {/* Linha de totais */}
+          <tr style={{ borderTop: `1.5px solid ${C.border}`, background: '#f7f9fc' }}>
+            <td style={{ ...tdStyle, fontWeight: 700, color: C.text }}>Total</td>
+            {ESTADOS_PROPOSTAS.map(e => {
+              const d = totaisPorEstado[e.key]
+              return (
+                <td key={e.key} style={{ ...tdStyle, textAlign: 'center' }}>
+                  {d ? (
+                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.88rem', color: e.color }}>{d.total}</span>
+                      <span style={{ fontSize: '0.68rem', color: C.muted }}>{formatEurInt(d.valor)}</span>
+                    </div>
+                  ) : '—'}
+                </td>
+              )
+            })}
+            <td style={{ ...tdStyle, textAlign: 'center' }}>
+              <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.1rem' }}>
+                <span style={{ fontWeight: 800, fontSize: '0.88rem', color: C.navy }}>{totalGlobal}</span>
+                <span style={{ fontSize: '0.68rem', color: C.muted }}>{formatEurInt(valorGlobal)}</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [dados, setDados]           = useState(null)
@@ -422,6 +546,11 @@ export default function Dashboard() {
           {/* Google Ads por campanha */}
           <Card title="Google Ads — leads por campanha">
             <TabelaAds dados={dados} />
+          </Card>
+
+          {/* Propostas por loja e estado */}
+          <Card title="Propostas por loja e estado">
+            <MatrizPropostasEstados dados={dados} />
           </Card>
 
           {/* ── OPERACIONAL ───────────────────────────────────────────────── */}
