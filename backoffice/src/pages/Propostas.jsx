@@ -19,10 +19,15 @@ const C = {
 }
 
 const ESTADO_CONFIG = {
-  enviada:    { label: 'Enviada',    dot: '#2563eb', bg: '#eff6ff', color: '#1d4ed8' },
-  adjudicada: { label: 'Adjudicada', dot: '#16a34a', bg: '#f0fdf4', color: '#15803d' },
-  recusada:   { label: 'Recusada',   dot: '#dc2626', bg: '#fef2f2', color: '#b91c1c' },
-  cancelada:  { label: 'Cancelada',  dot: '#94a3b8', bg: '#f8fafc', color: '#64748b' },
+  em_elaboracao: { label: 'Em Elaboração', dot: '#94a3b8', bg: '#f8fafc', color: '#64748b' },
+  enviada:       { label: 'Enviada',       dot: '#2563eb', bg: '#eff6ff', color: '#1d4ed8' },
+  recebida:      { label: 'Recebida',      dot: '#7c3aed', bg: '#f5f3ff', color: '#6d28d9' },
+  pedido_reuniao:{ label: 'Ped. Reunião',  dot: '#0891b2', bg: '#ecfeff', color: '#0e7490' },
+  duvida:        { label: 'Dúvida',        dot: '#d97706', bg: '#fffbeb', color: '#b45309' },
+  adjudicada:    { label: 'Adjudicada',    dot: '#16a34a', bg: '#f0fdf4', color: '#15803d' },
+  ativa:         { label: 'Ativa',         dot: '#059669', bg: '#ecfdf5', color: '#047857' },
+  recusada:      { label: 'Recusada',      dot: '#dc2626', bg: '#fef2f2', color: '#b91c1c' },
+  cancelada:     { label: 'Cancelada',     dot: '#94a3b8', bg: '#f8fafc', color: '#64748b' },
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -174,7 +179,8 @@ export default function Propostas() {
   const [sortCol, setSortCol]       = useState('data_envio')
   const [sortDir, setSortDir]       = useState('desc')
   const [page, setPage]             = useState(1)
-
+  const [historico, setHistorico]   = useState([])
+  const [loadingHistorico, setLoadingHistorico] = useState(false)
   const [novoEstado, setNovoEstado] = useState('')
   const [notas, setNotas]           = useState('')
   const [salvando, setSalvando]     = useState(false)
@@ -245,11 +251,17 @@ export default function Propostas() {
 
   // ── Detalhe ───────────────────────────────────────────────────────────────
 
-  function abrirDetalhe(p) {
+ function abrirDetalhe(p) {
     setDetalhe(p)
     setNovoEstado('')
     setNotas('')
     setErro('')
+    setHistorico([])
+    setLoadingHistorico(true)
+    api.get(`/propostas/${p.id}`).then(d => {
+      setHistorico(d?.historico || [])
+      setLoadingHistorico(false)
+    }).catch(() => setLoadingHistorico(false))
   }
 
   async function confirmarEstado() {
@@ -264,6 +276,8 @@ export default function Propostas() {
         setPropostas(prev => prev.map(p => p.id === detalhe.id ? atualizado : p))
         setNovoEstado('')
         setNotas('')
+        // Recarregar histórico
+        api.get(`/propostas/${detalhe.id}`).then(d => setHistorico(d?.historico || []))
       } else {
         setErro(res?.error || 'Erro ao actualizar estado.')
       }
@@ -374,7 +388,8 @@ export default function Propostas() {
           </div>
         )}
 
-        {detalhe.estado === 'enviada' && (
+        {/* Actualizar Estado — disponível para todos os estados excepto cancelada e recusada */}
+        {!['cancelada', 'recusada'].includes(detalhe.estado) && (
           <div style={{ gridColumn: '1 / -1' }}>
             <DetailCard title="Actualizar Estado">
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -384,7 +399,13 @@ export default function Propostas() {
                   style={{ ...selectStyle, minWidth: '160px' }}
                 >
                   <option value="">Seleccionar estado...</option>
+                  <option value="em_elaboracao">Em Elaboração</option>
+                  <option value="enviada">Enviada</option>
+                  <option value="recebida">Recebida</option>
+                  <option value="pedido_reuniao">Pedido Reunião</option>
+                  <option value="duvida">Dúvida</option>
                   <option value="adjudicada">Adjudicada</option>
+                  <option value="ativa">Ativa</option>
                   <option value="recusada">Recusada</option>
                   <option value="cancelada">Cancelada</option>
                 </select>
@@ -414,6 +435,81 @@ export default function Propostas() {
             </DetailCard>
           </div>
         )}
+
+        {/* Histórico de estados */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <DetailCard title="Histórico de Estados">
+            {loadingHistorico ? (
+              <p style={{ fontSize: '0.8rem', color: C.subtle, margin: 0 }}>A carregar…</p>
+            ) : historico.length === 0 ? (
+              <p style={{ fontSize: '0.8rem', color: C.subtle, margin: 0 }}>Sem alterações de estado registadas.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                {historico.map((h, i) => {
+                  const cfgAnterior = ESTADO_CONFIG[h.estado_anterior] || { label: h.estado_anterior || '—', dot: '#94a3b8' }
+                  const cfgNovo     = ESTADO_CONFIG[h.estado_novo]     || { label: h.estado_novo,     dot: '#94a3b8' }
+                  const isPA        = h.origem === 'power_automate'
+                  return (
+                    <div key={h.id} style={{
+                      display: 'flex', gap: '0.875rem', alignItems: 'flex-start',
+                      padding: '0.75rem 0',
+                      borderBottom: i < historico.length - 1 ? `1px solid ${C.borderL}` : 'none',
+                    }}>
+                      {/* Dot */}
+                      <div style={{
+                        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                        background: cfgNovo.bg || '#f1f5f9',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        marginTop: '0.1rem'
+                      }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfgNovo.dot }} />
+                      </div>
+
+                      {/* Conteúdo */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {h.estado_anterior && (
+                            <>
+                              <Badge estado={h.estado_anterior} />
+                              <span style={{ fontSize: '0.75rem', color: C.subtle }}>→</span>
+                            </>
+                          )}
+                          <Badge estado={h.estado_novo} />
+                          {isPA && (
+                            <span style={{
+                              fontSize: '0.65rem', fontWeight: 600,
+                              background: '#f0fdf4', color: '#15803d',
+                              padding: '0.15rem 0.4rem', borderRadius: '0.25rem',
+                            }}>
+                              Power Automate
+                            </span>
+                          )}
+                        </div>
+
+                        {h.notas && (
+                          <p style={{
+                            margin: '0.35rem 0 0', fontSize: '0.78rem',
+                            color: C.text, lineHeight: 1.5,
+                            background: C.bg, borderRadius: '0.375rem',
+                            padding: '0.4rem 0.625rem',
+                            wordBreak: 'break-word'
+                          }}>
+                            {h.notas}
+                          </p>
+                        )}
+
+                        <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: C.subtle }}>
+                          {formatDateTime(h.criado_em)}
+                          {h.utilizador_nome && <> · {h.utilizador_nome}</>}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </DetailCard>
+        </div>
 
       </div>
     </div>
