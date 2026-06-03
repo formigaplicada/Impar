@@ -23,7 +23,7 @@ const TIPOS_EVENTO = [
 ]
 
 const TIPOS_REUNIAO = [
-  { key: 'ago',            label: 'AGO',            color: '#2563eb', bg: '#eff6ff' },
+  { key: 'ago',            label: 'Ordinária',       color: '#2563eb', bg: '#eff6ff' },
   { key: 'extraordinaria', label: 'Extraordinária',  color: '#7c3aed', bg: '#f5f3ff' },
   { key: 'apresentacao',   label: 'Apresentação',    color: '#0891b2', bg: '#ecfeff' },
   { key: 'assinaturas',    label: 'Assinaturas',     color: '#d97706', bg: '#fffbeb' },
@@ -36,6 +36,7 @@ const FORMATOS = [
 ]
 
 const ESTADOS_ATA = [
+  { key: 'na',             label: 'Nao Aplicável',  color: '#64748b', bg: '#f1f5f9' },
   { key: 'pendente',       label: 'Pendente',       color: '#64748b', bg: '#f1f5f9' },
   { key: 'pronta',         label: 'Pronta',          color: '#16a34a', bg: '#dcfce7' },
   { key: 'em_assinaturas', label: 'Em assinaturas',  color: '#d97706', bg: '#fef3c7' },
