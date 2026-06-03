@@ -62,7 +62,11 @@ function mesLabel(iso) {
 }
 function diasAte(iso) {
   if (!iso) return null
-  return Math.ceil((new Date(iso) - new Date()) / (1000 * 60 * 60 * 24))
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  const data = new Date(iso)
+  data.setHours(0, 0, 0, 0)
+  return Math.ceil((data - hoje) / (1000 * 60 * 60 * 24))
 }
 function isoParaInputDatetime(iso) {
   if (!iso) return ''

@@ -2774,7 +2774,7 @@ app.post('/eventos', requireAuth, async (c) => {
       condominio_id, condominio_texto,
       localidade, loja_id, filial_texto,
       data_hora, formato, local_evento,
-      gestor, gestor_id,
+      gestor,
       estado_ata, comentarios, criado_por
     ) VALUES (
       ${tipo             || 'reuniao'},
