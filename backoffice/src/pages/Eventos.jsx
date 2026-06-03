@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../lib/api'
+import CondominioSearch from '../components/CondominioSearch'
 
 // ── Paleta Ímpar ──────────────────────────────────────────────────────────────
 const C = {
@@ -22,7 +23,7 @@ const TIPOS_EVENTO = [
 ]
 
 const TIPOS_REUNIAO = [
-  { key: 'ago',            label: 'Ordinária',            color: '#2563eb', bg: '#eff6ff' },
+  { key: 'ago',            label: 'AGO',            color: '#2563eb', bg: '#eff6ff' },
   { key: 'extraordinaria', label: 'Extraordinária',  color: '#7c3aed', bg: '#f5f3ff' },
   { key: 'apresentacao',   label: 'Apresentação',    color: '#0891b2', bg: '#ecfeff' },
   { key: 'assinaturas',    label: 'Assinaturas',     color: '#d97706', bg: '#fffbeb' },
@@ -129,8 +130,14 @@ const FORM_VAZIO = {
   comentarios: '',
 }
 
-function FormEvento({ inicial, condominios, lojas, onGuardar, onCancelar, loading }) {
+function FormEvento({ inicial, lojas, onGuardar, onCancelar, loading }) {
   const [form, setForm] = useState(inicial || FORM_VAZIO)
+  // condominio seleccionado: { id, n_impar, nome } | null
+  const [condominio, setCondominio] = useState(
+    inicial?.condominio_id
+      ? { id: inicial.condominio_id, n_impar: inicial.condominio_n_impar, nome: inicial.condominio_nome }
+      : null
+  )
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const lbl = {
@@ -169,24 +176,16 @@ function FormEvento({ inicial, condominios, lojas, onGuardar, onCancelar, loadin
       {/* Condomínio */}
       <div style={{ marginBottom: '1rem' }}>
         <label style={lbl}>Condomínio <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(opcional)</span></label>
-        <select
-          value={form.condominio_id}
-          onChange={e => {
-            const id = e.target.value
-            set('condominio_id', id)
-            if (id) {
-              const c = condominios.find(c => c.id === id)
-              if (c) set('condominio_texto', c.nome)
-            } else {
-              set('condominio_texto', '')
-            }
+        <CondominioSearch
+          value={condominio}
+          onChange={c => {
+            setCondominio(c)
+            set('condominio_id',    c?.id      || '')
+            set('condominio_texto', c?.nome    || form.condominio_texto)
           }}
-          style={inp}
-        >
-          <option value="">— Seleccionar —</option>
-          {condominios.map(c => <option key={c.id} value={c.id}>{c.n_impar} — {c.nome}</option>)}
-        </select>
-        {!form.condominio_id && (
+        />
+        {/* Texto livre — só visível se não houver condomínio seleccionado */}
+        {!condominio && (
           <input
             style={{ ...inp, marginTop: '0.5rem' }}
             placeholder="Ou escreve o nome/morada livremente"
@@ -392,7 +391,6 @@ function LinhaEvento({ e, onEditar, onApagar }) {
 export default function Eventos() {
   const [eventos,     setEventos]     = useState([])
   const [lojas,       setLojas]       = useState([])
-  const [condominios, setCondominios] = useState([])
   const [gestores,    setGestores]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [erro,        setErro]        = useState(null)
@@ -414,9 +412,8 @@ export default function Eventos() {
   useEffect(() => {
     Promise.all([
       api.get('/lojas').then(r => r.lojas || []),
-      api.get('/condominios').then(r => r.condominios || []),
       api.get('/eventos/gestores').then(r => r.gestores || []),
-    ]).then(([l, c, g]) => { setLojas(l); setCondominios(c); setGestores(g) })
+    ]).then(([l, g]) => { setLojas(l); setGestores(g) })
   }, [])
 
   // ── Carregar eventos ──────────────────────────────────────────────────────
@@ -610,7 +607,7 @@ export default function Eventos() {
       {/* Modal Criar */}
       {modal === 'criar' && (
         <Modal title="Novo Evento" onClose={() => setModal(null)}>
-          <FormEvento condominios={condominios} lojas={lojas} onGuardar={handleCriar} onCancelar={() => setModal(null)} loading={loadingGuardar} />
+          <FormEvento lojas={lojas} onGuardar={handleCriar} onCancelar={() => setModal(null)} loading={loadingGuardar} />
         </Modal>
       )}
 
@@ -619,21 +616,22 @@ export default function Eventos() {
         <Modal title="Editar Evento" onClose={() => { setModal(null); setEventoEditar(null) }}>
           <FormEvento
             inicial={{
-              tipo:             eventoEditar.tipo             || 'reuniao',
-              tipo_reuniao:     eventoEditar.tipo_reuniao     || 'ago',
-              condominio_id:    eventoEditar.condominio_id    || '',
-              condominio_texto: eventoEditar.condominio_texto || '',
-              localidade:       eventoEditar.localidade       || '',
-              loja_id:          eventoEditar.loja_id          || '',
-              filial_texto:     eventoEditar.filial_texto     || '',
-              data_hora:        isoParaInputDatetime(eventoEditar.data_hora),
-              formato:          eventoEditar.formato          || 'presencial',
-              local_evento:     eventoEditar.local_evento     || '',
-              gestor:           eventoEditar.gestor           || '',
-              estado_ata:       eventoEditar.estado_ata       || 'pendente',
-              comentarios:      eventoEditar.comentarios      || '',
+              tipo:                 eventoEditar.tipo             || 'reuniao',
+              tipo_reuniao:         eventoEditar.tipo_reuniao     || 'ago',
+              condominio_id:        eventoEditar.condominio_id    || '',
+              condominio_n_impar:   eventoEditar.condominio_n_impar || '',
+              condominio_nome:      eventoEditar.condominio_nome  || '',
+              condominio_texto:     eventoEditar.condominio_texto || '',
+              localidade:           eventoEditar.localidade       || '',
+              loja_id:              eventoEditar.loja_id          || '',
+              filial_texto:         eventoEditar.filial_texto     || '',
+              data_hora:            isoParaInputDatetime(eventoEditar.data_hora),
+              formato:              eventoEditar.formato          || 'presencial',
+              local_evento:         eventoEditar.local_evento     || '',
+              gestor:               eventoEditar.gestor           || '',
+              estado_ata:           eventoEditar.estado_ata       || 'pendente',
+              comentarios:          eventoEditar.comentarios      || '',
             }}
-            condominios={condominios}
             lojas={lojas}
             onGuardar={handleEditar}
             onCancelar={() => { setModal(null); setEventoEditar(null) }}
