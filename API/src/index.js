@@ -2266,4 +2266,663 @@ app.get('/dd/dashboard', requireAuth, async (c) => {
   })
 })
 
+// =============================================================================
+// MÓDULO WHATSAPP — CondExpress
+// =============================================================================
+// Adicionar ao ficheiro principal do Worker Hono (index.js).
+//
+// Endpoints:
+//   GET  /whatsapp/webhook   — verificação do challenge pela Meta (público)
+//   POST /whatsapp/webhook   — recebe eventos da Meta (público)
+//   POST /whatsapp/send      — envia mensagem (requer auth)
+//   GET  /whatsapp/comunicacoes — lista comunicacoes WhatsApp (requer auth)
+//
+// Variáveis de ambiente necessárias no Worker (wrangler.toml / dashboard):
+//   WHATSAPP_VERIFY_TOKEN     — token de verificação (defines tu, metes igual na Meta)
+//   WHATSAPP_TOKEN            — token permanente da Cloud API da Meta
+//   WHATSAPP_PHONE_ID         — Phone Number ID (da Meta)
+//   WHATSAPP_INBOX_DRIVE_ID   — b!Ghl6woYj7UubNJ5CYBjF3qNWAIDjiXBGphV4NV5ctJ_S14rrRndLQa5vxcLAXDAr
+//   WHATSAPP_INBOX_FOLDER_ID  — 01XKR3VWFNRYRPNAHQNVEJZKTCWCTVPMRO
+// =============================================================================
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILITÁRIOS INTERNOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Descarrega um media do WhatsApp e faz upload para SharePoint (Whatsapp Inbox)
+// Devolve { sharepoint_url, nome_ficheiro } ou lança erro
+async function downloadWhatsAppMediaToSharePoint(mediaId, mimeType, env) {
+  // 1. Obter URL de download do media
+  const metaRes = await fetch(
+    `https://graph.facebook.com/v19.0/${mediaId}`,
+    { headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` } }
+  )
+  if (!metaRes.ok) throw new Error(`Meta media lookup falhou: ${metaRes.status}`)
+  const metaData = await metaRes.json()
+  const mediaUrl = metaData.url
+  if (!mediaUrl) throw new Error('URL de media não encontrado na resposta da Meta')
+
+  // 2. Descarregar o ficheiro binário
+  const fileRes = await fetch(mediaUrl, {
+    headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` }
+  })
+  if (!fileRes.ok) throw new Error(`Download do media falhou: ${fileRes.status}`)
+  const fileBuffer = await fileRes.arrayBuffer()
+
+  // 3. Determinar extensão a partir do MIME type
+  const extMap = {
+    'image/jpeg':       'jpg',
+    'image/png':        'png',
+    'image/webp':       'webp',
+    'video/mp4':        'mp4',
+    'audio/ogg':        'ogg',
+    'audio/mpeg':       'mp3',
+    'application/pdf':  'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  }
+  const ext = extMap[mimeType] || 'bin'
+  const nomeFicheiro = `${mediaId}_${Date.now()}.${ext}`
+
+  // 4. Upload para SharePoint (pasta Inbox)
+  const msToken = await getMicrosoftToken(env)
+  const uploadRes = await fetch(
+    `https://graph.microsoft.com/v1.0/drives/${env.WHATSAPP_INBOX_DRIVE_ID}/items/${env.WHATSAPP_INBOX_FOLDER_ID}:/${nomeFicheiro}:/content`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${msToken}`,
+        'Content-Type': mimeType,
+      },
+      body: fileBuffer,
+    }
+  )
+  if (!uploadRes.ok) {
+    const err = await uploadRes.json()
+    throw new Error(`Upload SharePoint falhou: ${err?.error?.message || uploadRes.status}`)
+  }
+  const uploadData = await uploadRes.json()
+
+  return {
+    sharepoint_url: uploadData.webUrl,
+    nome_ficheiro:  nomeFicheiro,
+  }
+}
+
+// Envia uma mensagem de texto via WhatsApp Cloud API
+async function enviarMensagemWhatsApp(para, texto, env) {
+  const res = await fetch(
+    `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_ID}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization:  `Bearer ${env.WHATSAPP_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to:                para,
+        type:              'text',
+        text:              { body: texto },
+      }),
+    }
+  )
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(`Envio WhatsApp falhou: ${err?.error?.message || res.status}`)
+  }
+  return await res.json() // contém messages[0].id
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /whatsapp/webhook — verificação do challenge pela Meta
+// ─────────────────────────────────────────────────────────────────────────────
+// A Meta faz um GET com hub.mode=subscribe, hub.verify_token e hub.challenge.
+// Se o verify_token bater certo, respondemos com o challenge (texto simples).
+
+app.get('/whatsapp/webhook', (c) => {
+  const mode      = c.req.query('hub.mode')
+  const token     = c.req.query('hub.verify_token')
+  const challenge = c.req.query('hub.challenge')
+
+  if (mode === 'subscribe' && token === c.env.WHATSAPP_VERIFY_TOKEN) {
+    return c.text(challenge, 200)
+  }
+
+  return c.json({ error: 'Verificação falhou' }, 403)
+})
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /whatsapp/webhook — recebe eventos da Meta
+// ─────────────────────────────────────────────────────────────────────────────
+// Processa: mensagens de texto, imagens, documentos, áudio, vídeo
+// e updates de estado (entregue, lido).
+
+app.post('/whatsapp/webhook', async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  let body
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.text('OK', 200) // A Meta espera sempre 200, mesmo em erro
+  }
+
+  // A Meta espera sempre 200 rapidamente — processamos de forma assíncrona
+  // usando c.executionCtx.waitUntil para não bloquear a resposta
+  const processar = async () => {
+    try {
+      const entry = body?.entry?.[0]
+      const changes = entry?.changes?.[0]
+      const value = changes?.value
+
+      if (!value) return
+
+      // ── Updates de estado (entregue, lido) ───────────────────────────────
+      const statuses = value?.statuses || []
+      for (const status of statuses) {
+        const { id: canal_msg_id, status: estado, timestamp } = status
+
+        const estadoMap = {
+          sent:      'enviada',
+          delivered: 'entregue',
+          read:      'lida',
+          failed:    'falhada',
+        }
+        const novoEstado = estadoMap[estado]
+        if (!novoEstado) continue
+
+        await sql`
+          UPDATE comunicacoes
+          SET
+            estado        = ${novoEstado},
+            atualizado_em = NOW(),
+            entregue_em   = CASE WHEN ${novoEstado} = 'entregue' THEN NOW() ELSE entregue_em END,
+            lido_em       = CASE WHEN ${novoEstado} = 'lida'     THEN NOW() ELSE lido_em     END
+          WHERE canal_msg_id = ${canal_msg_id}
+            AND canal        = 'whatsapp'
+        `
+      }
+
+      // ── Mensagens recebidas ───────────────────────────────────────────────
+      const messages = value?.messages || []
+      for (const msg of messages) {
+        const canal_msg_id = msg.id
+        const de           = msg.from  // número E.164 sem +
+        const tipo_raw     = msg.type  // text, image, document, audio, video, location
+
+        // Idempotência — ignorar se já processámos esta mensagem
+        const existente = await sql`
+          SELECT id FROM comunicacoes
+          WHERE canal_msg_id = ${canal_msg_id} AND canal = 'whatsapp'
+        `
+        if (existente.length > 0) continue
+
+        const tipoMap = {
+          text:     'texto',
+          image:    'imagem',
+          document: 'documento',
+          audio:    'audio',
+          video:    'video',
+          location: 'localizacao',
+        }
+        const tipo = tipoMap[tipo_raw] || 'texto'
+
+        let conteudo      = null
+        let ficheiro_url  = null
+        let ficheiro_nome = null
+        let ficheiro_mime = null
+
+        if (tipo_raw === 'text') {
+          conteudo = msg.text?.body || ''
+        }
+
+        if (['image', 'document', 'audio', 'video'].includes(tipo_raw)) {
+          const mediaObj = msg[tipo_raw]
+          const mediaId  = mediaObj?.id
+          ficheiro_mime  = mediaObj?.mime_type || null
+          ficheiro_nome  = mediaObj?.filename  || null  // só documentos têm filename
+
+          if (mediaId) {
+            try {
+              const upload = await downloadWhatsAppMediaToSharePoint(mediaId, ficheiro_mime, c.env)
+              ficheiro_url  = upload.sharepoint_url
+              ficheiro_nome = ficheiro_nome || upload.nome_ficheiro
+              conteudo      = ficheiro_nome
+            } catch (err) {
+              conteudo = `[Erro ao guardar ficheiro: ${err.message}]`
+            }
+          }
+        }
+
+        if (tipo_raw === 'location') {
+          const loc = msg.location
+          conteudo = `Localização: ${loc?.latitude}, ${loc?.longitude}`
+          if (loc?.name)    conteudo += ` — ${loc.name}`
+          if (loc?.address) conteudo += ` (${loc.address})`
+        }
+
+        await sql`
+          INSERT INTO comunicacoes (
+            canal, direcao, tipo,
+            de, para,
+            conteudo, ficheiro_url, ficheiro_nome, ficheiro_mime,
+            estado, canal_msg_id,
+            criado_em
+          ) VALUES (
+            'whatsapp', 'inbound', ${tipo},
+            ${de}, ${c.env.WHATSAPP_PHONE_ID},
+            ${conteudo}, ${ficheiro_url}, ${ficheiro_nome}, ${ficheiro_mime},
+            'entregue', ${canal_msg_id},
+            NOW()
+          )
+        `
+      }
+    } catch (err) {
+      console.error('Erro ao processar webhook WhatsApp:', err.message)
+    }
+  }
+
+  // Responde 200 imediatamente à Meta e processa em background
+  c.executionCtx.waitUntil(processar())
+  return c.text('OK', 200)
+})
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /whatsapp/send — envia mensagem de texto
+// ─────────────────────────────────────────────────────────────────────────────
+// Body: { para, texto, contexto_tipo?, contexto_id? }
+// para: número E.164 sem + (ex: "351912345678")
+
+app.post('/whatsapp/send', requireAuth, async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
+
+  let body
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Payload JSON inválido' }, 400)
+  }
+
+  const { para, texto, contexto_tipo, contexto_id } = body
+
+  if (!para || !texto) {
+    return c.json({ error: 'para e texto são obrigatórios' }, 400)
+  }
+
+  // Normalizar número — remover + se vier com ele
+  const numero = para.replace(/^\+/, '')
+
+  let canal_msg_id = null
+  let estado = 'enviada'
+
+  try {
+    const metaRes = await enviarMensagemWhatsApp(numero, texto, c.env)
+    canal_msg_id  = metaRes?.messages?.[0]?.id || null
+  } catch (err) {
+    estado = 'falhada'
+    // Regista na mesma mas com estado falhada
+    await sql`
+      INSERT INTO comunicacoes (
+        canal, direcao, tipo,
+        de, para,
+        conteudo, estado,
+        contexto_tipo, contexto_id,
+        utilizador_id
+      ) VALUES (
+        'whatsapp', 'outbound', 'texto',
+        ${c.env.WHATSAPP_PHONE_ID}, ${numero},
+        ${texto}, 'falhada',
+        ${contexto_tipo || null}, ${contexto_id || null},
+        ${user.id}
+      )
+    `
+    return c.json({ error: `Falha ao enviar: ${err.message}` }, 502)
+  }
+
+  const rows = await sql`
+    INSERT INTO comunicacoes (
+      canal, direcao, tipo,
+      de, para,
+      conteudo, estado, canal_msg_id,
+      contexto_tipo, contexto_id,
+      utilizador_id
+    ) VALUES (
+      'whatsapp', 'outbound', 'texto',
+      ${c.env.WHATSAPP_PHONE_ID}, ${numero},
+      ${texto}, ${estado}, ${canal_msg_id},
+      ${contexto_tipo || null}, ${contexto_id || null},
+      ${user.id}
+    )
+    RETURNING id
+  `
+
+  return c.json({ ok: true, id: rows[0].id, canal_msg_id })
+})
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /whatsapp/comunicacoes — lista comunicações WhatsApp
+// ─────────────────────────────────────────────────────────────────────────────
+// Query params opcionais: contexto_tipo, contexto_id, de, limit (default 50)
+
+app.get('/whatsapp/comunicacoes', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const { contexto_tipo, contexto_id, de, limit } = c.req.query()
+  const maxRows = Math.min(parseInt(limit || '50'), 200)
+
+  const rows = await sql`
+    SELECT
+      c.id, c.canal, c.direcao, c.tipo,
+      c.de, c.para, c.conteudo,
+      c.ficheiro_url, c.ficheiro_nome, c.ficheiro_mime,
+      c.estado, c.canal_msg_id,
+      c.contexto_tipo, c.contexto_id,
+      c.criado_em, c.entregue_em, c.lido_em,
+      u.nome as utilizador_nome
+    FROM comunicacoes c
+    LEFT JOIN utilizadores u ON u.id = c.utilizador_id
+    WHERE c.canal = 'whatsapp'
+      ${contexto_tipo ? sql`AND c.contexto_tipo = ${contexto_tipo}` : sql``}
+      ${contexto_id   ? sql`AND c.contexto_id   = ${contexto_id}`   : sql``}
+      ${de            ? sql`AND c.de            = ${de}`            : sql``}
+    ORDER BY c.criado_em DESC
+    LIMIT ${maxRows}
+  `
+
+  return c.json({ comunicacoes: rows })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AGENDA — Eventos
+// Adicionar ao index.js junto dos outros routes
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+// ── GET /eventos ──────────────────────────────────────────────────────────────
+// Filtros opcionais: tipo, gestor, loja_id, mes (YYYY-MM), estado_ata, condominio_id
+
+app.get('/eventos', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const { tipo, gestor, loja_id, mes, estado_ata, condominio_id } = c.req.query()
+
+  let mesInicio = null
+  let mesFim    = null
+  if (mes) {
+    mesInicio = `${mes}-01`
+    const [ano, m] = mes.split('-').map(Number)
+    const proximo  = m === 12 ? `${ano + 1}-01-01` : `${ano}-${String(m + 1).padStart(2, '0')}-01`
+    mesFim = proximo
+  }
+
+  const rows = await sql`
+    SELECT
+      e.id,
+      e.tipo,
+      e.tipo_reuniao,
+      e.condominio_id,
+      e.condominio_texto,
+      c.nome        AS condominio_nome,
+      c.n_impar     AS condominio_n_impar,
+      e.localidade,
+      e.loja_id,
+      l.nome        AS loja_nome,
+      e.filial_texto,
+      e.data_hora,
+      e.formato,
+      e.local_evento,
+      e.gestor,
+      e.estado_ata,
+      e.comentarios,
+      e.criado_em,
+      e.atualizado_em,
+      u.nome        AS criado_por_nome
+    FROM eventos e
+    LEFT JOIN condominios  c ON c.id = e.condominio_id
+    LEFT JOIN lojas        l ON l.id = e.loja_id
+    LEFT JOIN utilizadores u ON u.id = e.criado_por
+    WHERE 1=1
+      ${tipo          ? sql`AND e.tipo         = ${tipo}`                    : sql``}
+      ${gestor        ? sql`AND e.gestor        ILIKE ${'%' + gestor + '%'}` : sql``}
+      ${loja_id       ? sql`AND e.loja_id       = ${loja_id}`                : sql``}
+      ${estado_ata    ? sql`AND e.estado_ata    = ${estado_ata}`             : sql``}
+      ${condominio_id ? sql`AND e.condominio_id = ${condominio_id}`          : sql``}
+      ${mesInicio     ? sql`AND e.data_hora    >= ${mesInicio}::date`        : sql``}
+      ${mesFim        ? sql`AND e.data_hora     < ${mesFim}::date`           : sql``}
+    ORDER BY e.data_hora ASC
+    LIMIT 500
+  `
+
+  return c.json({ eventos: rows })
+})
+
+
+// ── GET /eventos/gestores ─────────────────────────────────────────────────────
+
+app.get('/eventos/gestores', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const rows = await sql`
+    SELECT DISTINCT gestor
+    FROM eventos
+    WHERE gestor IS NOT NULL AND gestor <> ''
+    ORDER BY gestor ASC
+  `
+  return c.json({ gestores: rows.map(r => r.gestor) })
+})
+
+
+// ── GET /eventos/:id ──────────────────────────────────────────────────────────
+
+app.get('/eventos/:id', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const id  = c.req.param('id')
+
+  const rows = await sql`
+    SELECT
+      e.*,
+      c.nome    AS condominio_nome,
+      c.n_impar AS condominio_n_impar,
+      l.nome    AS loja_nome
+    FROM eventos e
+    LEFT JOIN condominios c ON c.id = e.condominio_id
+    LEFT JOIN lojas       l ON l.id = e.loja_id
+    WHERE e.id = ${id}
+  `
+  if (rows.length === 0) return c.json({ error: 'Evento não encontrado' }, 404)
+  return c.json({ evento: rows[0] })
+})
+
+
+// ── POST /eventos ─────────────────────────────────────────────────────────────
+
+app.post('/eventos', requireAuth, async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
+  const body = await c.req.json()
+
+  const {
+    tipo,
+    tipo_reuniao,
+    condominio_id,
+    condominio_texto,
+    localidade,
+    loja_id,
+    filial_texto,
+    data_hora,
+    formato,
+    local_evento,
+    gestor,
+    estado_ata,
+    comentarios,
+  } = body
+
+  if (!data_hora) return c.json({ error: 'data_hora é obrigatória' }, 400)
+
+  const TIPOS          = ['reuniao']
+  const TIPOS_REUNIAO  = ['ago', 'extraordinaria', 'apresentacao', 'assinaturas', 'outro']
+  const FORMATOS       = ['presencial', 'online']
+  const ESTADOS_ATA    = ['pendente', 'pronta', 'em_assinaturas', 'assinada']
+
+  if (tipo         && !TIPOS.includes(tipo))               return c.json({ error: 'tipo inválido' }, 400)
+  if (tipo_reuniao && !TIPOS_REUNIAO.includes(tipo_reuniao)) return c.json({ error: 'tipo_reuniao inválido' }, 400)
+  if (formato      && !FORMATOS.includes(formato))          return c.json({ error: 'formato inválido' }, 400)
+  if (estado_ata   && !ESTADOS_ATA.includes(estado_ata))    return c.json({ error: 'estado_ata inválido' }, 400)
+
+  const rows = await sql`
+    INSERT INTO eventos (
+      tipo, tipo_reuniao,
+      condominio_id, condominio_texto,
+      localidade,
+      loja_id, filial_texto,
+      data_hora,
+      formato, local_evento,
+      gestor, estado_ata, comentarios,
+      criado_por
+    ) VALUES (
+      ${tipo          || 'reuniao'},
+      ${tipo_reuniao  || null},
+      ${condominio_id   || null},
+      ${condominio_texto || null},
+      ${localidade      || null},
+      ${loja_id         || null},
+      ${filial_texto    || null},
+      ${data_hora},
+      ${formato         || 'presencial'},
+      ${local_evento    || null},
+      ${gestor          || null},
+      ${estado_ata      || 'pendente'},
+      ${comentarios     || null},
+      ${user.id}
+    )
+    RETURNING id
+  `
+
+  return c.json({ ok: true, id: rows[0].id }, 201)
+})
+
+
+// ── PUT /eventos/:id ──────────────────────────────────────────────────────────
+
+app.put('/eventos/:id', requireAuth, async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  const id   = c.req.param('id')
+  const body = await c.req.json()
+
+  const existe = await sql`SELECT id FROM eventos WHERE id = ${id}`
+  if (existe.length === 0) return c.json({ error: 'Evento não encontrado' }, 404)
+
+  const {
+    tipo,
+    tipo_reuniao,
+    condominio_id,
+    condominio_texto,
+    localidade,
+    loja_id,
+    filial_texto,
+    data_hora,
+    formato,
+    local_evento,
+    gestor,
+    estado_ata,
+    comentarios,
+  } = body
+
+  await sql`
+    UPDATE eventos SET
+      tipo             = ${tipo          || 'reuniao'},
+      tipo_reuniao     = ${tipo_reuniao  ?? null},
+      condominio_id    = ${condominio_id   ?? null},
+      condominio_texto = ${condominio_texto ?? null},
+      localidade       = ${localidade      ?? null},
+      loja_id          = ${loja_id         ?? null},
+      filial_texto     = ${filial_texto    ?? null},
+      data_hora        = ${data_hora},
+      formato          = ${formato         || 'presencial'},
+      local_evento     = ${local_evento    ?? null},
+      gestor           = ${gestor         ?? null},
+      estado_ata       = ${estado_ata     || 'pendente'},
+      comentarios      = ${comentarios    ?? null}
+    WHERE id = ${id}
+  `
+
+  return c.json({ ok: true })
+})
+
+
+// ── DELETE /eventos/:id ───────────────────────────────────────────────────────
+
+app.delete('/eventos/:id', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const id  = c.req.param('id')
+
+  const existe = await sql`SELECT id FROM eventos WHERE id = ${id}`
+  if (existe.length === 0) return c.json({ error: 'Evento não encontrado' }, 404)
+
+  await sql`DELETE FROM eventos WHERE id = ${id}`
+  return c.json({ ok: true })
+})
+
+
+// ── POST /eventos/importar ────────────────────────────────────────────────────
+// Importa um array de eventos em bulk (vindo do CSV migrado para JSON no frontend)
+// Body: { eventos: [ { tipo, tipo_reuniao, condominio_texto, localidade,
+//                      filial_texto, data_hora, formato, local_evento,
+//                      gestor, estado_ata, comentarios } ] }
+
+app.post('/eventos/importar', requireAuth, async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  const user = c.get('user')
+  const body = await c.req.json()
+
+  const lista = body?.eventos
+  if (!Array.isArray(lista) || lista.length === 0) {
+    return c.json({ error: 'Array de eventos em falta ou vazio' }, 400)
+  }
+  if (lista.length > 1000) {
+    return c.json({ error: 'Máximo de 1000 eventos por importação' }, 400)
+  }
+
+  let inseridos = 0
+  const erros   = []
+
+  for (const e of lista) {
+    if (!e.data_hora) {
+      erros.push({ linha: e, motivo: 'data_hora em falta' })
+      continue
+    }
+    try {
+      await sql`
+        INSERT INTO eventos (
+          tipo, tipo_reuniao,
+          condominio_texto, localidade, filial_texto,
+          data_hora, formato, local_evento,
+          gestor, estado_ata, comentarios,
+          criado_por
+        ) VALUES (
+          ${e.tipo         || 'reuniao'},
+          ${e.tipo_reuniao || null},
+          ${e.condominio_texto || null},
+          ${e.localidade       || null},
+          ${e.filial_texto     || null},
+          ${e.data_hora},
+          ${e.formato      || 'presencial'},
+          ${e.local_evento || null},
+          ${e.gestor       || null},
+          ${e.estado_ata   || 'pendente'},
+          ${e.comentarios  || null},
+          ${user.id}
+        )
+      `
+      inseridos++
+    } catch (err) {
+      erros.push({ linha: e, motivo: err.message })
+    }
+  }
+
+  return c.json({ ok: true, inseridos, erros })
+})
+
 export default app

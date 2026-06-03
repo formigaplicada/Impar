@@ -2,3 +2,18 @@ name = "impar-api"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+
+[vars]
+WHATSAPP_INBOX_DRIVE_ID  = "b!Ghl6woYj7UubNJ5CYBjF3qNWAIDjiXBGphV4NV5ctJ_S14rrRndLQa5vxcLAXDAr"
+WHATSAPP_INBOX_FOLDER_ID = "01XKR3VWFNRYRPNAHQNVEJZKTCWCTVPMRO"
+
+# Secrets — NÃO adicionar aqui, usar wrangler secret put ou o Dashboard:
+#   WHATSAPP_VERIFY_TOKEN
+#   WHATSAPP_TOKEN
+#   WHATSAPP_PHONE_ID
+#   DATABASE_URL
+#   MICROSOFT_CLIENT_ID
+#   MICROSOFT_CLIENT_SECRET
+#   MICROSOFT_TENANT_ID
+#   NIF_API_KEY
+#   POWER_AUTOMATE_API_KEY
