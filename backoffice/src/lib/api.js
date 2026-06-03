@@ -1,4 +1,4 @@
-const API_URL = 'https://impar-api.formigaplicada.workers.dev'
+const API_URL = 'https://api.condexpress.com'
 
 function getToken() {
   return localStorage.getItem('session_token')
