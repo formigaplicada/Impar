@@ -22,7 +22,7 @@ const TIPOS_EVENTO = [
 ]
 
 const TIPOS_REUNIAO = [
-  { key: 'ago',            label: 'AGO',            color: '#2563eb', bg: '#eff6ff' },
+  { key: 'ago',            label: 'Ordinária',            color: '#2563eb', bg: '#eff6ff' },
   { key: 'extraordinaria', label: 'Extraordinária',  color: '#7c3aed', bg: '#f5f3ff' },
   { key: 'apresentacao',   label: 'Apresentação',    color: '#0891b2', bg: '#ecfeff' },
   { key: 'assinaturas',    label: 'Assinaturas',     color: '#d97706', bg: '#fffbeb' },
