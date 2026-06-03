@@ -23,7 +23,7 @@ const TIPOS_EVENTO = [
 ]
 
 const TIPOS_REUNIAO = [
-  { key: 'ago',            label: 'Ordinária',       color: '#2563eb', bg: '#eff6ff' },
+  { key: 'ago',            label: 'AGO',            color: '#2563eb', bg: '#eff6ff' },
   { key: 'extraordinaria', label: 'Extraordinária',  color: '#7c3aed', bg: '#f5f3ff' },
   { key: 'apresentacao',   label: 'Apresentação',    color: '#0891b2', bg: '#ecfeff' },
   { key: 'assinaturas',    label: 'Assinaturas',     color: '#d97706', bg: '#fffbeb' },
@@ -36,7 +36,6 @@ const FORMATOS = [
 ]
 
 const ESTADOS_ATA = [
-  { key: 'na',             label: 'Nao Aplicável',  color: '#64748b', bg: '#f1f5f9' },
   { key: 'pendente',       label: 'Pendente',       color: '#64748b', bg: '#f1f5f9' },
   { key: 'pronta',         label: 'Pronta',          color: '#16a34a', bg: '#dcfce7' },
   { key: 'em_assinaturas', label: 'Em assinaturas',  color: '#d97706', bg: '#fef3c7' },
@@ -131,7 +130,7 @@ const FORM_VAZIO = {
   comentarios: '',
 }
 
-function FormEvento({ inicial, lojas, onGuardar, onCancelar, loading }) {
+function FormEvento({ inicial, lojas, utilizadores, onGuardar, onCancelar, loading }) {
   const [form, setForm] = useState(inicial || FORM_VAZIO)
   // condominio seleccionado: { id, n_impar, nome } | null
   const [condominio, setCondominio] = useState(
@@ -181,8 +180,35 @@ function FormEvento({ inicial, lojas, onGuardar, onCancelar, loading }) {
           value={condominio}
           onChange={c => {
             setCondominio(c)
-            set('condominio_id',    c?.id      || '')
-            set('condominio_texto', c?.nome    || form.condominio_texto)
+            if (!c) {
+              set('condominio_id', '')
+              return
+            }
+            set('condominio_id',    c.id)
+            set('condominio_texto', c.nome)
+
+            // Auto-fill localidade a partir do codigo_postal (ex: "2750-123 Cascais" → "Cascais")
+            if (c.codigo_postal) {
+              const partes = c.codigo_postal.trim().split(/\s+/)
+              if (partes.length > 1) set('localidade', partes.slice(1).join(' '))
+            }
+
+            // Auto-fill loja
+            if (c.loja_id) set('loja_id', String(c.loja_id))
+
+            // Auto-fill gestor — tenta fazer match pelo nome na lista de utilizadores
+            if (c.gestor) {
+              const match = utilizadores.find(u =>
+                u.nome.toLowerCase() === c.gestor.toLowerCase()
+              )
+              if (match) {
+                set('gestor_id', match.id)
+                set('gestor',    match.nome)
+              } else {
+                set('gestor_id', '')
+                set('gestor',    c.gestor)
+              }
+            }
           }}
         />
         {/* Texto livre — só visível se não houver condomínio seleccionado */}
@@ -227,7 +253,23 @@ function FormEvento({ inicial, lojas, onGuardar, onCancelar, loading }) {
         </div>
         <div>
           <label style={lbl}>Gestor</label>
-          <input style={inp} value={form.gestor} onChange={e => set('gestor', e.target.value)} placeholder="Nome do gestor" />
+          <select
+            style={inp}
+            value={form.gestor}
+            onChange={e => set('gestor', e.target.value === '__outro__' ? '' : e.target.value)}
+          >
+            <option value="">— Seleccionar —</option>
+            {utilizadores.map(u => <option key={u.id} value={u.nome}>{u.nome}</option>)}
+            <option value="__outro__">Outro (texto livre)</option>
+          </select>
+          {!form.gestor && (
+            <input
+              style={{ ...inp, marginTop: '0.5rem' }}
+              placeholder="Nome do gestor"
+              value={form.gestor}
+              onChange={e => set('gestor', e.target.value)}
+            />
+          )}
         </div>
       </div>
 
@@ -392,6 +434,7 @@ function LinhaEvento({ e, onEditar, onApagar }) {
 export default function Eventos() {
   const [eventos,     setEventos]     = useState([])
   const [lojas,       setLojas]       = useState([])
+  const [utilizadores, setUtilizadores] = useState([])
   const [gestores,    setGestores]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [erro,        setErro]        = useState(null)
@@ -414,7 +457,7 @@ export default function Eventos() {
     Promise.all([
       api.get('/lojas').then(r => r.lojas || []),
       api.get('/eventos/gestores').then(r => r.gestores || []),
-    ]).then(([l, g]) => { setLojas(l); setGestores(g) })
+    ]).then(([l, u]) => { setLojas(l); setUtilizadores(u); setGestores(u.map(u => u.nome)) })
   }, [])
 
   // ── Carregar eventos ──────────────────────────────────────────────────────
@@ -608,7 +651,7 @@ export default function Eventos() {
       {/* Modal Criar */}
       {modal === 'criar' && (
         <Modal title="Novo Evento" onClose={() => setModal(null)}>
-          <FormEvento lojas={lojas} onGuardar={handleCriar} onCancelar={() => setModal(null)} loading={loadingGuardar} />
+          <FormEvento lojas={lojas} utilizadores={utilizadores} onGuardar={handleCriar} onCancelar={() => setModal(null)} loading={loadingGuardar} />
         </Modal>
       )}
 
@@ -634,6 +677,7 @@ export default function Eventos() {
               comentarios:          eventoEditar.comentarios      || '',
             }}
             lojas={lojas}
+            utilizadores={utilizadores}
             onGuardar={handleEditar}
             onCancelar={() => { setModal(null); setEventoEditar(null) }}
             loading={loadingGuardar}

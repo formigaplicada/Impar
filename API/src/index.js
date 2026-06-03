@@ -2642,8 +2642,12 @@ app.get('/whatsapp/comunicacoes', requireAuth, async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AGENDA — Eventos
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 // ── GET /eventos ──────────────────────────────────────────────────────────────
-// Filtros opcionais: tipo, gestor, loja_id, mes (YYYY-MM), estado_ata, condominio_id
 
 app.get('/eventos', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
@@ -2700,17 +2704,17 @@ app.get('/eventos', requireAuth, async (c) => {
 })
 
 
-// ── GET /eventos/gestores ─────────────────────────────────────────────────────
+// ── GET /eventos/gestores — lista utilizadores activos para o dropdown ────────
 
 app.get('/eventos/gestores', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const rows = await sql`
-    SELECT DISTINCT gestor
-    FROM eventos
-    WHERE gestor IS NOT NULL AND gestor <> ''
-    ORDER BY gestor ASC
+    SELECT id, nome
+    FROM utilizadores
+    WHERE ativo = true
+    ORDER BY nome ASC
   `
-  return c.json({ gestores: rows.map(r => r.gestor) })
+  return c.json({ gestores: rows })
 })
 
 
@@ -2727,8 +2731,8 @@ app.get('/eventos/:id', requireAuth, async (c) => {
       c.n_impar AS condominio_n_impar,
       l.nome    AS loja_nome
     FROM eventos e
-    LEFT JOIN condominios c ON c.id = e.condominio_id
-    LEFT JOIN lojas       l ON l.id = e.loja_id
+    LEFT JOIN condominios  c ON c.id = e.condominio_id
+    LEFT JOIN lojas        l ON l.id = e.loja_id
     WHERE e.id = ${id}
   `
   if (rows.length === 0) return c.json({ error: 'Evento não encontrado' }, 404)
@@ -2744,57 +2748,48 @@ app.post('/eventos', requireAuth, async (c) => {
   const body = await c.req.json()
 
   const {
-    tipo,
-    tipo_reuniao,
-    condominio_id,
-    condominio_texto,
-    localidade,
-    loja_id,
-    filial_texto,
-    data_hora,
-    formato,
-    local_evento,
+    tipo, tipo_reuniao,
+    condominio_id, condominio_texto,
+    localidade, loja_id, filial_texto,
+    data_hora, formato, local_evento,
     gestor,
-    estado_ata,
-    comentarios,
+    estado_ata, comentarios,
   } = body
 
   if (!data_hora) return c.json({ error: 'data_hora é obrigatória' }, 400)
 
-  const TIPOS          = ['reuniao']
-  const TIPOS_REUNIAO  = ['ago', 'extraordinaria', 'apresentacao', 'assinaturas', 'outro']
-  const FORMATOS       = ['presencial', 'online']
-  const ESTADOS_ATA    = ['pendente', 'pronta', 'em_assinaturas', 'assinada']
+  const TIPOS         = ['reuniao']
+  const TIPOS_REUNIAO = ['ago', 'extraordinaria', 'apresentacao', 'assinaturas', 'outro']
+  const FORMATOS      = ['presencial', 'online']
+  const ESTADOS_ATA   = ['pendente', 'pronta', 'em_assinaturas', 'assinada']
 
-  if (tipo         && !TIPOS.includes(tipo))               return c.json({ error: 'tipo inválido' }, 400)
+  if (tipo         && !TIPOS.includes(tipo))                 return c.json({ error: 'tipo inválido' }, 400)
   if (tipo_reuniao && !TIPOS_REUNIAO.includes(tipo_reuniao)) return c.json({ error: 'tipo_reuniao inválido' }, 400)
-  if (formato      && !FORMATOS.includes(formato))          return c.json({ error: 'formato inválido' }, 400)
-  if (estado_ata   && !ESTADOS_ATA.includes(estado_ata))    return c.json({ error: 'estado_ata inválido' }, 400)
+  if (formato      && !FORMATOS.includes(formato))           return c.json({ error: 'formato inválido' }, 400)
+  if (estado_ata   && !ESTADOS_ATA.includes(estado_ata))     return c.json({ error: 'estado_ata inválido' }, 400)
 
   const rows = await sql`
     INSERT INTO eventos (
       tipo, tipo_reuniao,
       condominio_id, condominio_texto,
-      localidade,
-      loja_id, filial_texto,
-      data_hora,
-      formato, local_evento,
-      gestor, estado_ata, comentarios,
-      criado_por
+      localidade, loja_id, filial_texto,
+      data_hora, formato, local_evento,
+      gestor, gestor_id,
+      estado_ata, comentarios, criado_por
     ) VALUES (
-      ${tipo          || 'reuniao'},
-      ${tipo_reuniao  || null},
-      ${condominio_id   || null},
+      ${tipo             || 'reuniao'},
+      ${tipo_reuniao     || null},
+      ${condominio_id    || null},
       ${condominio_texto || null},
-      ${localidade      || null},
-      ${loja_id         || null},
-      ${filial_texto    || null},
+      ${localidade       || null},
+      ${loja_id          || null},
+      ${filial_texto     || null},
       ${data_hora},
-      ${formato         || 'presencial'},
-      ${local_evento    || null},
-      ${gestor          || null},
-      ${estado_ata      || 'pendente'},
-      ${comentarios     || null},
+      ${formato          || 'presencial'},
+      ${local_evento     || null},
+      ${gestor           || null},
+      ${estado_ata       || 'pendente'},
+      ${comentarios      || null},
       ${user.id}
     )
     RETURNING id
@@ -2815,36 +2810,29 @@ app.put('/eventos/:id', requireAuth, async (c) => {
   if (existe.length === 0) return c.json({ error: 'Evento não encontrado' }, 404)
 
   const {
-    tipo,
-    tipo_reuniao,
-    condominio_id,
-    condominio_texto,
-    localidade,
-    loja_id,
-    filial_texto,
-    data_hora,
-    formato,
-    local_evento,
+    tipo, tipo_reuniao,
+    condominio_id, condominio_texto,
+    localidade, loja_id, filial_texto,
+    data_hora, formato, local_evento,
     gestor,
-    estado_ata,
-    comentarios,
+    estado_ata, comentarios,
   } = body
 
   await sql`
     UPDATE eventos SET
-      tipo             = ${tipo          || 'reuniao'},
-      tipo_reuniao     = ${tipo_reuniao  ?? null},
-      condominio_id    = ${condominio_id   ?? null},
+      tipo             = ${tipo             || 'reuniao'},
+      tipo_reuniao     = ${tipo_reuniao     ?? null},
+      condominio_id    = ${condominio_id    ?? null},
       condominio_texto = ${condominio_texto ?? null},
-      localidade       = ${localidade      ?? null},
-      loja_id          = ${loja_id         ?? null},
-      filial_texto     = ${filial_texto    ?? null},
+      localidade       = ${localidade       ?? null},
+      loja_id          = ${loja_id          ?? null},
+      filial_texto     = ${filial_texto     ?? null},
       data_hora        = ${data_hora},
-      formato          = ${formato         || 'presencial'},
-      local_evento     = ${local_evento    ?? null},
-      gestor           = ${gestor         ?? null},
-      estado_ata       = ${estado_ata     || 'pendente'},
-      comentarios      = ${comentarios    ?? null}
+      formato          = ${formato          || 'presencial'},
+      local_evento     = ${local_evento     ?? null},
+      gestor           = ${gestor          ?? null},
+      estado_ata       = ${estado_ata       || 'pendente'},
+      comentarios      = ${comentarios      ?? null}
     WHERE id = ${id}
   `
 
@@ -2867,10 +2855,6 @@ app.delete('/eventos/:id', requireAuth, async (c) => {
 
 
 // ── POST /eventos/importar ────────────────────────────────────────────────────
-// Importa um array de eventos em bulk (vindo do CSV migrado para JSON no frontend)
-// Body: { eventos: [ { tipo, tipo_reuniao, condominio_texto, localidade,
-//                      filial_texto, data_hora, formato, local_evento,
-//                      gestor, estado_ata, comentarios } ] }
 
 app.post('/eventos/importar', requireAuth, async (c) => {
   const sql  = neon(c.env.DATABASE_URL)
@@ -2878,29 +2862,21 @@ app.post('/eventos/importar', requireAuth, async (c) => {
   const body = await c.req.json()
 
   const lista = body?.eventos
-  if (!Array.isArray(lista) || lista.length === 0) {
-    return c.json({ error: 'Array de eventos em falta ou vazio' }, 400)
-  }
-  if (lista.length > 1000) {
-    return c.json({ error: 'Máximo de 1000 eventos por importação' }, 400)
-  }
+  if (!Array.isArray(lista) || lista.length === 0) return c.json({ error: 'Array de eventos em falta ou vazio' }, 400)
+  if (lista.length > 1000) return c.json({ error: 'Máximo de 1000 eventos por importação' }, 400)
 
   let inseridos = 0
   const erros   = []
 
   for (const e of lista) {
-    if (!e.data_hora) {
-      erros.push({ linha: e, motivo: 'data_hora em falta' })
-      continue
-    }
+    if (!e.data_hora) { erros.push({ linha: e, motivo: 'data_hora em falta' }); continue }
     try {
       await sql`
         INSERT INTO eventos (
           tipo, tipo_reuniao,
           condominio_texto, localidade, filial_texto,
           data_hora, formato, local_evento,
-          gestor, estado_ata, comentarios,
-          criado_por
+          gestor, estado_ata, comentarios, criado_por
         ) VALUES (
           ${e.tipo         || 'reuniao'},
           ${e.tipo_reuniao || null},
