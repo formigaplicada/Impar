@@ -462,7 +462,7 @@ export default function Eventos() {
 
   async function handleApagar() {
     try {
-      await api.delete(`/eventos/${apagarId}`)
+      await api.del(`/eventos/${apagarId}`)
       setApagarId(null); carregar()
     } catch (e) { alert('Erro: ' + e.message) }
   }

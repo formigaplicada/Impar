@@ -2295,7 +2295,7 @@ app.get('/dd/dashboard', requireAuth, async (c) => {
 async function downloadWhatsAppMediaToSharePoint(mediaId, mimeType, env) {
   // 1. Obter URL de download do media
   const metaRes = await fetch(
-    `https://graph.facebook.com/v19.0/${mediaId}`,
+    `https://graph.facebook.com/v25.0/${mediaId}`,
     { headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` } }
   )
   if (!metaRes.ok) throw new Error(`Meta media lookup falhou: ${metaRes.status}`)
@@ -2352,7 +2352,7 @@ async function downloadWhatsAppMediaToSharePoint(mediaId, mimeType, env) {
 // Envia uma mensagem de texto via WhatsApp Cloud API
 async function enviarMensagemWhatsApp(para, texto, env) {
   const res = await fetch(
-    `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_ID}/messages`,
+    `https://graph.facebook.com/v25.0/${env.WHATSAPP_PHONE_ID}/messages`,
     {
       method: 'POST',
       headers: {
@@ -2925,4 +2925,156 @@ app.post('/eventos/importar', requireAuth, async (c) => {
   return c.json({ ok: true, inseridos, erros })
 })
 
-export default app
+// =============================================================================
+// CRON — Alertas de Reuniões via WhatsApp
+// =============================================================================
+// Adicionar ao index.js do Worker.
+//
+// Endpoint manual para teste:
+//   GET /whatsapp/cron/reunioes  (requer auth)
+//
+// Cron automático configurado no wrangler.toml:
+//   "0 17 * * *"  → 17h UTC = 18h Lisboa (horário de inverno)
+//   "0 16 * * *"  → 16h UTC = 18h Lisboa (horário de verão)
+//
+// O Worker não sabe o horário de verão automaticamente — em produção
+// podes usar sempre 17h UTC e aceitar a diferença de 1h no verão,
+// ou gerir via variável de ambiente.
+// =============================================================================
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Função principal — busca reuniões de amanhã e envia alertas
+// ─────────────────────────────────────────────────────────────────────────────
+async function enviarAlertasReunioes(env) {
+  const sql = neon(env.DATABASE_URL)
+
+  // Buscar reuniões de amanhã (em UTC, dia seguinte ao dia atual)
+  const reunioes = await sql`
+    SELECT
+      e.id,
+      e.condominio_texto,
+      e.localidade,
+      e.filial_texto,
+      e.data_hora,
+      e.formato,
+      e.local_evento,
+      e.gestor,
+      e.tipo_reuniao,
+      u.nome      AS utilizador_nome,
+      u.telemovel AS utilizador_telemovel
+    FROM eventos e
+    LEFT JOIN utilizadores u ON u.id = e.criado_por
+    WHERE e.tipo = 'reuniao'
+      AND e.data_hora >= (NOW() AT TIME ZONE 'Europe/Lisbon' + INTERVAL '1 day')::date
+      AND e.data_hora <  (NOW() AT TIME ZONE 'Europe/Lisbon' + INTERVAL '2 days')::date
+      AND u.telemovel IS NOT NULL
+      AND u.telemovel != ''
+      AND u.ativo = true
+    ORDER BY e.data_hora ASC
+  `
+
+  if (reunioes.length === 0) {
+    console.log('Cron reuniões: nenhuma reunião encontrada para amanhã')
+    return { enviados: 0, erros: 0 }
+  }
+
+  console.log(`Cron reuniões: ${reunioes.length} reunião(ões) encontrada(s) para amanhã`)
+
+  let enviados = 0
+  let erros = 0
+
+  for (const reuniao of reunioes) {
+    const numero = reuniao.utilizador_telemovel.replace(/^\+/, '').replace(/\s/g, '')
+
+    try {
+      // Enviar template via WhatsApp Cloud API
+      const res = await fetch(
+        `https://graph.facebook.com/v25.0/${env.WHATSAPP_PHONE_ID}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization:  `Bearer ${env.WHATSAPP_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to:                numero,
+            type:              'template',
+            template: {
+              name:     '3p_direct_integration_test_template',
+              language: { code: 'en_US' },
+            },
+          }),
+        }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.error?.message || `HTTP ${res.status}`)
+      }
+
+      const canal_msg_id = data?.messages?.[0]?.id || null
+
+      // Registar na tabela comunicacoes
+      await sql`
+        INSERT INTO comunicacoes (
+          canal, direcao, tipo,
+          de, para,
+          conteudo, estado, canal_msg_id,
+          contexto_tipo, contexto_id
+        ) VALUES (
+          'whatsapp', 'outbound', 'texto',
+          ${env.WHATSAPP_PHONE_ID}, ${numero},
+          ${'Alerta reunião: ' + (reuniao.condominio_texto || reuniao.localidade || '') + ' às ' + new Date(reuniao.data_hora).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Lisbon' })},
+          'enviada', ${canal_msg_id},
+          'ocorrencia', ${reuniao.id}
+        )
+      `
+
+      console.log(`Alerta enviado para ${reuniao.utilizador_nome} (${numero}) — reunião ${reuniao.id}`)
+      enviados++
+
+    } catch (err) {
+      console.error(`Erro ao enviar alerta para ${reuniao.utilizador_nome}: ${err.message}`)
+      erros++
+    }
+  }
+
+  return { enviados, erros, total: reunioes.length }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /whatsapp/cron/reunioes — endpoint manual para teste
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/whatsapp/cron/reunioes', requireAuth, async (c) => {
+  const resultado = await enviarAlertasReunioes(c.env)
+  return c.json(resultado)
+})
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRON HANDLER — adicionar ao export default
+// ─────────────────────────────────────────────────────────────────────────────
+// No export default do Worker, adiciona o handler scheduled:
+//
+// export default {
+//   fetch: app.fetch,
+//   async scheduled(event, env, ctx) {
+//     ctx.waitUntil(enviarAlertasReunioes(env))
+//   }
+// }
+//
+// Se o teu export atual é apenas:
+//   export default app
+// tens de mudar para o formato acima.
+// =============================================================================
+
+export default {
+  fetch: app.fetch,
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(enviarAlertasReunioes(env))
+  }
+}
