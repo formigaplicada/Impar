@@ -7,6 +7,7 @@ import Condominios from './pages/Condominios'
 import Dashboard from './pages/Dashboard'
 import Prestadores from './pages/Prestadores'
 import OcorrenciaDetalhe from './pages/OcorrenciaDetalhe'
+import Eventos from './pages/Eventos'  // adicionar no topo
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/backoffice/limpezas" element={<Backoffice page="limpezas" />} />
         <Route path="/backoffice/condominios" element={<Backoffice page="condominios" />} />
         <Route path="/backoffice/prestadores" element={<Backoffice page="prestadores" />} />
+        <Route path="/backoffice/eventos" element={<Backoffice page="eventos" />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>

@@ -9,6 +9,7 @@ import Condominios from './Condominios'
 import Prestadores from './Prestadores'
 import Propostas from './Propostas'
 import OcorrenciaDetalhe from './OcorrenciaDetalhe'
+import Eventos from './Eventos'
 
 // ── Estrutura do menu ────────────────────────────────────────────────────────
 // adminOnly: true — item só visível para role === 'admin'
@@ -32,6 +33,7 @@ const MENU = [
     items: [
       { key: 'ocorrencias', label: '⚠️ Ocorrências',  path: '/backoffice/ocorrencias', page: 'ocorrencias' },
       { key: 'limpezas',    label: '🧹 Limpezas',     path: '/backoffice/limpezas',    page: 'limpezas'    },
+      { key: 'eventos',     label: '📅 Agenda',        path: '/backoffice/eventos',     page: 'eventos'     },
     ]
   },
   {
@@ -51,6 +53,7 @@ const PAGE_TITLE = {
   'ocorrencia_detalhe': 'Ocorrência',
   'limpezas':           'Limpezas',
   'prestadores':        'Prestadores',
+  'eventos':            'Agenda',
 }
 
 export default function Backoffice({ page }) {
@@ -197,6 +200,7 @@ export default function Backoffice({ page }) {
            page === 'ocorrencia_detalhe' ? <OcorrenciaDetalhe /> :
            page === 'limpezas'           ? <Limpezas /> :
            page === 'prestadores'        ? <Prestadores /> :
+           page === 'eventos'            ? <Eventos /> :
            <Dashboard />}
         </main>
       </div>
