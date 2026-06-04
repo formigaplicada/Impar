@@ -3329,6 +3329,228 @@ app.post('/condominios/:id/documentos/upload', requireAuth, async (c) => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sync OneDrive → Condexpress por Loja
+//
+// Adicionar ao index.js:
+//   1. A função core syncLojaOneDrive (abaixo)
+//   2. Os dois endpoints
+//   3. A chamada ao cron no scheduled handler (ver fim do ficheiro)
+//
+// Lógica por pasta do OneDrive da loja:
+//   — Pasta cujo onedrive_folder_id já existe na BD  → ignorar
+//   — n_impar existe na BD mas sem onedrive_folder_id → ligar (update)
+//   — n_impar não existe na BD                        → criar condomínio e ligar
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+// ── Função core ───────────────────────────────────────────────────────────────
+
+async function syncLojaOneDrive({ token, loja, sql }) {
+  if (!loja.onedrive_activos_folder_id) {
+    return { ok: false, reason: 'no_activos_folder' }
+  }
+
+  // 1. Buscar todas as pastas do OneDrive desta loja
+  let pastas
+  try {
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/users/vitor.lopes@impar.pt/drive/items/${loja.onedrive_activos_folder_id}/children?$top=500&$select=id,name,folder`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (!res.ok) {
+      const err = await res.json()
+      return { ok: false, reason: 'api_error', error: err?.error?.message || `HTTP ${res.status}` }
+    }
+    const data = await res.json()
+    pastas = (data.value || []).filter(i => i.folder)
+  } catch (err) {
+    return { ok: false, reason: 'api_error', error: err.message }
+  }
+
+  if (pastas.length === 0) {
+    return { ok: true, criados: 0, ligados: 0, ignorados: 0, detalhes: [] }
+  }
+
+  // 2. Buscar todos os onedrive_folder_id já usados nesta loja (para ignorar pastas já mapeadas)
+  const jaMapados = await sql`
+    SELECT onedrive_folder_id
+    FROM condominios
+    WHERE loja_id = ${loja.id}
+      AND onedrive_folder_id IS NOT NULL
+      AND ativo = true
+  `
+  const idsMapados = new Set(jaMapados.map(r => r.onedrive_folder_id))
+
+  // 3. Buscar condomínios existentes desta loja (por n_impar) para detetar os que faltam ligar
+  const existentes = await sql`
+    SELECT id, n_impar, onedrive_folder_id
+    FROM condominios
+    WHERE loja_id = ${loja.id}
+      AND ativo = true
+  `
+  const porNImpar = new Map(existentes.map(c => [Number(c.n_impar), c]))
+
+  // Extrair prefixo numérico: "12510 - Rua Virgílio Ferreira" → 12510
+  function extractPrefix(name) {
+    const match = name.match(/^(\d+)\s*-/)
+    return match ? Number(match[1]) : null
+  }
+
+  // Extrair nome sem prefixo: "12510 - Rua Virgílio Ferreira" → "Rua Virgílio Ferreira"
+  function extractNome(name) {
+    return name.replace(/^\d+\s*-\s*/, '').trim()
+  }
+
+  const detalhes = []
+  let criados   = 0
+  let ligados   = 0
+  let ignorados = 0
+
+  for (const pasta of pastas) {
+    const nImpar = extractPrefix(pasta.name)
+
+    // Sem prefixo numérico válido — ignorar
+    if (nImpar === null || isNaN(nImpar)) {
+      ignorados++
+      detalhes.push({ pasta: pasta.name, resultado: 'ignorado', motivo: 'sem prefixo numérico' })
+      continue
+    }
+
+    // Pasta já mapeada nesta loja — ignorar completamente
+    if (idsMapados.has(pasta.id)) {
+      ignorados++
+      detalhes.push({ pasta: pasta.name, resultado: 'ignorado', motivo: 'já mapeado' })
+      continue
+    }
+
+    const existente = porNImpar.get(nImpar)
+
+    if (existente) {
+      // Condomínio existe mas sem onedrive_folder_id → ligar
+      await sql`
+        UPDATE condominios
+        SET onedrive_folder_id = ${pasta.id}
+        WHERE id = ${existente.id}
+      `
+      ligados++
+      detalhes.push({ pasta: pasta.name, n_impar: nImpar, resultado: 'ligado', condominio_id: existente.id })
+
+    } else {
+      // Não existe → criar condomínio novo e ligar
+      // Usa o n_impar da pasta em vez do auto-increment da loja
+      const nome    = extractNome(pasta.name)
+      const condId  = String(nImpar).padStart(6, '0')
+
+      try {
+        await sql`
+          INSERT INTO condominios (id, n_impar, loja_id, nome, onedrive_folder_id)
+          VALUES (${condId}, ${nImpar}, ${loja.id}, ${nome}, ${pasta.id})
+          ON CONFLICT (id) DO NOTHING
+        `
+        criados++
+        detalhes.push({ pasta: pasta.name, n_impar: nImpar, resultado: 'criado', condominio_id: condId, nome })
+      } catch (err) {
+        detalhes.push({ pasta: pasta.name, n_impar: nImpar, resultado: 'erro', motivo: err.message })
+      }
+    }
+  }
+
+  return { ok: true, criados, ligados, ignorados, detalhes }
+}
+
+
+// ── GET /lojas — lista todas as lojas (já existia, mas agora inclui onedrive_activos_folder_id) ──
+// Se já tens este endpoint, substitui ou ajusta para incluir o campo onedrive_activos_folder_id.
+
+app.get('/lojas', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const rows = await sql`
+    SELECT id, codigo, nome, gestor, email, telefone, morada, proximo_n_impar, onedrive_activos_folder_id
+    FROM lojas
+    WHERE ativo = true
+    ORDER BY nome ASC
+  `
+  return c.json({ lojas: rows })
+})
+
+
+// ── POST /admin/lojas/:id/sync-onedrive ──────────────────────────────────────
+// Sincroniza manualmente uma loja específica (chamado pelo botão no frontend)
+
+app.post('/admin/lojas/:id/sync-onedrive', requireAuth, async (c) => {
+  const sql    = neon(c.env.DATABASE_URL)
+  const lojaId = c.req.param('id')
+
+  const rows = await sql`
+    SELECT id, nome, onedrive_activos_folder_id
+    FROM lojas
+    WHERE id = ${lojaId} AND ativo = true
+  `
+  if (rows.length === 0) return c.json({ error: 'Loja não encontrada' }, 404)
+
+  const token = await getMicrosoftToken(c.env)
+  const res   = await syncLojaOneDrive({ token, loja: rows[0], sql })
+
+  return c.json(res)
+})
+
+
+// ── POST /admin/lojas/sync-onedrive (todas) ───────────────────────────────────
+// Corre o sync em todas as lojas — usado pelo cron e disponível manualmente
+
+app.post('/admin/lojas/sync-onedrive', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const res = await syncTodasAsLojas(c.env, sql)
+  return c.json(res)
+})
+
+
+// ── Função usada pelo cron e pelo endpoint em massa ───────────────────────────
+
+async function syncTodasAsLojas(env, sql) {
+  const lojas = await sql`
+    SELECT id, nome, onedrive_activos_folder_id
+    FROM lojas
+    WHERE ativo = true
+      AND onedrive_activos_folder_id IS NOT NULL
+    ORDER BY nome ASC
+  `
+
+  if (lojas.length === 0) return { ok: true, lojas: [] }
+
+  const token     = await getMicrosoftToken(env)
+  const resultado = []
+
+  for (const loja of lojas) {
+    const res = await syncLojaOneDrive({ token, loja, sql })
+    resultado.push({ loja_id: loja.id, loja_nome: loja.nome, ...res })
+  }
+
+  return { ok: true, lojas: resultado }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRON HANDLER — substitui o export default existente no index.js
+//
+// O cron de "0 2 * * *"  (2h UTC) corre a sync de lojas
+// O cron de "0 17 * * *" (17h UTC) corre os alertas de reuniões (já existia)
+//
+// export default {
+//   fetch: app.fetch,
+//   async scheduled(event, env, ctx) {
+//     if (event.cron === '0 2 * * *') {
+//       const sql = neon(env.DATABASE_URL)
+//       ctx.waitUntil(syncTodasAsLojas(env, sql))
+//     }
+//     if (event.cron === '0 17 * * *') {
+//       ctx.waitUntil(enviarAlertasReunioes(env))
+//     }
+//   }
+// }
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
 // CRON HANDLER — adicionar ao export default
 // ─────────────────────────────────────────────────────────────────────────────
 // No export default do Worker, adiciona o handler scheduled:
