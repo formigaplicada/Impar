@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 
 // ── Paleta Ímpar ─────────────────────────────────────────────────────────────
@@ -231,27 +231,311 @@ function SyncButton({ condominioId, onSuccess }) {
   )
 }
 
+// ── Upload com progresso via XHR ──────────────────────────────────────────────
+
+function uploadComProgresso({ url, formData, token, onProgress }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', url)
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      try { resolve(JSON.parse(xhr.responseText)) }
+      catch { reject(new Error('Resposta inválida do servidor')) }
+    }
+    xhr.onerror = () => reject(new Error('Erro de rede'))
+    xhr.send(formData)
+  })
+}
+
+// ── Modal Nova Pasta ──────────────────────────────────────────────────────────
+
+function ModalNovaPasta({ condominioId, currentFolderId, onClose, onCreated }) {
+  const [nome, setNome]       = useState('')
+  const [loading, setLoading] = useState(false)
+  const [erro, setErro]       = useState('')
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  async function handleCriar() {
+    const n = nome.trim()
+    if (!n) { setErro('Introduz um nome para a pasta.'); return }
+    setLoading(true); setErro('')
+    const res = await api.post(`/condominios/${condominioId}/documentos/pasta`, {
+      folder_id: currentFolderId,
+      name: n,
+    })
+    setLoading(false)
+    if (res?.ok) { onCreated(res.item); onClose() }
+    else setErro(res?.error || 'Erro ao criar pasta.')
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
+    }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{
+        background: C.white, borderRadius: '0.75rem', padding: '1.5rem',
+        width: '100%', maxWidth: '360px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.15)', fontFamily: 'DM Sans, sans-serif',
+      }}>
+        <h3 style={{ margin: '0 0 1.25rem', fontSize: '1rem', fontWeight: 700, color: C.navy }}>
+          📁 Nova Pasta
+        </h3>
+        <input
+          autoFocus
+          type="text"
+          placeholder="Nome da pasta"
+          value={nome}
+          onChange={e => { setNome(e.target.value); setErro('') }}
+          onKeyDown={e => e.key === 'Enter' && handleCriar()}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            border: `1.5px solid ${erro ? '#dc2626' : C.border}`,
+            borderRadius: '0.5rem', padding: '0.5rem 0.75rem',
+            fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', color: C.text, outline: 'none',
+          }}
+        />
+        {erro && <p style={{ margin: '0.5rem 0 0', fontSize: '0.78rem', color: '#dc2626' }}>{erro}</p>}
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{
+            background: 'none', border: `1px solid ${C.border}`, borderRadius: '0.5rem',
+            padding: '0.45rem 1rem', fontSize: '0.875rem', cursor: 'pointer',
+            color: C.muted, fontFamily: 'DM Sans, sans-serif',
+          }}>Cancelar</button>
+          <button onClick={handleCriar} disabled={loading} style={{
+            background: loading ? C.border : C.navy, color: loading ? C.muted : C.white,
+            border: 'none', borderRadius: '0.5rem', padding: '0.45rem 1.25rem',
+            fontSize: '0.875rem', fontWeight: 600, cursor: loading ? 'default' : 'pointer',
+            fontFamily: 'DM Sans, sans-serif',
+          }}>
+            {loading ? '⏳ A criar…' : 'Criar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Upload Manager ────────────────────────────────────────────────────────────
+
+function UploadManager({ uploads }) {
+  if (uploads.length === 0) return null
+  return (
+    <div style={{
+      background: C.surface, border: `1px solid ${C.border}`,
+      borderRadius: '0.75rem', padding: '0.875rem 1rem', marginBottom: '1rem',
+    }}>
+      <p style={{ margin: '0 0 0.625rem', fontSize: '0.78rem', fontWeight: 600, color: C.muted, letterSpacing: '0.03em' }}>
+        A CARREGAR
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {uploads.map(u => (
+          <div key={u.id}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+              <span style={{ fontSize: '0.8rem', color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
+                {u.status === 'done'     && '✅ '}
+                {u.status === 'error'    && '❌ '}
+                {u.status === 'uploading' && '⬆️ '}
+                {u.status === 'pending'  && '⏳ '}
+                {u.name}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: u.status === 'error' ? '#dc2626' : C.muted, flexShrink: 0, marginLeft: '0.5rem' }}>
+                {u.status === 'done'     ? 'Concluído'
+                 : u.status === 'error'  ? (u.error || 'Erro')
+                 : u.status === 'pending' ? 'A aguardar…'
+                 : `${u.progress}%`}
+              </span>
+            </div>
+            {(u.status === 'uploading' || u.status === 'pending') && (
+              <div style={{ height: '4px', background: C.borderL, borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', background: C.blue, borderRadius: '2px',
+                  width: `${u.progress}%`, transition: 'width 0.2s ease',
+                }} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Drop Zone ─────────────────────────────────────────────────────────────────
+
+function DropZone({ onFiles }) {
+  const [dragging, setDragging] = useState(false)
+  const counter = useRef(0)
+
+  function onDragEnter(e) { e.preventDefault(); counter.current++; if (counter.current === 1) setDragging(true) }
+  function onDragLeave(e) { e.preventDefault(); counter.current--; if (counter.current === 0) setDragging(false) }
+  function onDragOver(e)  { e.preventDefault() }
+  function onDrop(e) {
+    e.preventDefault(); counter.current = 0; setDragging(false)
+    const items = e.dataTransfer?.items
+    if (items) {
+      const files = []
+      for (const item of items) { if (item.kind === 'file') files.push(item.getAsFile()) }
+      if (files.length > 0) onFiles(files)
+    } else if (e.dataTransfer?.files) {
+      onFiles(e.dataTransfer.files)
+    }
+  }
+
+  return (
+    <div
+      onDragEnter={onDragEnter} onDragLeave={onDragLeave}
+      onDragOver={onDragOver}   onDrop={onDrop}
+      style={{
+        border: `2px dashed ${dragging ? C.blue : C.border}`,
+        borderRadius: '0.75rem',
+        padding: dragging ? '1.25rem' : '0.625rem',
+        marginBottom: '0.875rem',
+        background: dragging ? C.blueL : 'transparent',
+        textAlign: 'center', fontSize: '0.8rem',
+        color: dragging ? C.blue : C.subtle,
+        transition: 'all 0.15s', cursor: 'default',
+      }}
+    >
+      {dragging ? '📂 Larga aqui para fazer upload' : 'Arrasta ficheiros ou pastas aqui'}
+    </div>
+  )
+}
+
+// ── Toolbar Documentos ────────────────────────────────────────────────────────
+
+function ToolbarDocumentos({ condominioId, currentFolderId, onPastaCreated, onUploadDone }) {
+  const [modalPasta, setModalPasta] = useState(false)
+  const [uploads, setUploads]       = useState([])
+  const inputFichRef  = useRef()
+  const inputPastaRef = useRef()
+
+  function updateUpload(id, patch) {
+    setUploads(prev => prev.map(u => u.id === id ? { ...u, ...patch } : u))
+  }
+
+  async function processarFicheiros(files) {
+    if (!files || files.length === 0) return
+
+    const novos = Array.from(files).map((f, i) => ({
+      id:           `${Date.now()}-${i}`,
+      name:         f.name,
+      relativePath: f.webkitRelativePath || '',
+      file:         f,
+      progress:     0,
+      status:       'pending',
+      error:        null,
+    }))
+
+    setUploads(prev => [...prev, ...novos])
+
+    const token   = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+    const baseUrl = import.meta.env.VITE_API_URL || ''
+    const BATCH   = 20
+
+    for (let start = 0; start < novos.length; start += BATCH) {
+      const batch = novos.slice(start, start + BATCH)
+      const fd    = new FormData()
+      fd.append('folder_id', currentFolderId || '')
+
+      const relPaths = []
+      for (const u of batch) {
+        fd.append('files', u.file, u.name)
+        relPaths.push(u.relativePath)
+        updateUpload(u.id, { status: 'uploading' })
+      }
+      fd.append('relative_paths', JSON.stringify(relPaths))
+
+      try {
+        const res = await uploadComProgresso({
+          url:        `${baseUrl}/condominios/${condominioId}/documentos/upload`,
+          formData:   fd,
+          token,
+          onProgress: (pct) => { for (const u of batch) updateUpload(u.id, { progress: pct }) },
+        })
+
+        const errosPorNome = {}
+        for (const e of (res.errors || [])) errosPorNome[e.name] = e.error
+
+        for (const u of batch) {
+          const nome = u.relativePath ? u.relativePath.split('/').pop() : u.name
+          if (errosPorNome[nome]) updateUpload(u.id, { status: 'error', error: errosPorNome[nome], progress: 0 })
+          else                    updateUpload(u.id, { status: 'done', progress: 100 })
+        }
+
+        if (res.items?.length > 0) onUploadDone()
+
+      } catch (err) {
+        for (const u of batch) updateUpload(u.id, { status: 'error', error: err.message, progress: 0 })
+      }
+    }
+
+    setTimeout(() => setUploads(prev => prev.filter(u => u.status !== 'done')), 3000)
+  }
+
+  function handleFicheiros(e) { processarFicheiros(e.target.files); e.target.value = '' }
+  function handlePasta(e)     { processarFicheiros(e.target.files); e.target.value = '' }
+
+  const btnToolbar = {
+    display: 'flex', alignItems: 'center', gap: '0.375rem',
+    background: C.surface, border: `1px solid ${C.border}`,
+    borderRadius: '0.5rem', padding: '0.4rem 0.875rem',
+    fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
+    color: C.navy, fontFamily: 'DM Sans, sans-serif',
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.875rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={() => setModalPasta(true)} style={btnToolbar}>📁 Nova pasta</button>
+        <button onClick={() => inputFichRef.current?.click()}  style={btnToolbar}>⬆️ Upload ficheiros</button>
+        <button onClick={() => inputPastaRef.current?.click()} style={btnToolbar}>📂 Upload pasta</button>
+        <input ref={inputFichRef}  type="file" multiple style={{ display: 'none' }} onChange={handleFicheiros} />
+        <input ref={inputPastaRef} type="file" multiple webkitdirectory="true" style={{ display: 'none' }} onChange={handlePasta} />
+      </div>
+
+      <DropZone onFiles={processarFicheiros} />
+      <UploadManager uploads={uploads} />
+
+      {modalPasta && (
+        <ModalNovaPasta
+          condominioId={condominioId}
+          currentFolderId={currentFolderId}
+          onClose={() => setModalPasta(false)}
+          onCreated={(item) => { onPastaCreated(item); setModalPasta(false) }}
+        />
+      )}
+    </>
+  )
+}
+
 // ── Tab Documentos ────────────────────────────────────────────────────────────
 
 function TabDocumentos({ condominioId }) {
-  const [loading, setLoading]       = useState(true)
-  const [items, setItems]           = useState([])
-  const [available, setAvailable]   = useState(true)
-  const [erro, setErro]             = useState('')
-  const [breadcrumb, setBreadcrumb] = useState([]) // [{ id, name }]
-  const [rootFolderId, setRootFolderId] = useState(null)
+  const [loading, setLoading]               = useState(true)
+  const [items, setItems]                   = useState([])
+  const [available, setAvailable]           = useState(true)
+  const [erro, setErro]                     = useState('')
+  const [breadcrumb, setBreadcrumb]         = useState([])
+  const [rootFolderId, setRootFolderId]     = useState(null)
+  const [currentFolderId, setCurrentFolderId] = useState(null)
 
   async function carregar(folderId = null) {
     setLoading(true); setErro('')
-    const qs = folderId ? `?folder_id=${folderId}` : ''
+    const qs   = folderId ? `?folder_id=${folderId}` : ''
     const data = await api.get(`/condominios/${condominioId}/documentos${qs}`)
-    if (!data?.available) {
-      setAvailable(false)
-      setLoading(false)
-      return
-    }
+    if (!data?.available) { setAvailable(false); setLoading(false); return }
     setAvailable(true)
     setRootFolderId(data.root_folder_id)
+    setCurrentFolderId(folderId || data.root_folder_id)
     setItems(data.items || [])
     setLoading(false)
   }
@@ -264,14 +548,16 @@ function TabDocumentos({ condominioId }) {
   }
 
   function navegarBreadcrumb(idx) {
-    if (idx === -1) {
-      setBreadcrumb([])
-      carregar(null)
-    } else {
+    if (idx === -1) { setBreadcrumb([]); carregar(null) }
+    else {
       const crumb = breadcrumb[idx]
       setBreadcrumb(prev => prev.slice(0, idx + 1))
       carregar(crumb.id)
     }
+  }
+
+  function handlePastaCreated(item) {
+    setItems(prev => [item, ...prev])
   }
 
   if (loading) return (
@@ -310,13 +596,21 @@ function TabDocumentos({ condominioId }) {
         ))}
       </div>
 
+      {/* Toolbar — Nova Pasta + Upload */}
+      <ToolbarDocumentos
+        condominioId={condominioId}
+        currentFolderId={currentFolderId}
+        onPastaCreated={handlePastaCreated}
+        onUploadDone={() => carregar(currentFolderId)}
+      />
+
       {/* Lista */}
       {items.length === 0 ? (
         <div style={{ padding: '2.5rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>Pasta vazia.</div>
       ) : (
         <div style={{ background: C.surface, borderRadius: '0.75rem', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-             <thead>
+            <thead>
               <tr style={{ background: '#f7f9fc', borderBottom: `1.5px solid ${C.border}` }}>
                 <th style={{ ...thDoc, textAlign: 'left' }}>Nome</th>
                 <th style={{ ...thDoc, textAlign: 'right' }}>Tamanho</th>

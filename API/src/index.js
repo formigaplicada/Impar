@@ -3030,6 +3030,303 @@ app.get('/whatsapp/cron/reunioes', requireAuth, async (c) => {
   return c.json(resultado)
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /condominios/:id/documentos/pasta
+//
+// Cria uma nova pasta dentro de uma pasta do OneDrive.
+//
+// Body JSON: { folder_id: string, name: string }
+//   folder_id — ID da pasta pai (se omitido, usa a raiz do condomínio)
+//   name      — Nome da nova pasta
+//
+// Response: { ok: true, item: { id, name, type, modified, webUrl, children } }
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.post('/condominios/:id/documentos/pasta', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const condominioId = c.req.param('id')
+  const body = await c.req.json()
+  const { folder_id, name } = body
+
+  if (!name || !name.trim()) return c.json({ error: 'Nome da pasta é obrigatório' }, 400)
+
+  // Buscar onedrive_folder_id do condomínio
+  const cond = await sql`
+    SELECT onedrive_folder_id FROM condominios WHERE id = ${condominioId}
+  `
+  if (cond.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+
+  const onedrive_folder_id = cond[0].onedrive_folder_id
+  if (!onedrive_folder_id) return c.json({ error: 'Pasta OneDrive não configurada' }, 400)
+
+  const parentId = folder_id || onedrive_folder_id
+
+  try {
+    const token = await getMicrosoftToken(c.env)
+
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/users/vitor.lopes@impar.pt/drive/items/${parentId}/children`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization:  `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          folder: {},
+          '@microsoft.graph.conflictBehavior': 'rename',
+        }),
+      }
+    )
+
+    if (!res.ok) {
+      const err = await res.json()
+      return c.json({ ok: false, error: err?.error?.message || 'Erro Graph API' }, 502)
+    }
+
+    const item = await res.json()
+
+    return c.json({
+      ok: true,
+      item: {
+        id:       item.id,
+        name:     item.name,
+        type:     'folder',
+        modified: item.lastModifiedDateTime,
+        webUrl:   item.webUrl,
+        children: 0,
+        size:     0,
+      },
+    })
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500)
+  }
+})
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /condominios/:id/documentos/upload
+//
+// Faz upload de um ou mais ficheiros para uma pasta do OneDrive.
+// Suporta upload de pastas completas via relative_path por ficheiro.
+//
+// Body: multipart/form-data
+//   folder_id      — ID da pasta de destino (se omitido, usa a raiz do condomínio)
+//   files          — Um ou mais ficheiros (campo "files")
+//   relative_paths — JSON string: array de caminhos relativos paralelo a files
+//                    Ex: '["subpasta/doc.pdf", "outro.jpg"]'
+//                    Omitir ou enviar array de strings vazias para ficheiros soltos.
+//
+// Response:
+//   { ok: true, items: [...], errors: [...] }
+//   Cada item: { name, id, size, modified, webUrl, mimeType }
+//   Cada error: { name, error: string }
+//
+// Notas:
+//   — Ficheiros até ~4 MB usam upload simples (PUT .../content).
+//   — Ficheiros maiores usam upload session (resumable).
+//   — Subpastas são criadas automaticamente se não existirem (via relative_path).
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.post('/condominios/:id/documentos/upload', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const condominioId = c.req.param('id')
+
+  // Buscar onedrive_folder_id do condomínio
+  const cond = await sql`
+    SELECT onedrive_folder_id FROM condominios WHERE id = ${condominioId}
+  `
+  if (cond.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+
+  const onedrive_folder_id = cond[0].onedrive_folder_id
+  if (!onedrive_folder_id) return c.json({ error: 'Pasta OneDrive não configurada' }, 400)
+
+  // Parse multipart
+  let formData
+  try {
+    formData = await c.req.formData()
+  } catch {
+    return c.json({ error: 'Erro ao processar form-data' }, 400)
+  }
+
+  const folder_id = formData.get('folder_id') || onedrive_folder_id
+  const files = formData.getAll('files')
+
+  // relative_paths — array JSON opcional, paralelo a files
+  let relativePaths = []
+  try {
+    const raw = formData.get('relative_paths')
+    if (raw) relativePaths = JSON.parse(raw)
+  } catch { /* ignora — sem caminhos relativos */ }
+
+  if (!files || files.length === 0) return c.json({ error: 'Nenhum ficheiro enviado' }, 400)
+
+  const token = await getMicrosoftToken(c.env)
+  const GRAPH_USER = 'vitor.lopes@impar.pt'
+  const SIMPLE_UPLOAD_LIMIT = 4 * 1024 * 1024 // 4 MB
+
+  // Cache de IDs de subpastas já criadas nesta request (evita criar duplicados)
+  // Chave: "parentId/nomePasta", Valor: id da pasta criada/encontrada
+  const folderCache = {}
+
+  // ── Garante que uma subpasta existe, criando-a se necessário ────────────────
+  async function ensureFolder(parentId, folderName) {
+    const cacheKey = `${parentId}/${folderName}`
+    if (folderCache[cacheKey]) return folderCache[cacheKey]
+
+    // Tenta criar (conflictBehavior: fail para detectar se já existe)
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${GRAPH_USER}/drive/items/${parentId}/children`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: folderName,
+          folder: {},
+          '@microsoft.graph.conflictBehavior': 'fail',
+        }),
+      }
+    )
+
+    if (res.ok) {
+      const data = await res.json()
+      folderCache[cacheKey] = data.id
+      return data.id
+    }
+
+    // Se já existe (409), busca pelo nome
+    if (res.status === 409) {
+      const listRes = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${GRAPH_USER}/drive/items/${parentId}/children?$filter=name eq '${encodeURIComponent(folderName)}'&$select=id,name`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      const listData = await listRes.json()
+      const existing = listData.value?.[0]
+      if (existing) {
+        folderCache[cacheKey] = existing.id
+        return existing.id
+      }
+    }
+
+    throw new Error(`Não foi possível criar/encontrar a pasta "${folderName}"`)
+  }
+
+  // ── Resolve o parentId destino a partir do relative_path ────────────────────
+  // Ex: relative_path = "Documentos/2024/Janeiro/ficheiro.pdf"
+  //     → cria Documentos → 2024 → Janeiro, devolve id de Janeiro
+  async function resolveParent(relativePath) {
+    if (!relativePath) return folder_id
+
+    const parts = relativePath.split('/')
+    // Remove o último elemento (nome do ficheiro)
+    const dirs = parts.slice(0, -1)
+    if (dirs.length === 0) return folder_id
+
+    let currentId = folder_id
+    for (const dir of dirs) {
+      if (!dir) continue
+      currentId = await ensureFolder(currentId, dir)
+    }
+    return currentId
+  }
+
+  // ── Upload simples (≤ 4 MB) ──────────────────────────────────────────────────
+  async function uploadSimple(parentId, fileName, buffer) {
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${GRAPH_USER}/drive/items/${parentId}:/${encodeURIComponent(fileName)}:/content`,
+      {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
+        body: buffer,
+      }
+    )
+    if (!res.ok) {
+      const err = await res.json()
+      throw new Error(err?.error?.message || `HTTP ${res.status}`)
+    }
+    return res.json()
+  }
+
+  // ── Upload por sessão (> 4 MB) ───────────────────────────────────────────────
+  async function uploadLarge(parentId, fileName, buffer) {
+    // 1. Criar sessão
+    const sessionRes = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${GRAPH_USER}/drive/items/${parentId}:/${encodeURIComponent(fileName)}:/createUploadSession`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item: { '@microsoft.graph.conflictBehavior': 'rename' } }),
+      }
+    )
+    if (!sessionRes.ok) throw new Error('Erro ao criar upload session')
+    const { uploadUrl } = await sessionRes.json()
+
+    // 2. Upload em chunks de 10 MB
+    const CHUNK = 10 * 1024 * 1024
+    const total = buffer.byteLength
+    let offset = 0
+
+    let lastItem = null
+    while (offset < total) {
+      const end = Math.min(offset + CHUNK, total)
+      const chunk = buffer.slice(offset, end)
+      const chunkRes = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Length': String(end - offset),
+          'Content-Range':  `bytes ${offset}-${end - 1}/${total}`,
+        },
+        body: chunk,
+      })
+      if (!chunkRes.ok && chunkRes.status !== 202) {
+        throw new Error(`Erro no chunk ${offset}-${end - 1}: HTTP ${chunkRes.status}`)
+      }
+      if (chunkRes.status === 201 || chunkRes.status === 200) {
+        lastItem = await chunkRes.json()
+      }
+      offset = end
+    }
+    return lastItem
+  }
+
+  // ── Processar cada ficheiro ──────────────────────────────────────────────────
+  const results = []
+  const errors  = []
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i]
+    if (!(file instanceof File)) continue
+
+    const relativePath = relativePaths[i] || ''
+    const fileName     = relativePath ? relativePath.split('/').pop() : file.name
+
+    try {
+      const parentId = await resolveParent(relativePath)
+      const buffer   = await file.arrayBuffer()
+
+      let item
+      if (buffer.byteLength <= SIMPLE_UPLOAD_LIMIT) {
+        item = await uploadSimple(parentId, fileName, buffer)
+      } else {
+        item = await uploadLarge(parentId, fileName, buffer)
+      }
+
+      results.push({
+        name:     item.name,
+        id:       item.id,
+        size:     item.size || 0,
+        modified: item.lastModifiedDateTime,
+        webUrl:   item.webUrl,
+        mimeType: item.file?.mimeType || null,
+      })
+    } catch (err) {
+      errors.push({ name: fileName, error: err.message })
+    }
+  }
+
+  return c.json({ ok: true, items: results, errors })
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRON HANDLER — adicionar ao export default
