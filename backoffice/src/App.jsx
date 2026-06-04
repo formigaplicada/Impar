@@ -23,6 +23,7 @@ export default function App() {
         <Route path="/backoffice/condominios" element={<Backoffice page="condominios" />} />
         <Route path="/backoffice/prestadores" element={<Backoffice page="prestadores" />} />
         <Route path="/backoffice/eventos" element={<Backoffice page="eventos" />} />
+        <Route path="/backoffice/lojas" element={<Backoffice page="lojas" />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
