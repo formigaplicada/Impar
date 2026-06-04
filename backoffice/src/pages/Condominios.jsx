@@ -437,8 +437,8 @@ function ToolbarDocumentos({ condominioId, currentFolderId, onPastaCreated, onUp
 
     setUploads(prev => [...prev, ...novos])
 
-    const token   = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
-    const baseUrl = import.meta.env.VITE_API_URL || ''
+    const token = localStorage.getItem('session_token') || ''
+    const baseUrl = 'https://api.condexpress.com'
     const BATCH   = 20
 
     for (let start = 0; start < novos.length; start += BATCH) {
