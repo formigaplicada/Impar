@@ -189,18 +189,6 @@ app.get('/me', requireAuth, async (c) => {
   return c.json({ user: { ...user, impersonator_nome: impersonator } })
 })
 
-// ── Lojas ─────────────────────────────────────────────────────
-
-app.get('/lojas', requireAuth, async (c) => {
-  const sql = neon(c.env.DATABASE_URL)
-  const rows = await sql`
-    SELECT id, codigo, nome, gestor, email, telefone, morada, proximo_n_impar
-    FROM lojas
-    WHERE ativo = true
-    ORDER BY nome ASC
-  `
-  return c.json({ lojas: rows })
-})
 
 // ── Condomínios ───────────────────────────────────────────────
 
@@ -2651,7 +2639,7 @@ app.get('/whatsapp/comunicacoes', requireAuth, async (c) => {
 
 app.get('/eventos', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
-  const { tipo, gestor, loja_id, mes, estado_ata, condominio_id } = c.req.query()
+  const { tipo, gestor, loja_id, mes, estado, condominio_id } = c.req.query()
 
   let mesInicio = null
   let mesFim    = null
@@ -2679,7 +2667,7 @@ app.get('/eventos', requireAuth, async (c) => {
       e.formato,
       e.local_evento,
       e.gestor,
-      e.estado_ata,
+      e.estado,
       e.comentarios,
       e.criado_em,
       e.atualizado_em,
@@ -2692,7 +2680,7 @@ app.get('/eventos', requireAuth, async (c) => {
       ${tipo          ? sql`AND e.tipo         = ${tipo}`                    : sql``}
       ${gestor        ? sql`AND e.gestor        ILIKE ${'%' + gestor + '%'}` : sql``}
       ${loja_id       ? sql`AND e.loja_id       = ${loja_id}`                : sql``}
-      ${estado_ata    ? sql`AND e.estado_ata    = ${estado_ata}`             : sql``}
+      ${estado      ? sql`AND e.estado      = ${estado}`               : sql``}
       ${condominio_id ? sql`AND e.condominio_id = ${condominio_id}`          : sql``}
       ${mesInicio     ? sql`AND e.data_hora    >= ${mesInicio}::date`        : sql``}
       ${mesFim        ? sql`AND e.data_hora     < ${mesFim}::date`           : sql``}
@@ -2760,13 +2748,13 @@ app.post('/eventos', requireAuth, async (c) => {
 
   const TIPOS         = ['reuniao']
   const TIPOS_REUNIAO = ['ago', 'extraordinaria', 'apresentacao', 'assinaturas', 'outro']
-  const FORMATOS      = ['presencial', 'online']
-  const ESTADOS_ATA   = ['pendente', 'pronta', 'em_assinaturas', 'assinada']
+  const FORMATOS      = ['presencial', 'online', 'misto']
+  const ESTADOS       = ['agendada', 'realizada', 'adiada', 'cancelada']
 
   if (tipo         && !TIPOS.includes(tipo))                 return c.json({ error: 'tipo inválido' }, 400)
   if (tipo_reuniao && !TIPOS_REUNIAO.includes(tipo_reuniao)) return c.json({ error: 'tipo_reuniao inválido' }, 400)
   if (formato      && !FORMATOS.includes(formato))           return c.json({ error: 'formato inválido' }, 400)
-  if (estado_ata   && !ESTADOS_ATA.includes(estado_ata))     return c.json({ error: 'estado_ata inválido' }, 400)
+  if (estado       && !ESTADOS.includes(estado))              return c.json({ error: 'estado inválido' }, 400)
 
   const rows = await sql`
     INSERT INTO eventos (
@@ -2774,7 +2762,7 @@ app.post('/eventos', requireAuth, async (c) => {
       condominio_id, condominio_texto,
       localidade, loja_id, filial_texto,
       data_hora, formato, local_evento,
-      gestor,
+      gestor, gestor_id,
       estado_ata, comentarios, criado_por
     ) VALUES (
       ${tipo             || 'reuniao'},
@@ -2788,7 +2776,7 @@ app.post('/eventos', requireAuth, async (c) => {
       ${formato          || 'presencial'},
       ${local_evento     || null},
       ${gestor           || null},
-      ${estado_ata       || 'pendente'},
+      ${estado         || 'agendada'},
       ${comentarios      || null},
       ${user.id}
     )
@@ -2831,7 +2819,7 @@ app.put('/eventos/:id', requireAuth, async (c) => {
       formato          = ${formato          || 'presencial'},
       local_evento     = ${local_evento     ?? null},
       gestor           = ${gestor          ?? null},
-      estado_ata       = ${estado_ata       || 'pendente'},
+      estado          = ${estado         || 'agendada'},
       comentarios      = ${comentarios      ?? null}
     WHERE id = ${id}
   `
@@ -2876,7 +2864,7 @@ app.post('/eventos/importar', requireAuth, async (c) => {
           tipo, tipo_reuniao,
           condominio_texto, localidade, filial_texto,
           data_hora, formato, local_evento,
-          gestor, estado_ata, comentarios, criado_por
+          gestor, estado, comentarios, criado_por
         ) VALUES (
           ${e.tipo         || 'reuniao'},
           ${e.tipo_reuniao || null},
@@ -2887,7 +2875,7 @@ app.post('/eventos/importar', requireAuth, async (c) => {
           ${e.formato      || 'presencial'},
           ${e.local_evento || null},
           ${e.gestor       || null},
-          ${e.estado_ata   || 'pendente'},
+          ${e.estado     || 'agendada'},
           ${e.comentarios  || null},
           ${user.id}
         )
@@ -3371,93 +3359,139 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     return { ok: true, criados: 0, ligados: 0, ignorados: 0, detalhes: [] }
   }
 
-  // 2. Buscar todos os onedrive_folder_id já usados nesta loja (para ignorar pastas já mapeadas)
+  // 2. Buscar IDs de pastas já mapeadas — 1 query
   const jaMapados = await sql`
     SELECT onedrive_folder_id
     FROM condominios
-    WHERE loja_id = ${loja.id}
-      AND onedrive_folder_id IS NOT NULL
+    WHERE onedrive_folder_id IS NOT NULL
       AND ativo = true
   `
   const idsMapados = new Set(jaMapados.map(r => r.onedrive_folder_id))
 
-  // 3. Buscar condomínios existentes desta loja (por n_impar) para detetar os que faltam ligar
-  const existentes = await sql`
-    SELECT id, n_impar, onedrive_folder_id
-    FROM condominios
-    WHERE loja_id = ${loja.id}
-      AND ativo = true
-  `
-  const porNImpar = new Map(existentes.map(c => [Number(c.n_impar), c]))
+  // 3. Buscar condomínios existentes com n_impar E old_n_impar — 1 query
+      const existentes = await sql`
+      SELECT id, n_impar, old_n_impar, onedrive_folder_id
+      FROM condominios
+      WHERE ativo = true
+      `
 
-  // Extrair prefixo numérico: "12510 - Rua Virgílio Ferreira" → 12510
+  // Dois maps para lookup por n_impar e old_n_impar
+  const porNImpar    = new Map()
+  const porOldNImpar = new Map()
+  for (const c of existentes) {
+    porNImpar.set(Number(c.n_impar), c)
+    if (c.old_n_impar != null) {
+      porOldNImpar.set(Number(String(c.old_n_impar).trim()), c)
+    }
+  }
+
   function extractPrefix(name) {
     const match = name.match(/^(\d+)\s*-/)
     return match ? Number(match[1]) : null
   }
 
-  // Extrair nome sem prefixo: "12510 - Rua Virgílio Ferreira" → "Rua Virgílio Ferreira"
   function extractNome(name) {
     return name.replace(/^\d+\s*-\s*/, '').trim()
   }
 
   const detalhes = []
-  let criados   = 0
-  let ligados   = 0
-  let ignorados = 0
+  let ignorados  = 0
+  const paraCriar = []
+  const paraLigar = []
 
   for (const pasta of pastas) {
     const nImpar = extractPrefix(pasta.name)
 
-    // Sem prefixo numérico válido — ignorar
     if (nImpar === null || isNaN(nImpar)) {
       ignorados++
       detalhes.push({ pasta: pasta.name, resultado: 'ignorado', motivo: 'sem prefixo numérico' })
       continue
     }
 
-    // Pasta já mapeada nesta loja — ignorar completamente
     if (idsMapados.has(pasta.id)) {
       ignorados++
       detalhes.push({ pasta: pasta.name, resultado: 'ignorado', motivo: 'já mapeado' })
       continue
     }
 
-    const existente = porNImpar.get(nImpar)
+    // Match por n_impar ou old_n_impar
+    const existente = porNImpar.get(nImpar) || porOldNImpar.get(nImpar)
 
     if (existente) {
-      // Condomínio existe mas sem onedrive_folder_id → ligar
+      if (!existente.onedrive_folder_id) {
+        paraLigar.push({ condId: existente.id, folderId: pasta.id, nImpar, pasta: pasta.name })
+      } else {
+        ignorados++
+        detalhes.push({ pasta: pasta.name, resultado: 'ignorado', motivo: 'já mapeado' })
+      }
+    } else {
+      const nome   = extractNome(pasta.name)
+      const condId = String(nImpar)
+      paraCriar.push({ condId, nImpar, nome, folderId: pasta.id, pasta: pasta.name })
+    }
+  }
+
+  // ── Batch INSERT — 1 query ────────────────────────────────────────────────
+  let criados = 0
+  if (paraCriar.length > 0) {
+    try {
+      const ids       = paraCriar.map(r => r.condId)
+      const nImpars   = paraCriar.map(r => r.nImpar)
+      const lojaIds   = paraCriar.map(r => loja.id)
+      const nomes     = paraCriar.map(r => r.nome)
+      const folderIds = paraCriar.map(r => r.folderId)
+
+      await sql`
+        INSERT INTO condominios (id, n_impar, loja_id, nome, onedrive_folder_id)
+        SELECT * FROM unnest(
+          ${ids}::text[],
+          ${nImpars}::int[],
+          ${lojaIds}::int[],
+          ${nomes}::text[],
+          ${folderIds}::text[]
+        ) AS t(id, n_impar, loja_id, nome, onedrive_folder_id)
+        ON CONFLICT (id) DO NOTHING
+      `
+      criados = paraCriar.length
+      for (const r of paraCriar) {
+        detalhes.push({ pasta: r.pasta, n_impar: r.nImpar, resultado: 'criado', condominio_id: r.condId, nome: r.nome })
+      }
+    } catch (err) {
+      for (const r of paraCriar) {
+        detalhes.push({ pasta: r.pasta, n_impar: r.nImpar, resultado: 'erro', motivo: err.message })
+      }
+    }
+  }
+
+  // ── Batch UPDATE — 1 query ────────────────────────────────────────────────
+  let ligados = 0
+  if (paraLigar.length > 0) {
+    try {
+      const condIds   = paraLigar.map(r => r.condId)
+      const folderIds = paraLigar.map(r => r.folderId)
+
       await sql`
         UPDATE condominios
-        SET onedrive_folder_id = ${pasta.id}
-        WHERE id = ${existente.id}
+        SET onedrive_folder_id = t.folder_id
+        FROM unnest(
+          ${condIds}::text[],
+          ${folderIds}::text[]
+        ) AS t(cond_id, folder_id)
+        WHERE condominios.id = t.cond_id
       `
-      ligados++
-      detalhes.push({ pasta: pasta.name, n_impar: nImpar, resultado: 'ligado', condominio_id: existente.id })
-
-    } else {
-      // Não existe → criar condomínio novo e ligar
-      // Usa o n_impar da pasta em vez do auto-increment da loja
-      const nome    = extractNome(pasta.name)
-      const condId  = String(nImpar).padStart(6, '0')
-
-      try {
-        await sql`
-          INSERT INTO condominios (id, n_impar, loja_id, nome, onedrive_folder_id)
-          VALUES (${condId}, ${nImpar}, ${loja.id}, ${nome}, ${pasta.id})
-          ON CONFLICT (id) DO NOTHING
-        `
-        criados++
-        detalhes.push({ pasta: pasta.name, n_impar: nImpar, resultado: 'criado', condominio_id: condId, nome })
-      } catch (err) {
-        detalhes.push({ pasta: pasta.name, n_impar: nImpar, resultado: 'erro', motivo: err.message })
+      ligados = paraLigar.length
+      for (const r of paraLigar) {
+        detalhes.push({ pasta: r.pasta, n_impar: r.nImpar, resultado: 'ligado', condominio_id: r.condId })
+      }
+    } catch (err) {
+      for (const r of paraLigar) {
+        detalhes.push({ pasta: r.pasta, n_impar: r.nImpar, resultado: 'erro', motivo: err.message })
       }
     }
   }
 
   return { ok: true, criados, ligados, ignorados, detalhes }
 }
-
 
 // ── GET /lojas — lista todas as lojas (já existia, mas agora inclui onedrive_activos_folder_id) ──
 // Se já tens este endpoint, substitui ou ajusta para incluir o campo onedrive_activos_folder_id.
