@@ -2741,7 +2741,7 @@ app.post('/eventos', requireAuth, async (c) => {
     localidade, loja_id, filial_texto,
     data_hora, formato, local_evento,
     gestor,
-    estado_ata, comentarios,
+    estado, comentarios,
   } = body
 
   if (!data_hora) return c.json({ error: 'data_hora é obrigatória' }, 400)
@@ -2763,7 +2763,7 @@ app.post('/eventos', requireAuth, async (c) => {
       localidade, loja_id, filial_texto,
       data_hora, formato, local_evento,
       gestor, gestor_id,
-      estado_ata, comentarios, criado_por
+      estado, comentarios, criado_por
     ) VALUES (
       ${tipo             || 'reuniao'},
       ${tipo_reuniao     || null},
@@ -2803,7 +2803,7 @@ app.put('/eventos/:id', requireAuth, async (c) => {
     localidade, loja_id, filial_texto,
     data_hora, formato, local_evento,
     gestor,
-    estado_ata, comentarios,
+    estado, comentarios,
   } = body
 
   await sql`

@@ -324,14 +324,17 @@ function LinhaEvento({ e, onEditar, onApagar }) {
         <Badge label={estado.label} color={estado.color} bg={estado.bg} />
       </td>
 
-      {/* Acções */}
-      <td style={{ ...tdS, textAlign: 'right', whiteSpace: 'nowrap' }}>
-        <button onClick={() => onEditar(e)} style={btnAcao(C.navy)}>Editar</button>
-        <button onClick={() => onApagar(e)} style={{ ...btnAcao('#dc2626'), marginLeft: '0.5rem' }}>Apagar</button>
+ {/* Acções */}
+      <td style={{ ...tdS, textAlign: 'right' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
+          <button onClick={() => onEditar(e)} style={btnAcao(C.navy)}>Editar</button>
+          <button onClick={() => onApagar(e)} style={btnAcao('#dc2626')}>Apagar</button>
+        </div>
       </td>
     </tr>
   )
 }
+ 
 
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function Eventos() {
