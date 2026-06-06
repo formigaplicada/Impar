@@ -2841,6 +2841,17 @@ app.delete('/eventos/:id', requireAuth, async (c) => {
   return c.json({ ok: true })
 })
 
+// ── POST /eventos/sincronizar-estados ─────────────────────────────────────────
+app.post('/eventos/sincronizar-estados', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const result = await sql`
+    UPDATE eventos
+    SET estado = 'realizada'
+    WHERE estado = 'agendada'
+      AND data_hora < NOW()
+  `
+  return c.json({ ok: true })
+})
 
 // ── POST /eventos/importar ────────────────────────────────────────────────────
 

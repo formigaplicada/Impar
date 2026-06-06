@@ -356,6 +356,7 @@ export default function Eventos() {
   const [apagarId,       setApagarId]       = useState(null)
 
   useEffect(() => {
+    api.post('/eventos/sincronizar-estados', {})
     Promise.all([
       api.get('/lojas').then(r => r.lojas || []),
       api.get('/eventos/gestores').then(r => r.gestores || []),
