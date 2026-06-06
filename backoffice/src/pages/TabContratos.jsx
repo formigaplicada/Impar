@@ -60,6 +60,128 @@ function Badge({ label, color, bg }) {
   )
 }
 
+
+// ── PrestadorPorServico ───────────────────────────────────────────────────────
+// Fluxo: selecciona serviço → lista prestadores associados → escolhe ou associa novo
+
+function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl }) {
+  const [servicoSelId,   setServicoSelId]   = useState('')
+  const [associados,     setAssociados]     = useState([])
+  const [naoAssociados,  setNaoAssociados]  = useState([])
+  const [loadingPrest,   setLoadingPrest]   = useState(false)
+  const [mostrarAssoc,   setMostrarAssoc]   = useState(false)
+  const [prestAssocId,   setPrestAssocId]   = useState('')
+  const [salvandoAssoc,  setSalvandoAssoc]  = useState(false)
+
+  async function carregarPrestadores(servicoId) {
+    if (!servicoId) { setAssociados([]); setNaoAssociados([]); return }
+    setLoadingPrest(true)
+    const data = await api.get(`/prestadores/por-servico/${servicoId}`)
+    setAssociados(data.associados || [])
+    setNaoAssociados(data.nao_associados || [])
+    setLoadingPrest(false)
+  }
+
+  async function associarPrestador() {
+    if (!prestAssocId || !servicoSelId) return
+    setSalvandoAssoc(true)
+    await api.post('/prestador-servicos', { prestador_id: Number(prestAssocId), servico_id: servicoSelId })
+    await carregarPrestadores(servicoSelId)
+    setPrestAssocId('')
+    setMostrarAssoc(false)
+    setSalvandoAssoc(false)
+  }
+
+  const prestadorSel = associados.find(p => String(p.id) === String(form.prestador_id))
+
+  return (
+    <div style={{ marginBottom: '1rem' }}>
+      {/* 1 — Seleccionar serviço */}
+      <label style={lbl}>Serviço prestado</label>
+      <select
+        style={inp}
+        value={servicoSelId}
+        onChange={e => {
+          setServicoSelId(e.target.value)
+          set('prestador_id', '')
+          carregarPrestadores(e.target.value)
+        }}
+      >
+        <option value="">— Seleccionar serviço —</option>
+        {servicosCatalogo.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+      </select>
+
+      {/* 2 — Lista de prestadores (após serviço seleccionado) */}
+      {servicoSelId && (
+        <div style={{ marginTop: '0.75rem' }}>
+          <label style={lbl}>Prestador</label>
+
+          {loadingPrest ? (
+            <div style={{ fontSize: '0.82rem', color: '#6b7a90', padding: '0.5rem' }}>A carregar…</div>
+          ) : associados.length === 0 ? (
+            <div style={{ fontSize: '0.82rem', color: '#9aa3b0', padding: '0.5rem 0' }}>
+              Sem prestadores associados a este serviço.
+            </div>
+          ) : (
+            <select
+              style={inp}
+              value={form.prestador_id}
+              onChange={e => set('prestador_id', e.target.value)}
+            >
+              <option value="">— Seleccionar prestador —</option>
+              {associados.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}{p.cidade ? ` — ${p.cidade}` : ''}{p.contador > 1 ? ` (${p.contador}×)` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Associar novo prestador a este serviço */}
+          {!mostrarAssoc ? (
+            <button
+              type="button"
+              onClick={() => setMostrarAssoc(true)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#2563eb', fontSize: '0.78rem', padding: '0.35rem 0',
+                fontFamily: 'DM Sans, sans-serif', marginTop: '0.35rem',
+              }}
+            >+ Associar prestador a este serviço</button>
+          ) : (
+            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
+              <select
+                style={{ ...inp, flex: 1 }}
+                value={prestAssocId}
+                onChange={e => setPrestAssocId(e.target.value)}
+              >
+                <option value="">— Seleccionar prestador —</option>
+                {naoAssociados.map(p => <option key={p.id} value={p.id}>{p.nome}{p.cidade ? ` — ${p.cidade}` : ''}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={associarPrestador}
+                disabled={!prestAssocId || salvandoAssoc}
+                style={{
+                  background: '#011640', color: '#fff', border: 'none', borderRadius: '0.5rem',
+                  padding: '0.5rem 0.875rem', fontSize: '0.78rem', fontWeight: 600,
+                  cursor: prestAssocId ? 'pointer' : 'not-allowed',
+                  opacity: prestAssocId ? 1 : 0.5, fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+                }}
+              >{salvandoAssoc ? '…' : 'Associar'}</button>
+              <button
+                type="button"
+                onClick={() => { setMostrarAssoc(false); setPrestAssocId('') }}
+                style={{ background: 'none', border: '1px solid #e4e8ef', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.78rem', cursor: 'pointer', color: '#6b7a90' }}
+              >✕</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Modal Contrato ────────────────────────────────────────────────────────────
 const FORM_VAZIO = {
   tipo: 'condominio',
@@ -194,15 +316,15 @@ function ModalContrato({ inicial, tipo, condominioId, prestadores, servicosCatal
           <button onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.4rem', color: C.muted }}>×</button>
         </div>
 
-        {/* Prestador (só tipo prestador) */}
+        {/* Prestador — fluxo: serviço primeiro, depois lista filtrada */}
         {tipo === 'prestador' && (
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={lbl}>Prestador</label>
-            <select style={inp} value={form.prestador_id} onChange={e => set('prestador_id', e.target.value)}>
-              <option value="">— Seleccionar —</option>
-              {prestadores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-            </select>
-          </div>
+          <PrestadorPorServico
+            servicosCatalogo={catalogoFiltrado}
+            form={form}
+            set={set}
+            inp={inp}
+            lbl={lbl}
+          />
         )}
 
         {/* Datas */}

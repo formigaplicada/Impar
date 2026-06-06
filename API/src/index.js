@@ -3732,6 +3732,21 @@ app.post('/contratos', requireAuth, async (c) => {
     `
   }
 
+  // Se for contrato de prestador, upsert em prestador_servicos (incrementar contador)
+  if ((tipo || 'condominio') === 'prestador' && prestador_id) {
+    const condInfo = await sql`SELECT loja_id FROM condominios WHERE id = ${condominio_id}`
+    const lojaId   = condInfo[0]?.loja_id || null
+    for (const s of servicos) {
+      if (!s.servico_id) continue
+      await sql`
+        INSERT INTO prestador_servicos (prestador_id, servico_id, loja_id, contador)
+        VALUES (${Number(prestador_id)}, ${s.servico_id}, ${lojaId}, 1)
+        ON CONFLICT (prestador_id, servico_id, loja_id)
+        DO UPDATE SET contador = prestador_servicos.contador + 1, atualizado_em = NOW()
+      `
+    }
+  }
+
   // Log criação
   await sql`
     INSERT INTO contrato_logs (contrato_id, utilizador_id, acao, detalhe)
@@ -3823,6 +3838,63 @@ app.delete('/contratos/:id', requireAuth, async (c) => {
   if (existe.length === 0) return c.json({ error: 'Contrato não encontrado' }, 404)
 
   await sql`DELETE FROM contratos WHERE id = ${id}`
+  return c.json({ ok: true })
+})
+
+
+// ── GET /prestadores/por-servico/:servico_id ──────────────────────────────────
+// Devolve prestadores associados a um serviço, ordenados por contador DESC
+// Filtro opcional: loja_id (para mostrar os da loja primeiro)
+
+app.get('/prestadores/por-servico/:servico_id', requireAuth, async (c) => {
+  const sql        = neon(c.env.DATABASE_URL)
+  const servico_id = c.req.param('servico_id')
+  const { loja_id } = c.req.query()
+
+  // Prestadores já associados a este serviço
+  const associados = await sql`
+    SELECT
+      p.id, p.nome, p.telefone, p.email, p.cidade,
+      ps.contador,
+      ps.loja_id,
+      CASE WHEN ps.loja_id = ${loja_id ? Number(loja_id) : null} THEN 1 ELSE 2 END AS prioridade
+    FROM prestador_servicos ps
+    JOIN prestadores p ON p.id = ps.prestador_id
+    WHERE ps.servico_id = ${servico_id}
+      AND p.ativo = true
+    ORDER BY prioridade ASC, ps.contador DESC, p.nome ASC
+  `
+
+  // Prestadores ainda não associados a este serviço (para poder associar)
+  const naoAssociados = await sql`
+    SELECT p.id, p.nome, p.telefone, p.email, p.cidade
+    FROM prestadores p
+    WHERE p.ativo = true
+      AND p.id NOT IN (
+        SELECT prestador_id FROM prestador_servicos WHERE servico_id = ${servico_id}
+      )
+    ORDER BY p.nome ASC
+  `
+
+  return c.json({ associados, nao_associados: naoAssociados })
+})
+
+
+// ── POST /prestador-servicos ──────────────────────────────────────────────────
+// Associar manualmente um prestador a um serviço (sem incrementar contador)
+
+app.post('/prestador-servicos', requireAuth, async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  const { prestador_id, servico_id, loja_id } = await c.req.json()
+
+  if (!prestador_id || !servico_id) return c.json({ error: 'prestador_id e servico_id são obrigatórios' }, 400)
+
+  await sql`
+    INSERT INTO prestador_servicos (prestador_id, servico_id, loja_id, contador)
+    VALUES (${prestador_id}, ${servico_id}, ${loja_id || null}, 0)
+    ON CONFLICT (prestador_id, servico_id, loja_id) DO NOTHING
+  `
+
   return c.json({ ok: true })
 })
 
