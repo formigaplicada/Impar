@@ -1,11 +1,7 @@
 // ── TabContratos ──────────────────────────────────────────────────────────────
-// Adicionar ao Condominios.jsx em substituição do TabPlaceholder de contratos
-//
-// Uso: {tab === 'contratos' && <TabContratos condominioId={condominio.id} />}
-//
-// Requer no topo do Condominios.jsx:
-//   import TabContratos from './TabContratos'   (se ficheiro separado)
-//   ou copiar este conteúdo directamente para Condominios.jsx
+// Uso em Condominios.jsx:
+//   import TabContratos from './TabContratos'
+//   {tab === 'contratos' && <TabContratos condominioId={condominio.id} />}
 
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
@@ -25,16 +21,16 @@ const C = {
 }
 
 const ESTADOS_CONTRATO = [
-  { key: 'ativo',      label: 'Ativo',      color: '#16a34a', bg: '#dcfce7' },
-  { key: 'suspenso',   label: 'Suspenso',   color: '#d97706', bg: '#fef3c7' },
-  { key: 'terminado',  label: 'Terminado',  color: '#dc2626', bg: '#fef2f2' },
+  { key: 'ativo',     label: 'Ativo',     color: '#16a34a', bg: '#dcfce7' },
+  { key: 'suspenso',  label: 'Suspenso',  color: '#d97706', bg: '#fef3c7' },
+  { key: 'terminado', label: 'Terminado', color: '#dc2626', bg: '#fef2f2' },
 ]
 
 const PERIODICIDADES = [
-  { key: 'mensal',      label: 'Mensal',      meses: 12 },
-  { key: 'trimestral',  label: 'Trimestral',  meses: 4  },
-  { key: 'semestral',   label: 'Semestral',   meses: 2  },
-  { key: 'anual',       label: 'Anual',       meses: 1  },
+  { key: 'mensal',     label: 'Mensal',     meses: 12 },
+  { key: 'trimestral', label: 'Trimestral', meses: 4  },
+  { key: 'semestral',  label: 'Semestral',  meses: 2  },
+  { key: 'anual',      label: 'Anual',      meses: 1  },
 ]
 
 const cfgEstado = k => ESTADOS_CONTRATO.find(e => e.key === k) || ESTADOS_CONTRATO[0]
@@ -47,11 +43,11 @@ function formatDate(iso) {
 function totalAnual(valor, periodicidade) {
   if (!valor) return null
   const p = PERIODICIDADES.find(p => p.key === periodicidade)
-  return valor * (p?.meses || 12)
+  return Number(valor) * (p?.meses || 12)
 }
 
 function formatEur(val) {
-  if (val === null || val === undefined) return '—'
+  if (val === null || val === undefined || val === '') return '—'
   return Number(val).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })
 }
 
@@ -65,7 +61,7 @@ function Badge({ label, color, bg }) {
 }
 
 // ── Modal Contrato ────────────────────────────────────────────────────────────
-const FORM_VAZIO_CONTRATO = {
+const FORM_VAZIO = {
   tipo: 'condominio',
   prestador_id: '',
   data_inicio: '',
@@ -76,11 +72,58 @@ const FORM_VAZIO_CONTRATO = {
   condicoes: '',
 }
 
-function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
-  const [form, setForm]       = useState(inicial || FORM_VAZIO_CONTRATO)
+function ModalContrato({ inicial, tipo, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
+  const [form, setForm]     = useState(inicial || { ...FORM_VAZIO, tipo })
   const [servicos, setServicos] = useState(inicial?.servicos || [])
+  const [customInput, setCustomInput] = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Filtrar catálogo conforme tipo
+  const catalogoFiltrado = servicosCatalogo.filter(s =>
+    tipo === 'condominio' ? s.em_contrato : s.em_prestador
+  )
+
+  function toggleServico(s) {
+    setServicos(prev => {
+      const existe = prev.find(sv => sv.servico_id === s.id)
+      if (existe) return prev.filter(sv => sv.servico_id !== s.id)
+      return [...prev, {
+        servico_id: s.id,
+        nome_custom: null,
+        valor_mensal: '',
+        periodicidade: 'mensal',
+        estimativa: false,
+        observacoes: '',
+      }]
+    })
+  }
+
+  function addCustom() {
+    const nome = customInput.trim()
+    if (!nome) return
+    setServicos(prev => [...prev, {
+      servico_id: null,
+      nome_custom: nome,
+      valor_mensal: '',
+      periodicidade: 'mensal',
+      estimativa: false,
+      observacoes: '',
+    }])
+    setCustomInput('')
+  }
+
+  function removeCustom(idx) {
+    setServicos(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function updateServico(identifier, campo, valor) {
+    // identifier é servico_id (string) ou index (number) para custom
+    setServicos(prev => prev.map((s, i) => {
+      const match = typeof identifier === 'number' ? i === identifier : s.servico_id === identifier
+      return match ? { ...s, [campo]: valor } : s
+    }))
+  }
 
   const lbl = {
     fontSize: '0.72rem', fontWeight: 600, color: C.muted,
@@ -95,16 +138,42 @@ function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, o
   }
   const row2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }
 
-  function toggleServico(servicoId) {
-    setServicos(prev => {
-      const existe = prev.find(s => s.servico_id === servicoId)
-      if (existe) return prev.filter(s => s.servico_id !== servicoId)
-      return [...prev, { servico_id: servicoId, valor_mensal: '', periodicidade: 'mensal', estimativa: false, observacoes: '' }]
-    })
-  }
-
-  function updateServico(servicoId, campo, valor) {
-    setServicos(prev => prev.map(s => s.servico_id === servicoId ? { ...s, [campo]: valor } : s))
+  // Render campos de detalhe de um serviço seleccionado
+  function DetalheServico({ sv, identifier, nome }) {
+    return (
+      <div style={{ padding: '0 0.875rem 0.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+        <div>
+          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Valor (€)</label>
+          <input
+            type="number" min="0" step="0.01"
+            style={{ ...inp, fontSize: '0.82rem' }}
+            value={sv.valor_mensal}
+            onChange={e => updateServico(identifier, 'valor_mensal', e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
+        <div>
+          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Periodicidade</label>
+          <select style={{ ...inp, fontSize: '0.82rem' }} value={sv.periodicidade} onChange={e => updateServico(identifier, 'periodicidade', e.target.value)}>
+            {PERIODICIDADES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <input
+            type="checkbox"
+            id={`est-${identifier}`}
+            checked={sv.estimativa}
+            onChange={e => updateServico(identifier, 'estimativa', e.target.checked)}
+            style={{ width: 14, height: 14 }}
+          />
+          <label htmlFor={`est-${identifier}`} style={{ fontSize: '0.78rem', color: C.muted, cursor: 'pointer' }}>Valor estimado</label>
+        </div>
+        <div>
+          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Observações</label>
+          <input style={{ ...inp, fontSize: '0.82rem' }} value={sv.observacoes} onChange={e => updateServico(identifier, 'observacoes', e.target.value)} placeholder="Notas..." />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -120,22 +189,13 @@ function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, o
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: C.navy, fontFamily: 'DM Sans, sans-serif' }}>
-            {inicial ? 'Editar Contrato' : 'Novo Contrato'}
+            {inicial ? 'Editar' : 'Novo'} {tipo === 'condominio' ? 'Contrato' : 'Contrato de Prestador'}
           </h2>
           <button onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.4rem', color: C.muted }}>×</button>
         </div>
 
-        {/* Tipo */}
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={lbl}>Tipo</label>
-          <select style={inp} value={form.tipo} onChange={e => set('tipo', e.target.value)}>
-            <option value="condominio">Contrato</option>
-            <option value="prestador">Prestador</option>
-          </select>
-        </div>
-
-        {/* Prestador (só se tipo = prestador) */}
-        {form.tipo === 'prestador' && (
+        {/* Prestador (só tipo prestador) */}
+        {tipo === 'prestador' && (
           <div style={{ marginBottom: '1rem' }}>
             <label style={lbl}>Prestador</label>
             <select style={inp} value={form.prestador_id} onChange={e => set('prestador_id', e.target.value)}>
@@ -166,16 +226,12 @@ function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, o
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '1.5rem' }}>
-            <input
-              type="checkbox" id="renovacao" checked={form.renovacao_automatica}
-              onChange={e => set('renovacao_automatica', e.target.checked)}
-              style={{ width: 16, height: 16, cursor: 'pointer' }}
-            />
+            <input type="checkbox" id="renovacao" checked={form.renovacao_automatica} onChange={e => set('renovacao_automatica', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
             <label htmlFor="renovacao" style={{ fontSize: '0.875rem', color: C.text, cursor: 'pointer' }}>Renovação automática</label>
           </div>
         </div>
 
-        {/* Documento URL */}
+        {/* Documento */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={lbl}>Documento <span style={{ fontWeight: 400, textTransform: 'none' }}>(link OneDrive — opcional)</span></label>
           <input style={inp} value={form.documento_url} onChange={e => set('documento_url', e.target.value)} placeholder="https://..." />
@@ -187,11 +243,11 @@ function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, o
           <textarea style={{ ...inp, resize: 'vertical', minHeight: '3.5rem' }} value={form.condicoes} onChange={e => set('condicoes', e.target.value)} placeholder="Notas e condições do contrato..." />
         </div>
 
-        {/* Serviços */}
-        <div style={{ marginBottom: '1.5rem' }}>
+        {/* Serviços do catálogo */}
+        <div style={{ marginBottom: '1rem' }}>
           <label style={{ ...lbl, marginBottom: '0.75rem' }}>Serviços incluídos</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {servicosCatalogo.map(s => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {catalogoFiltrado.map(s => {
               const sel = servicos.find(sv => sv.servico_id === s.id)
               return (
                 <div key={s.id} style={{
@@ -199,48 +255,58 @@ function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, o
                   borderRadius: '0.5rem', overflow: 'hidden',
                   background: sel ? C.blueL : C.white,
                 }}>
-                  {/* Header do serviço */}
-                  <div
-                    onClick={() => toggleServico(s.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.875rem', cursor: 'pointer' }}
-                  >
-                    <input type="checkbox" checked={!!sel} onChange={() => toggleServico(s.id)} style={{ width: 15, height: 15 }} />
+                  <div onClick={() => toggleServico(s)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.875rem', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!sel} onChange={() => toggleServico(s)} style={{ width: 15, height: 15 }} />
                     <span style={{ fontSize: '0.875rem', fontWeight: sel ? 600 : 400, color: sel ? C.navy : C.text }}>{s.nome}</span>
-                    {s.categoria === 'custom' && <Badge label="Custom" color={C.muted} bg="#f1f5f9" />}
                   </div>
-
-                  {/* Detalhes (só se seleccionado) */}
-                  {sel && (
-                    <div style={{ padding: '0 0.875rem 0.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                      <div>
-                        <label style={{ ...lbl, marginBottom: '0.2rem' }}>Valor (€)</label>
-                        <input
-                          type="number" min="0" step="0.01"
-                          style={{ ...inp, fontSize: '0.82rem' }}
-                          value={sel.valor_mensal}
-                          onChange={e => updateServico(s.id, 'valor_mensal', e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <label style={{ ...lbl, marginBottom: '0.2rem' }}>Periodicidade</label>
-                        <select style={{ ...inp, fontSize: '0.82rem' }} value={sel.periodicidade} onChange={e => updateServico(s.id, 'periodicidade', e.target.value)}>
-                          {PERIODICIDADES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
-                        </select>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <input type="checkbox" id={`est-${s.id}`} checked={sel.estimativa} onChange={e => updateServico(s.id, 'estimativa', e.target.checked)} style={{ width: 14, height: 14 }} />
-                        <label htmlFor={`est-${s.id}`} style={{ fontSize: '0.78rem', color: C.muted, cursor: 'pointer' }}>Valor estimado</label>
-                      </div>
-                      <div>
-                        <label style={{ ...lbl, marginBottom: '0.2rem' }}>Observações</label>
-                        <input style={{ ...inp, fontSize: '0.82rem' }} value={sel.observacoes} onChange={e => updateServico(s.id, 'observacoes', e.target.value)} placeholder="Notas..." />
-                      </div>
-                    </div>
-                  )}
+                  {sel && <DetalheServico sv={sel} identifier={s.id} nome={s.nome} />}
                 </div>
               )
             })}
+          </div>
+        </div>
+
+        {/* Serviços custom (Outros) */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ ...lbl, marginBottom: '0.75rem' }}>Outros serviços</label>
+
+          {/* Serviços custom já adicionados */}
+          {servicos.filter(sv => !sv.servico_id).map((sv, i) => {
+            const idx = servicos.indexOf(sv)
+            return (
+              <div key={i} style={{
+                border: `1px solid ${C.blue}`, borderRadius: '0.5rem',
+                overflow: 'hidden', background: C.blueL, marginBottom: '0.4rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.875rem' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: C.navy }}>{sv.nome_custom}</span>
+                  <button onClick={() => removeCustom(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '1rem' }}>✕</button>
+                </div>
+                <DetalheServico sv={sv} identifier={idx} nome={sv.nome_custom} />
+              </div>
+            )
+          })}
+
+          {/* Input para adicionar novo */}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              style={{ ...inp, flex: 1 }}
+              placeholder="Nome do serviço..."
+              value={customInput}
+              onChange={e => setCustomInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }}
+            />
+            <button
+              onClick={addCustom}
+              disabled={!customInput.trim()}
+              style={{
+                background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
+                padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600,
+                cursor: customInput.trim() ? 'pointer' : 'not-allowed',
+                opacity: customInput.trim() ? 1 : 0.5,
+                fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+              }}
+            >+ Adicionar</button>
           </div>
         </div>
 
@@ -252,7 +318,7 @@ function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, o
             color: C.muted, fontFamily: 'DM Sans, sans-serif',
           }}>Cancelar</button>
           <button
-            onClick={() => onGuardar({ ...form, servicos })}
+            onClick={() => onGuardar({ ...form, tipo, servicos })}
             disabled={!form.data_inicio || loading}
             style={{
               background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
@@ -268,25 +334,24 @@ function ModalContrato({ inicial, condominioId, prestadores, servicosCatalogo, o
 }
 
 // ── Card de Contrato ──────────────────────────────────────────────────────────
-function CardContrato({ contrato, servicosCatalogo, onEditar, onLog }) {
-  const [logAberto, setLogAberto] = useState(false)
-  const [logs, setLogs]           = useState([])
-  const [loadingLog, setLoadingLog] = useState(false)
+function CardContrato({ contrato, onEditar }) {
+  const [logAberto,   setLogAberto]   = useState(false)
+  const [logs,        setLogs]        = useState([])
+  const [loadingLog,  setLoadingLog]  = useState(false)
   const estado = cfgEstado(contrato.estado)
 
   async function carregarLogs() {
-    if (logs.length > 0) { setLogAberto(v => !v); return }
-    setLoadingLog(true)
-    const data = await api.get(`/contratos/${contrato.id}/logs`)
-    setLogs(data.logs || [])
-    setLoadingLog(false)
+    if (logAberto) { setLogAberto(false); return }
+    if (logs.length === 0) {
+      setLoadingLog(true)
+      const data = await api.get(`/contratos/${contrato.id}/logs`)
+      setLogs(data.logs || [])
+      setLoadingLog(false)
+    }
     setLogAberto(true)
   }
 
-  const totalServicos = contrato.servicos?.reduce((acc, s) => {
-    const anual = totalAnual(s.valor_mensal, s.periodicidade)
-    return acc + (anual || 0)
-  }, 0)
+  const totalServicos = contrato.servicos?.reduce((acc, s) => acc + (totalAnual(s.valor_mensal, s.periodicidade) || 0), 0)
 
   return (
     <div style={{
@@ -294,24 +359,22 @@ function CardContrato({ contrato, servicosCatalogo, onEditar, onLog }) {
       borderRadius: '0.875rem', overflow: 'hidden',
       boxShadow: '0 1px 4px rgba(1,22,64,0.06)', marginBottom: '1rem',
     }}>
-      {/* Cabeçalho do card */}
+      {/* Cabeçalho */}
       <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${C.borderL}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <Badge label={estado.label} color={estado.color} bg={estado.bg} />
-          {contrato.tipo === 'prestador' && contrato.prestador_nome && (
+          {contrato.prestador_nome && (
             <span style={{ fontSize: '0.875rem', fontWeight: 600, color: C.text }}>{contrato.prestador_nome}</span>
           )}
           <span style={{ fontSize: '0.78rem', color: C.muted }}>
             {formatDate(contrato.data_inicio)} → {contrato.data_fim ? formatDate(contrato.data_fim) : 'sem fim'}
           </span>
-          {contrato.renovacao_automatica && (
-            <Badge label="Renovação auto." color="#0891b2" bg="#ecfeff" />
-          )}
+          {contrato.renovacao_automatica && <Badge label="Renovação auto." color="#0891b2" bg="#ecfeff" />}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {contrato.documento_url && (
             <a href={contrato.documento_url} target="_blank" rel="noreferrer" style={{
-              background: 'none', border: `1px solid ${C.border}`, borderRadius: '0.35rem',
+              border: `1px solid ${C.border}`, borderRadius: '0.35rem',
               padding: '0.2rem 0.6rem', fontSize: '0.72rem', color: C.blue,
               textDecoration: 'none', fontWeight: 600,
             }}>📄 Doc</a>
@@ -337,10 +400,13 @@ function CardContrato({ contrato, servicosCatalogo, onEditar, onLog }) {
             <tbody>
               {contrato.servicos.map((s, i) => (
                 <tr key={s.id} style={{ borderBottom: i < contrato.servicos.length - 1 ? `1px solid ${C.borderL}` : 'none' }}>
-                  <td style={{ padding: '0.5rem 1rem', color: C.text, fontWeight: 500 }}>{s.servico_nome}</td>
-                  <td style={{ padding: '0.5rem 1rem', color: C.text }}>{formatEur(s.valor_mensal)}</td>
+                  <td style={{ padding: '0.5rem 1rem', color: C.text, fontWeight: 500 }}>
+                    {s.servico_nome || s.nome_custom}
+                    {s.nome_custom && <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: C.subtle }}>(outro)</span>}
+                  </td>
+                  <td style={{ padding: '0.5rem 1rem' }}>{formatEur(s.valor_mensal)}</td>
                   <td style={{ padding: '0.5rem 1rem', color: C.muted }}>{PERIODICIDADES.find(p => p.key === s.periodicidade)?.label || s.periodicidade}</td>
-                  <td style={{ padding: '0.5rem 1rem', color: C.text, fontWeight: 600 }}>
+                  <td style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>
                     {formatEur(totalAnual(s.valor_mensal, s.periodicidade))}
                     {s.estimativa && <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: C.muted }}>(est.)</span>}
                   </td>
@@ -349,18 +415,15 @@ function CardContrato({ contrato, servicosCatalogo, onEditar, onLog }) {
                   </td>
                 </tr>
               ))}
-              {/* Total */}
               <tr style={{ background: '#f7f9fc', borderTop: `1.5px solid ${C.border}` }}>
                 <td colSpan={3} style={{ padding: '0.5rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total anual</td>
-                <td colSpan={2} style={{ padding: '0.5rem 1rem', fontWeight: 700, color: C.navy, fontSize: '0.875rem' }}>{formatEur(totalServicos)}</td>
+                <td colSpan={2} style={{ padding: '0.5rem 1rem', fontWeight: 700, color: C.navy }}>{formatEur(totalServicos)}</td>
               </tr>
             </tbody>
           </table>
         </div>
       ) : (
-        <div style={{ padding: '1.5rem', textAlign: 'center', color: C.subtle, fontSize: '0.82rem' }}>
-          Sem serviços associados.
-        </div>
+        <div style={{ padding: '1.5rem', textAlign: 'center', color: C.subtle, fontSize: '0.82rem' }}>Sem serviços associados.</div>
       )}
 
       {/* Condições */}
@@ -372,14 +435,10 @@ function CardContrato({ contrato, servicosCatalogo, onEditar, onLog }) {
 
       {/* Histórico */}
       <div style={{ borderTop: `1px solid ${C.borderL}` }}>
-        <button
-          onClick={carregarLogs}
-          style={{ width: '100%', background: 'none', border: 'none', padding: '0.6rem 1.25rem', cursor: 'pointer', fontSize: '0.75rem', color: C.muted, textAlign: 'left', fontFamily: 'DM Sans, sans-serif', display: 'flex', justifyContent: 'space-between' }}
-        >
+        <button onClick={carregarLogs} style={{ width: '100%', background: 'none', border: 'none', padding: '0.6rem 1.25rem', cursor: 'pointer', fontSize: '0.75rem', color: C.muted, textAlign: 'left', fontFamily: 'DM Sans, sans-serif', display: 'flex', justifyContent: 'space-between' }}>
           <span>🕐 Histórico de alterações</span>
           <span>{logAberto ? '▲' : '▼'}</span>
         </button>
-
         {logAberto && (
           <div style={{ padding: '0 1.25rem 1rem' }}>
             {loadingLog ? (
@@ -392,8 +451,7 @@ function CardContrato({ contrato, servicosCatalogo, onEditar, onLog }) {
                   <div key={log.id} style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem' }}>
                     <span style={{ color: C.subtle, whiteSpace: 'nowrap', flexShrink: 0 }}>
                       {new Date(log.criado_em).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                      {' '}
-                      {new Date(log.criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                      {' '}{new Date(log.criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     <span style={{ color: C.muted, flexShrink: 0 }}>{log.utilizador_nome || '—'}</span>
                     <span style={{ color: C.text }}>{log.acao}</span>
@@ -408,47 +466,37 @@ function CardContrato({ contrato, servicosCatalogo, onEditar, onLog }) {
   )
 }
 
-// ── TabContratos (componente principal) ───────────────────────────────────────
+// ── Componente principal ──────────────────────────────────────────────────────
 export default function TabContratos({ condominioId }) {
-  const [contratos,       setContratos]       = useState([])
+  const [contratos,        setContratos]        = useState([])
   const [servicosCatalogo, setServicosCatalogo] = useState([])
-  const [prestadores,     setPrestadores]     = useState([])
-  const [loading,         setLoading]         = useState(true)
-  const [modal,           setModal]           = useState(null)  // null | 'novo_condominio' | 'novo_prestador' | { contrato }
-  const [loadingGuardar,  setLoadingGuardar]  = useState(false)
-  const [secao,           setSecao]           = useState('condominio') // 'condominio' | 'prestador'
+  const [prestadores,      setPrestadores]      = useState([])
+  const [loading,          setLoading]          = useState(true)
+  const [modal,            setModal]            = useState(null) // null | { tipo, contrato? }
+  const [loadingGuardar,   setLoadingGuardar]   = useState(false)
+  const [secao,            setSecao]            = useState('condominio')
 
-  useEffect(() => {
-    Promise.all([
+  async function carregar() {
+    const [c, s, p] = await Promise.all([
       api.get(`/contratos?condominio_id=${condominioId}`).then(r => r.contratos || []),
       api.get('/servicos').then(r => r.servicos || []),
       api.get('/prestadores').then(r => r.prestadores || []),
-    ]).then(([c, s, p]) => {
-      setContratos(c)
-      setServicosCatalogo(s)
-      setPrestadores(p)
-      setLoading(false)
-    })
-  }, [condominioId])
+    ])
+    setContratos(c); setServicosCatalogo(s); setPrestadores(p); setLoading(false)
+  }
+
+  useEffect(() => { carregar() }, [condominioId])
 
   async function handleGuardar(form) {
     setLoadingGuardar(true)
     try {
       const payload = { ...form, condominio_id: condominioId }
-      if (modal?.contrato) {
-        await api.put(`/contratos/${modal.contrato.id}`, payload)
-      } else {
-        await api.post('/contratos', payload)
-      }
-      // Recarregar
-      const data = await api.get(`/contratos?condominio_id=${condominioId}`)
-      setContratos(data.contratos || [])
+      if (modal?.contrato) await api.put(`/contratos/${modal.contrato.id}`, payload)
+      else                 await api.post('/contratos', payload)
+      await carregar()
       setModal(null)
-    } catch (e) {
-      alert('Erro: ' + e.message)
-    } finally {
-      setLoadingGuardar(false)
-    }
+    } catch (e) { alert('Erro: ' + e.message) }
+    finally { setLoadingGuardar(false) }
   }
 
   const contratosCondominio = contratos.filter(c => c.tipo === 'condominio')
@@ -478,7 +526,7 @@ export default function TabContratos({ condominioId }) {
       {/* Botão adicionar */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
         <button
-          onClick={() => setModal(secao === 'condominio' ? 'novo_condominio' : 'novo_prestador')}
+          onClick={() => setModal({ tipo: secao })}
           style={{
             background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
             padding: '0.5rem 1.125rem', fontSize: '0.82rem', fontWeight: 600,
@@ -500,8 +548,7 @@ export default function TabContratos({ condominioId }) {
           <CardContrato
             key={c.id}
             contrato={c}
-            servicosCatalogo={servicosCatalogo}
-            onEditar={contrato => setModal({ contrato })}
+            onEditar={contrato => setModal({ tipo: contrato.tipo, contrato })}
           />
         ))
       )}
@@ -509,20 +556,18 @@ export default function TabContratos({ condominioId }) {
       {/* Modal */}
       {modal && (
         <ModalContrato
-          inicial={modal?.contrato ? {
+          tipo={modal.tipo}
+          inicial={modal.contrato ? {
             tipo:                 modal.contrato.tipo,
-            prestador_id:         modal.contrato.prestador_id        || '',
-            data_inicio:          modal.contrato.data_inicio?.slice(0, 10) || '',
-            data_fim:             modal.contrato.data_fim?.slice(0, 10)    || '',
+            prestador_id:         modal.contrato.prestador_id            || '',
+            data_inicio:          modal.contrato.data_inicio?.slice(0,10) || '',
+            data_fim:             modal.contrato.data_fim?.slice(0,10)    || '',
             estado:               modal.contrato.estado,
             renovacao_automatica: modal.contrato.renovacao_automatica,
-            documento_url:        modal.contrato.documento_url        || '',
-            condicoes:            modal.contrato.condicoes            || '',
-            servicos:             modal.contrato.servicos             || [],
-          } : {
-            ...FORM_VAZIO_CONTRATO,
-            tipo: secao,
-          }}
+            documento_url:        modal.contrato.documento_url            || '',
+            condicoes:            modal.contrato.condicoes                || '',
+            servicos:             modal.contrato.servicos                 || [],
+          } : null}
           condominioId={condominioId}
           prestadores={prestadores}
           servicosCatalogo={servicosCatalogo}

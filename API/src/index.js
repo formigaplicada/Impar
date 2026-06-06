@@ -3616,7 +3616,7 @@ app.get('/contratos', requireAuth, async (c) => {
   const ids = contratos.map(c => c.id)
   const servicos = await sql`
     SELECT
-      cs.id, cs.contrato_id, cs.servico_id, cs.valor_mensal,
+      cs.id, cs.contrato_id, cs.servico_id, cs.nome_custom, cs.valor_mensal,
       cs.periodicidade, cs.estimativa, cs.observacoes,
       s.nome AS servico_nome, s.categoria
     FROM contrato_servicos cs
@@ -3722,9 +3722,9 @@ app.post('/contratos', requireAuth, async (c) => {
   for (const s of servicos) {
     if (!s.servico_id) continue
     await sql`
-      INSERT INTO contrato_servicos (contrato_id, servico_id, valor_mensal, periodicidade, estimativa, observacoes)
-      VALUES (${contratoId}, ${s.servico_id}, ${s.valor_mensal || null}, ${s.periodicidade || 'mensal'}, ${s.estimativa || false}, ${s.observacoes || null})
-      ON CONFLICT (contrato_id, servico_id) DO UPDATE SET
+      INSERT INTO contrato_servicos (contrato_id, servico_id, nome_custom, valor_mensal, periodicidade, estimativa, observacoes)
+      VALUES (${contratoId}, ${s.servico_id || null}, ${s.nome_custom || null}, ${s.valor_mensal || null}, ${s.periodicidade || 'mensal'}, ${s.estimativa || false}, ${s.observacoes || null})
+      ON CONFLICT (contrato_id, servico_id) WHERE servico_id IS NOT NULL DO UPDATE SET
         valor_mensal  = EXCLUDED.valor_mensal,
         periodicidade = EXCLUDED.periodicidade,
         estimativa    = EXCLUDED.estimativa,
