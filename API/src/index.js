@@ -766,23 +766,29 @@ app.get('/prestadores', requireAuth, async (c) => {
 
   const rows = await sql`
     SELECT DISTINCT
-      p.id, p.nif, p.nome, p.email, p.telefone,
+      p.id, p.nif, p.nome,
+      COALESCE(pc.email,    p.email)    AS email,
+      COALESCE(pc.telefone, p.telefone) AS telefone,
       COALESCE(
-        (SELECT string_agg(s.nome, ', ' ORDER BY s.nome)
+        (SELECT string_agg(DISTINCT s.nome, ', ' ORDER BY s.nome)
          FROM prestador_servicos ps
          JOIN servicos s ON s.id = ps.servico_id
          WHERE ps.prestador_id = p.id),
         '—'
       ) AS servicos
     FROM prestadores p
+    LEFT JOIN prestador_contactos pc
+      ON pc.prestador_id = p.id
+      AND pc.loja_id = ${loja_id ? Number(loja_id) : null}
+      AND pc.ativo = true
     ${servico_id || loja_id ? sql`
       JOIN prestador_servicos ps2 ON ps2.prestador_id = p.id
     ` : sql``}
     WHERE p.ativo = true
-      ${nome      ? sql`AND p.nome ILIKE ${'%' + nome + '%'}` : sql``}
-      ${nif       ? sql`AND p.nif = ${nif}`                   : sql``}
-      ${servico_id ? sql`AND ps2.servico_id = ${servico_id}`  : sql``}
-      ${loja_id   ? sql`AND ps2.loja_id = ${Number(loja_id)}` : sql``}
+      ${nome       ? sql`AND p.nome ILIKE ${'%' + nome + '%'}` : sql``}
+      ${nif        ? sql`AND p.nif = ${nif}`                   : sql``}
+      ${servico_id ? sql`AND ps2.servico_id = ${servico_id}`   : sql``}
+      ${loja_id    ? sql`AND ps2.loja_id = ${Number(loja_id)}` : sql``}
     ORDER BY p.nome ASC
     LIMIT 200
   `
