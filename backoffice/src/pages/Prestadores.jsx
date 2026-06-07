@@ -176,21 +176,28 @@ export default function Prestadores() {
   const [prestadores, setPrestadores] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalAberto, setModalAberto] = useState(false)
-  const [filtros, setFiltros] = useState({ nome: '', nif: '' })
+  const [filtros,  setFiltros]  = useState({ nome: '', loja_id: '', servico_id: '' })
+  const [lojas,    setLojas]    = useState([])
+  const [servicos, setServicos] = useState([])
 
   async function carregar(f = filtros) {
     setLoading(true)
     const params = new URLSearchParams()
-    if (f.nome) params.set('nome', f.nome)
-    if (f.nif)  params.set('nif', f.nif)
+    if (f.nome)       params.set('nome',       f.nome)
+    if (f.loja_id)    params.set('loja_id',    f.loja_id)
+    if (f.servico_id) params.set('servico_id', f.servico_id)
     const data = await api.get(`/prestadores?${params}`)
     setPrestadores(data?.prestadores || [])
     setLoading(false)
   }
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => {
+    carregar()
+    api.get('/lojas').then(r => setLojas(r.lojas || []))
+    api.get('/servicos').then(r => setServicos((r.servicos || []).filter(s => s.em_prestador)))
+  }, [])
 
-  function handleFiltro(e) { setFiltros({ ...filtros, [e.target.name]: e.target.value }) }
+  function handleFiltro(e) { setFiltros(f => ({ ...f, [e.target.name]: e.target.value })) }
 
   return (
     <div>
@@ -206,13 +213,23 @@ export default function Prestadores() {
           />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>NIF</label>
-          <input name="nif" value={filtros.nif} onChange={handleFiltro} placeholder="NIF"
-            style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', width: '140px' }}
-          />
+          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>Loja</label>
+          <select name="loja_id" value={filtros.loja_id} onChange={handleFiltro}
+            style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', width: '160px' }}>
+            <option value="">Todas as lojas</option>
+            {lojas.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>Serviço</label>
+          <select name="servico_id" value={filtros.servico_id} onChange={handleFiltro}
+            style={{ padding: '0.5rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '0.5rem', fontSize: '0.875rem', width: '180px' }}>
+            <option value="">Todos os serviços</option>
+            {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
         </div>
         <button type="submit" style={{ background: '#2563eb', color: 'white', border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Filtrar</button>
-        <button type="button" onClick={() => { setFiltros({ nome: '', nif: '' }); carregar({}) }} style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Limpar</button>
+        <button type="button" onClick={() => { setFiltros({ nome: '', loja_id: '', servico_id: '' }); carregar({}) }} style={{ background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Limpar</button>
         <div style={{ flex: 1 }} />
         <button type="button" onClick={() => setModalAberto(true)} style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>+ Novo Prestador</button>
       </form>
@@ -227,7 +244,7 @@ export default function Prestadores() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                {['NIF', 'Nome', 'Natureza', 'Cidade', 'Email', 'Telefone'].map(h => (
+                {['NIF', 'Nome', 'Serviços', 'Email', 'Telefone'].map(h => (
                   <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
@@ -241,8 +258,7 @@ export default function Prestadores() {
                 >
                   <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontFamily: 'monospace', fontSize: '0.8rem' }}>{p.nif || '—'}</td>
                   <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: '#0f172a' }}>{p.nome}</td>
-                  <td style={{ padding: '0.875rem 1rem', color: '#64748b' }}>{p.natureza || '—'}</td>
-                  <td style={{ padding: '0.875rem 1rem', color: '#64748b' }}>{p.cidade || '—'}</td>
+                  <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>{p.servicos || '—'}</td>
                   <td style={{ padding: '0.875rem 1rem', color: '#2563eb' }}>{p.email || '—'}</td>
                   <td style={{ padding: '0.875rem 1rem', color: '#64748b' }}>{p.telefone || '—'}</td>
                 </tr>

@@ -762,16 +762,29 @@ app.post('/public/limpezas', async (c) => {
 
 app.get('/prestadores', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
-  const { nome, nif } = c.req.query()
+  const { nome, nif, loja_id, servico_id } = c.req.query()
 
   const rows = await sql`
-    SELECT id, nif, nome, natureza, estado, cidade, email, telefone, website
-    FROM prestadores
-    WHERE ativo = true
-      ${nome ? sql`AND nome ILIKE ${'%' + nome + '%'}` : sql``}
-      ${nif ? sql`AND nif = ${nif}` : sql``}
-    ORDER BY nome ASC
-    LIMIT 100
+    SELECT DISTINCT
+      p.id, p.nif, p.nome, p.email, p.telefone,
+      COALESCE(
+        (SELECT string_agg(s.nome, ', ' ORDER BY s.nome)
+         FROM prestador_servicos ps
+         JOIN servicos s ON s.id = ps.servico_id
+         WHERE ps.prestador_id = p.id),
+        '—'
+      ) AS servicos
+    FROM prestadores p
+    ${servico_id || loja_id ? sql`
+      JOIN prestador_servicos ps2 ON ps2.prestador_id = p.id
+    ` : sql``}
+    WHERE p.ativo = true
+      ${nome      ? sql`AND p.nome ILIKE ${'%' + nome + '%'}` : sql``}
+      ${nif       ? sql`AND p.nif = ${nif}`                   : sql``}
+      ${servico_id ? sql`AND ps2.servico_id = ${servico_id}`  : sql``}
+      ${loja_id   ? sql`AND ps2.loja_id = ${Number(loja_id)}` : sql``}
+    ORDER BY p.nome ASC
+    LIMIT 200
   `
   return c.json({ prestadores: rows })
 })
@@ -3585,6 +3598,18 @@ app.get('/servicos', requireAuth, async (c) => {
   return c.json({ servicos: rows })
 })
 
+app.post('/servicos', requireAuth, async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  const { nome, em_contrato, em_prestador } = await c.req.json()
+  if (!nome) return c.json({ error: 'nome é obrigatório' }, 400)
+  const rows = await sql`
+    INSERT INTO servicos (nome, em_contrato, em_prestador)
+    VALUES (${nome}, ${em_contrato || false}, ${em_prestador || false})
+    ON CONFLICT (nome) DO UPDATE SET em_prestador = EXCLUDED.em_prestador
+    RETURNING id
+  `
+  return c.json({ ok: true, id: rows[0].id })
+})
 
 // ── GET /contratos ────────────────────────────────────────────────────────────
 // Filtros: condominio_id, prestador_id, tipo, estado
