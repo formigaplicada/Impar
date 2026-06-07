@@ -244,8 +244,8 @@ export default function Prestadores() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                {['NIF', 'Nome', 'Serviços', 'Email', 'Telefone'].map(h => (
-                  <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                {['NIF', 'Nome', 'Serviços', 'Contacto'].map(h => (
+                <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -259,8 +259,10 @@ export default function Prestadores() {
                   <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontFamily: 'monospace', fontSize: '0.8rem' }}>{p.nif || '—'}</td>
                   <td style={{ padding: '0.875rem 1rem', fontWeight: 600, color: '#0f172a' }}>{p.nome}</td>
                   <td style={{ padding: '0.875rem 1rem', color: '#64748b', fontSize: '0.8rem' }}>{p.servicos || '—'}</td>
-                  <td style={{ padding: '0.875rem 1rem', color: '#2563eb' }}>{p.email || '—'}</td>
-                  <td style={{ padding: '0.875rem 1rem', color: '#64748b' }}>{p.telefone || '—'}</td>
+                  <td style={{ padding: '0.875rem 1rem' }}>{p.email && <div style={{ color: '#2563eb', fontSize: '0.82rem' }}>{p.email}</div>}
+                  {p.telefone && <div style={{ color: '#64748b', fontSize: '0.82rem' }}>{p.telefone}</div>}
+                  {!p.email && !p.telefone && <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
                 </tr>
               ))}
             </tbody>
