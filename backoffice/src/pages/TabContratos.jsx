@@ -64,7 +64,7 @@ function Badge({ label, color, bg }) {
 // ── PrestadorPorServico ───────────────────────────────────────────────────────
 // Fluxo: selecciona serviço → lista prestadores associados → escolhe ou associa novo
 
-function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl }) {
+function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl, lojaId }) {
   const [servicoSelId,   setServicoSelId]   = useState('')
   const [associados,     setAssociados]     = useState([])
   const [naoAssociados,  setNaoAssociados]  = useState([])
@@ -76,7 +76,7 @@ function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl }) {
   async function carregarPrestadores(servicoId) {
     if (!servicoId) { setAssociados([]); setNaoAssociados([]); return }
     setLoadingPrest(true)
-    const data = await api.get(`/prestadores/por-servico/${servicoId}`)
+    const data = await api.get(`/prestadores/por-servico/${servicoId}?loja_id=${lojaId || ''}`)
     setAssociados(data.associados || [])
     setNaoAssociados(data.nao_associados || [])
     setLoadingPrest(false)
@@ -324,6 +324,7 @@ function ModalContrato({ inicial, tipo, condominioId, prestadores, servicosCatal
             set={set}
             inp={inp}
             lbl={lbl}
+            lojaId={lojaId}
           />
         )}
 
@@ -589,7 +590,7 @@ function CardContrato({ contrato, onEditar }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export default function TabContratos({ condominioId }) {
+export default function TabContratos({ condominioId, lojaId }) {
   const [contratos,        setContratos]        = useState([])
   const [servicosCatalogo, setServicosCatalogo] = useState([])
   const [prestadores,      setPrestadores]      = useState([])
@@ -691,6 +692,7 @@ export default function TabContratos({ condominioId }) {
             servicos:             modal.contrato.servicos                 || [],
           } : null}
           condominioId={condominioId}
+          lojaId={lojaId}
           prestadores={prestadores}
           servicosCatalogo={servicosCatalogo}
           onGuardar={handleGuardar}

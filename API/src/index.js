@@ -2964,7 +2964,7 @@ async function enviarAlertasReunioes(env) {
       u.nome      AS utilizador_nome,
       u.telemovel AS utilizador_telemovel
     FROM eventos e
-    LEFT JOIN utilizadores u ON u.id = e.criado_por
+    LEFT JOIN utilizadores u ON u.id = COALESCE(e.gestor_id, e.criado_por)
     WHERE e.tipo = 'reuniao'
       AND e.data_hora >= (NOW() AT TIME ZONE 'Europe/Lisbon' + INTERVAL '1 day')::date
       AND e.data_hora <  (NOW() AT TIME ZONE 'Europe/Lisbon' + INTERVAL '2 days')::date
@@ -2985,7 +2985,12 @@ async function enviarAlertasReunioes(env) {
   let erros = 0
 
   for (const reuniao of reunioes) {
-    const numero = reuniao.utilizador_telemovel.replace(/^\+/, '').replace(/\s/g, '')
+          const numero = reuniao.utilizador_telemovel
+        .replace(/\s/g, '')           // remove espaços
+        .replace(/^\+/, '')           // remove + inicial
+        .replace(/^00/, '')           // remove 00 inicial
+        .replace(/^9/, '3519')        // número PT sem indicativo → adiciona 351
+        .replace(/^2/, '3512')        // fixo PT sem indicativo → adiciona 351
 
     // Formatar parâmetros do template
     const param1_evento  = [reuniao.tipo, reuniao.tipo_reuniao].filter(Boolean).join(' - ')
@@ -3020,10 +3025,10 @@ async function enviarAlertasReunioes(env) {
                 {
                   type: 'body',
                   parameters: [
-                    { type: 'text', text: param1_evento  },
-                    { type: 'text', text: param2_empresa },
-                    { type: 'text', text: param3_morada  },
-                    { type: 'text', text: param4_horas   },
+                    { type: 'text', parameter_name: 'evento',  text: param1_evento  },
+                    { type: 'text', parameter_name: 'empresa', text: param2_empresa },
+                    { type: 'text', parameter_name: 'morada',  text: param3_morada  },
+                    { type: 'text', parameter_name: 'horas',   text: param4_horas   },
                   ],
                 },
               ],
@@ -3920,7 +3925,8 @@ app.get('/prestadores/por-servico/:servico_id', requireAuth, async (c) => {
     JOIN prestadores p ON p.id = ps.prestador_id
     WHERE ps.servico_id = ${servico_id}
       AND p.ativo = true
-    ORDER BY prioridade ASC, ps.contador DESC, p.nome ASC
+      AND (ps.loja_id = ${loja_id ? Number(loja_id) : null} OR ps.loja_id IS NULL)
+      ORDER BY ps.contador DESC, p.nome ASC
   `
 
   // Prestadores ainda não associados a este serviço (para poder associar)
