@@ -194,7 +194,7 @@ const FORM_VAZIO = {
   condicoes: '',
 }
 
-function ModalContrato({ inicial, tipo, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
+function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
   const [form, setForm]     = useState(inicial || { ...FORM_VAZIO, tipo })
   const [servicos, setServicos] = useState(inicial?.servicos || [])
   const [customInput, setCustomInput] = useState('')
@@ -680,6 +680,7 @@ export default function TabContratos({ condominioId, lojaId }) {
       {modal && (
         <ModalContrato
           tipo={modal.tipo}
+          lojaId={lojaId} 
           inicial={modal.contrato ? {
             tipo:                 modal.contrato.tipo,
             prestador_id:         modal.contrato.prestador_id            || '',

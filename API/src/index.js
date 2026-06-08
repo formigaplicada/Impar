@@ -3914,35 +3914,32 @@ app.get('/prestadores/por-servico/:servico_id', requireAuth, async (c) => {
   const servico_id = c.req.param('servico_id')
   const { loja_id } = c.req.query()
 
-  // Prestadores já associados a este serviço
+  // 1 — Prestadores da loja para este serviço
   const associados = await sql`
-    SELECT
-      p.id, p.nome, p.telefone, p.email, p.cidade,
-      ps.contador,
-      ps.loja_id,
-      CASE WHEN ps.loja_id = ${loja_id ? Number(loja_id) : null} THEN 1 ELSE 2 END AS prioridade
+    SELECT p.id, p.nome, p.telefone, p.email, p.cidade, ps.contador
     FROM prestador_servicos ps
     JOIN prestadores p ON p.id = ps.prestador_id
     WHERE ps.servico_id = ${servico_id}
+      AND ps.loja_id = ${Number(loja_id)}
       AND p.ativo = true
-      AND (ps.loja_id = ${loja_id ? Number(loja_id) : null} OR ps.loja_id IS NULL)
-      ORDER BY ps.contador DESC, p.nome ASC
+    ORDER BY ps.contador DESC, p.nome ASC
   `
 
-  // Prestadores ainda não associados a este serviço (para poder associar)
+  // 2 — Prestadores não associados a este serviço+loja (para associar)
   const naoAssociados = await sql`
     SELECT p.id, p.nome, p.telefone, p.email, p.cidade
     FROM prestadores p
     WHERE p.ativo = true
       AND p.id NOT IN (
-        SELECT prestador_id FROM prestador_servicos WHERE servico_id = ${servico_id}
+        SELECT prestador_id FROM prestador_servicos
+        WHERE servico_id = ${servico_id}
+          AND loja_id = ${Number(loja_id)}
       )
     ORDER BY p.nome ASC
   `
 
   return c.json({ associados, nao_associados: naoAssociados })
 })
-
 
 // ── POST /prestador-servicos ──────────────────────────────────────────────────
 // Associar manualmente um prestador a um serviço (sem incrementar contador)
