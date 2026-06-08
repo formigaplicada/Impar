@@ -2839,6 +2839,7 @@ app.put('/eventos/:id', requireAuth, async (c) => {
       formato          = ${formato          || 'presencial'},
       local_evento     = ${local_evento     ?? null},
       gestor           = ${gestor          ?? null},
+      gestor_id        = ${gestor_id       ?? null},
       estado          = ${estado         || 'agendada'},
       comentarios      = ${comentarios      ?? null}
     WHERE id = ${id}
