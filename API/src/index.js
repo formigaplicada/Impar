@@ -2759,7 +2759,7 @@ app.post('/eventos', requireAuth, async (c) => {
     condominio_id, condominio_texto,
     localidade, loja_id, filial_texto,
     data_hora, formato, local_evento,
-    gestor,
+    gestor, gestor_id,
     estado, comentarios,
   } = body
 
@@ -2795,6 +2795,7 @@ app.post('/eventos', requireAuth, async (c) => {
       ${formato          || 'presencial'},
       ${local_evento     || null},
       ${gestor           || null},
+      ${gestor_id        || null},
       ${estado         || 'agendada'},
       ${comentarios      || null},
       ${user.id}
@@ -2821,7 +2822,7 @@ app.put('/eventos/:id', requireAuth, async (c) => {
     condominio_id, condominio_texto,
     localidade, loja_id, filial_texto,
     data_hora, formato, local_evento,
-    gestor,
+    gestor, gestor_id,
     estado, comentarios,
   } = body
 
@@ -2940,21 +2941,25 @@ app.post('/eventos/importar', requireAuth, async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Função principal — busca reuniões de amanhã e envia alertas
 // ─────────────────────────────────────────────────────────────────────────────
+// =============================================================================
+// CRON v2 — Alertas de Reuniões via WhatsApp (template evento_futuro)
+// =============================================================================
+// Substitui a função enviarAlertasReunioes no index.js
+// =============================================================================
+
 async function enviarAlertasReunioes(env) {
   const sql = neon(env.DATABASE_URL)
 
-  // Buscar reuniões de amanhã (em UTC, dia seguinte ao dia atual)
   const reunioes = await sql`
     SELECT
       e.id,
+      e.tipo,
+      e.tipo_reuniao,
       e.condominio_texto,
       e.localidade,
-      e.filial_texto,
+      e.local_evento,
       e.data_hora,
       e.formato,
-      e.local_evento,
-      e.gestor,
-      e.tipo_reuniao,
       u.nome      AS utilizador_nome,
       u.telemovel AS utilizador_telemovel
     FROM eventos e
@@ -2970,7 +2975,7 @@ async function enviarAlertasReunioes(env) {
 
   if (reunioes.length === 0) {
     console.log('Cron reuniões: nenhuma reunião encontrada para amanhã')
-    return { enviados: 0, erros: 0 }
+    return { enviados: 0, erros: 0, total: 0 }
   }
 
   console.log(`Cron reuniões: ${reunioes.length} reunião(ões) encontrada(s) para amanhã`)
@@ -2981,8 +2986,20 @@ async function enviarAlertasReunioes(env) {
   for (const reuniao of reunioes) {
     const numero = reuniao.utilizador_telemovel.replace(/^\+/, '').replace(/\s/g, '')
 
+    // Formatar parâmetros do template
+    const param1_evento  = [reuniao.tipo, reuniao.tipo_reuniao].filter(Boolean).join(' - ')
+    const param2_empresa = 'Ímpar'
+    const param3_morada  = [reuniao.local_evento, reuniao.localidade].filter(Boolean).join(', ')
+    const dataHora       = new Date(reuniao.data_hora)
+    const param4_horas   = dataHora.toLocaleString('pt-PT', {
+      day:      '2-digit',
+      month:    'long',
+      hour:     '2-digit',
+      minute:   '2-digit',
+      timeZone: 'Europe/Lisbon',
+    }).replace(',', ' às')
+
     try {
-      // Enviar template via WhatsApp Cloud API
       const res = await fetch(
         `https://graph.facebook.com/v25.0/${env.WHATSAPP_PHONE_ID}/messages`,
         {
@@ -2996,8 +3013,19 @@ async function enviarAlertasReunioes(env) {
             to:                numero,
             type:              'template',
             template: {
-              name:     '3p_direct_integration_test_template',
-              language: { code: 'en_US' },
+              name:     'evento_futuro',
+              language: { code: 'pt_PT' },
+              components: [
+                {
+                  type: 'body',
+                  parameters: [
+                    { type: 'text', text: param1_evento  },
+                    { type: 'text', text: param2_empresa },
+                    { type: 'text', text: param3_morada  },
+                    { type: 'text', text: param4_horas   },
+                  ],
+                },
+              ],
             },
           }),
         }
@@ -3011,7 +3039,6 @@ async function enviarAlertasReunioes(env) {
 
       const canal_msg_id = data?.messages?.[0]?.id || null
 
-      // Registar na tabela comunicacoes
       await sql`
         INSERT INTO comunicacoes (
           canal, direcao, tipo,
@@ -3021,13 +3048,13 @@ async function enviarAlertasReunioes(env) {
         ) VALUES (
           'whatsapp', 'outbound', 'texto',
           ${env.WHATSAPP_PHONE_ID}, ${numero},
-          ${'Alerta reunião: ' + (reuniao.condominio_texto || reuniao.localidade || '') + ' às ' + new Date(reuniao.data_hora).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Lisbon' })},
+          ${`Alerta reunião: ${param1_evento} em ${param3_morada} — ${param4_horas}`},
           'enviada', ${canal_msg_id},
           'ocorrencia', ${reuniao.id}
         )
       `
 
-      console.log(`Alerta enviado para ${reuniao.utilizador_nome} (${numero}) — reunião ${reuniao.id}`)
+      console.log(`Alerta enviado para ${reuniao.utilizador_nome} (${numero}) — ${param1_evento}`)
       enviados++
 
     } catch (err) {
@@ -3038,7 +3065,6 @@ async function enviarAlertasReunioes(env) {
 
   return { enviados, erros, total: reunioes.length }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /whatsapp/cron/reunioes — endpoint manual para teste

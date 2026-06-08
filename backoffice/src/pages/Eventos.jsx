@@ -104,6 +104,7 @@ const FORM_VAZIO = {
   formato: 'presencial',
   local_evento: '',
   gestor: '',
+  gestor_id: '',
   estado: 'agendada',
   comentarios: '',
 }
@@ -194,15 +195,24 @@ function FormEvento({ inicial, lojas, utilizadores, onGuardar, onCancelar, loadi
         </div>
         <div>
           <label style={lbl}>Gestor</label>
-          <select
-            style={inp}
-            value={form.gestor}
-            onChange={e => set('gestor', e.target.value === '__outro__' ? '' : e.target.value)}
-          >
-            <option value="">— Seleccionar —</option>
-            {utilizadores.map(u => <option key={u.id} value={u.nome}>{u.nome}</option>)}
-            <option value="__outro__">Outro (texto livre)</option>
-          </select>
+            <select
+              style={inp}
+              value={form.gestor_id || form.gestor}
+              onChange={e => {
+                const u = utilizadores.find(u => u.id === e.target.value)
+                if (u) {
+                  set('gestor',    u.nome)
+                  set('gestor_id', u.id)
+                } else {
+                  set('gestor',    '')
+                  set('gestor_id', '')
+                }
+              }}
+            >
+              <option value="">— Seleccionar —</option>
+              {utilizadores.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+              <option value="__outro__">Outro (texto livre)</option>
+            </select>
           {!form.gestor && (
             <input
               style={{ ...inp, marginTop: '0.5rem' }}
@@ -564,6 +574,7 @@ export default function Eventos() {
               formato:            eventoEditar.formato          || 'presencial',
               local_evento:       eventoEditar.local_evento     || '',
               gestor:             eventoEditar.gestor           || '',
+              gestor_id:          eventoEditar.gestor_id        || '',
               estado:             eventoEditar.estado           || 'agendada',
               comentarios:        eventoEditar.comentarios      || '',
             }}
