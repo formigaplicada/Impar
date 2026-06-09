@@ -1,13 +1,6 @@
 [[redirects]]
-  from = "/"
-  to = "https://my.condexpress.com/:splat"
-  status = 302
-  force = true
-  [redirects.query]
-    condominio = ":condominio"
-
-[[redirects]]
   from = "/*"
-  to = "https://my.condexpress.com/:splat"
+  to = "https://my.condexpress.com/"
   status = 302
   force = true
+  query = {condominio = ":condominio"}
