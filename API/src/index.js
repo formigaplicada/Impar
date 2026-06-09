@@ -4176,13 +4176,12 @@ app.get('/public/validar-pin', async (c) => {
 app.post('/public/limpezas', async (c) => {
   let d
   try {
-    // Suporta JSON e form-data (GAS envia form-data)
     const ct = c.req.header('Content-Type') || ''
-    if (ct.includes('application/json')) {
-      d = await c.req.json()
-    } else {
+    if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
       const form = await c.req.formData()
       d = Object.fromEntries(form.entries())
+    } else {
+      d = await c.req.json()
     }
   } catch {
     return c.json({ error: 'Body inválido' }, 400)
@@ -4260,13 +4259,13 @@ app.post('/public/limpezas', async (c) => {
 app.post('/public/ocorrencias', async (c) => {
   let d
   try {
-    const ct = c.req.header('Content-Type') || ''
-    if (ct.includes('application/json')) {
-      d = await c.req.json()
-    } else {
-      const form = await c.req.formData()
-      d = Object.fromEntries(form.entries())
-    }
+        const ct = c.req.header('Content-Type') || ''
+      if (ct.includes('application/x-www-form-urlencoded') || ct.includes('multipart/form-data')) {
+        const form = await c.req.formData()
+        d = Object.fromEntries(form.entries())
+      } else {
+        d = await c.req.json()
+      }
   } catch {
     return c.json({ error: 'Body inválido' }, 400)
   }
