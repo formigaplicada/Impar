@@ -343,24 +343,27 @@
     }
 
     async function handleSubmitLimpeza() {
-      state.loading = true; render();
-      const timestamp = new Date().toLocaleString('pt-PT');
-
-      const formData = new FormData();
-      formData.append('condominio', state.condominioId);
-      formData.append('latitude', state.location.latitude);
-      formData.append('longitude', state.location.longitude);
-      formData.append('accuracy', state.location.accuracy);
-      formData.append('timestamp', timestamp);
-      formData.append('photoBase64', state.photoBase64);
-
-      // GAS (existente)
-      fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
-
-      state.successMsg = 'Limpeza registada com sucesso!';
-      state.step = 'success';
-      render();
-    }
+  state.loading = true; render()
+  const timestamp = new Date().toLocaleString('pt-PT')
+ 
+  await fetch(WORKER_URL + '/public/limpezas', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      condominio:  state.condominioId,
+      latitude:    state.location.latitude,
+      longitude:   state.location.longitude,
+      accuracy:    state.location.accuracy,
+      temFoto:     state.photoBase64 ? 'true' : 'false',
+      photoBase64: state.photoBase64 || '',
+      timestamp
+    })
+  })
+ 
+  state.successMsg = 'Limpeza registada com sucesso!'
+  state.step = 'success'
+  render()
+}
 
     init();
   </script>

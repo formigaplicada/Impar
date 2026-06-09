@@ -213,26 +213,27 @@
       return data.descricao || '';
     }
 
-    async function carregarCategorias() {
-      try {
-        const res = await fetch(WEBHOOK_URL + '?action=getCategorias');
-        const data = await res.json();
-        return data.categorias || [];
-      } catch(e) {
-        return [
-          { emoji: '🔧', nome: 'Avaria / Equipamento' },
-          { emoji: '💧', nome: 'Infiltração / Humidade' },
-          { emoji: '🗑️', nome: 'Limpeza / Resíduos' },
-          { emoji: '🚪', nome: 'Acesso / Portões / Fechaduras' },
-          { emoji: '💡', nome: 'Iluminação' },
-          { emoji: '🌿', nome: 'Espaços Verdes' },
-          { emoji: '🚗', nome: 'Estacionamento' },
-          { emoji: '🔊', nome: 'Ruído / Perturbação' },
-          { emoji: '🏗️', nome: 'Danos Estruturais' },
-          { emoji: '📦', nome: 'Outras' }
-        ];
-      }
-    }
+async function carregarCategorias() {
+  try {
+    const res = await fetch(WORKER_URL + '/public/categorias')
+    const data = await res.json()
+    return data.categorias || []
+  } catch(e) {
+    // Fallback local se o Worker falhar
+    return [
+      { emoji: '🔧', nome: 'Avaria / Equipamento' },
+      { emoji: '💧', nome: 'Infiltração / Humidade' },
+      { emoji: '🗑️', nome: 'Limpeza / Resíduos' },
+      { emoji: '🚪', nome: 'Acesso / Portões / Fechaduras' },
+      { emoji: '💡', nome: 'Iluminação' },
+      { emoji: '🌿', nome: 'Espaços Verdes' },
+      { emoji: '🚗', nome: 'Estacionamento' },
+      { emoji: '🔊', nome: 'Ruído / Perturbação' },
+      { emoji: '🏗️', nome: 'Danos Estruturais' },
+      { emoji: '📦', nome: 'Outras' }
+    ]
+  }
+}
 
     async function sugerirCategoria(descricao, categorias) {
       if (!descricao || categorias.length === 0) return '';
@@ -537,32 +538,32 @@
     function handleBackTo(step) { state.step = step; render(); }
 
     async function handleSubmit() {
-      state.loading = true; render();
-      const timestamp = new Date().toLocaleString('pt-PT');
-      const categoriaFinal = state.categoriaOutra || state.categoriaSelected;
-
-      const formData = new FormData();
-      formData.append('sheet', 'Ocorrencias');
-      formData.append('ocId', state.ocId);
-      formData.append('condominio', state.condominioId);
-      formData.append('timestamp', timestamp);
-      formData.append('latitude', state.location.latitude);
-      formData.append('longitude', state.location.longitude);
-      formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
-      formData.append('photoBase64', state.photoBase64 || '');
-      formData.append('categoria', categoriaFinal);
-      formData.append('descricaoAI', state.descricaoAI);
-      formData.append('descricaoFinal', state.descricaoFinal);
-      formData.append('nome', state.nome);
-      formData.append('telefone', state.telefone);
-      formData.append('email', state.email);
-
-      // GAS (existente)
-      fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
-
-      state.step = 'success'; render();
-    }
-
+  state.loading = true; render()
+  const timestamp = new Date().toLocaleString('pt-PT')
+  const categoriaFinal = state.categoriaOutra || state.categoriaSelected
+ 
+  await fetch(WORKER_URL + '/public/ocorrencias', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ocId:           state.ocId,
+      condominio:     state.condominioId,
+      timestamp,
+      latitude:       state.location.latitude,
+      longitude:      state.location.longitude,
+      temFoto:        state.photoBase64 ? 'true' : 'false',
+      photoBase64:    state.photoBase64 || '',
+      categoria:      categoriaFinal,
+      descricaoAI:    state.descricaoAI,
+      descricaoFinal: state.descricaoFinal,
+      nome:           state.nome,
+      telefone:       state.telefone,
+      email:          state.email
+    })
+  })
+ 
+  state.step = 'success'; render()
+}
     init();
   </script>
 </body>
