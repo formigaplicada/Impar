@@ -141,30 +141,33 @@
     }
 
     async function init() {
-      const params = new URLSearchParams(window.location.search);
-      const cond   = params.get('condominio') || sessionStorage.getItem('condominioId');
-      if (!cond) {
-        state.step = 'error'; state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.'; render(); return;
-      }
+  const params = new URLSearchParams(window.location.search);
+  const cond   = params.get('condominio') || sessionStorage.getItem('condominioId');
+  if (!cond) {
+    state.step = 'error'; state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.'; render(); return;
+  }
 
-      state.condominioId = cond;
-      sessionStorage.setItem('condominioId', cond);
+  const info = await loadCondominioInfo(cond);
+  if (!info || !info.nipc) {
+    state.step = 'error'; state.errorMsg = 'Condomínio não encontrado. Verifica o QR Code.'; render(); return;
+  }
 
-      const info = await loadCondominioInfo(cond);
-      state.condominioNome = info.nome || cond;
-      state.condominioNipc = info.nipc || '';
-      mostrarBanner(info);
+  state.condominioId = info.nipc;
+  state.condominioNome = info.nome || cond;
+  state.condominioNipc = info.nipc;
+  sessionStorage.setItem('condominioId', info.nipc);
+  mostrarBanner(info);
 
-      const perfilAtual = sessionStorage.getItem('perfil');
-const imparPinOk  = sessionStorage.getItem('imparPinOk');
-if (perfilAtual === 'impar' && imparPinOk === cond) {
-  state.step = 'location';
-} else {
-  const pinOk = sessionStorage.getItem('limpezaPinOk');
-  state.step = (pinOk === cond) ? 'location' : 'pin';
+  const perfilAtual = sessionStorage.getItem('perfil');
+  const imparPinOk  = sessionStorage.getItem('imparPinOk');
+  if (perfilAtual === 'impar' && imparPinOk === info.nipc) {
+    state.step = 'location';
+  } else {
+    const pinOk = sessionStorage.getItem('limpezaPinOk');
+    state.step = (pinOk === info.nipc) ? 'location' : 'pin';
+  }
+  render();
 }
-      render();
-    }
 
     function backToIndex() { window.location.href = 'index.html?condominio=' + encodeURIComponent(state.condominioId); }
 

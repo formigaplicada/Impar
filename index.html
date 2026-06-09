@@ -266,47 +266,51 @@
 
     function resetPerfil() { sessionStorage.removeItem('perfil'); renderProfileSelect(); }
 
-    // ── INIT ──────────────────────────────────────────────────
     async function init() {
-      if (condominioIdFromUrl) {
-        setCondominioId(condominioIdFromUrl);
-        sessionStorage.removeItem('perfil');
-        sessionStorage.removeItem('imparPinOk');
-        sessionStorage.removeItem('imparUser');
-        sessionStorage.removeItem('limpezaPinOk');
-        sessionStorage.removeItem('condomino_PinOk');
-        sessionStorage.removeItem('condominioInfo');
-      }
+  if (condominioIdFromUrl) {
+    setCondominioId(condominioIdFromUrl);
+    sessionStorage.removeItem('perfil');
+    sessionStorage.removeItem('imparPinOk');
+    sessionStorage.removeItem('imparUser');
+    sessionStorage.removeItem('limpezaPinOk');
+    sessionStorage.removeItem('condomino_PinOk');
+    sessionStorage.removeItem('condominioInfo');
+  }
 
-      const condId = condominioIdFromUrl || getCondominioId();
+  const condId = condominioIdFromUrl || getCondominioId();
 
-      if (!condId) {
-        document.getElementById('app').innerHTML = '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';
-        return;
-      }
+  if (!condId) {
+    document.getElementById('app').innerHTML = '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';
+    return;
+  }
 
-      // Carregar e mostrar banner
-      const info = await loadCondominioInfo(condId);
-      mostrarBanner(info);
+  // Carregar info e normalizar para NIPC
+  const info = await loadCondominioInfo(condId);
+  if (!info || !info.nipc) {
+    document.getElementById('app').innerHTML = '<div class="error-box"><strong>Condomínio não encontrado</strong>Verifica o QR Code e tenta novamente.</div>';
+    return;
+  }
+  const nipc = info.nipc;
+  setCondominioId(nipc);
+  mostrarBanner(info);
 
-      if (appParam) {
-        if (appParam === 'limpeza')    { window.location.href = 'limpeza.html?condominio='    + encodeURIComponent(condId); return; }
-        if (appParam === 'ocorrencia') { window.location.href = 'ocorrencia.html?condominio=' + encodeURIComponent(condId); return; }
-        if (appParam === 'manutencao') { window.location.href = 'https://impar.pt'; return; }
-      }
+  if (appParam) {
+    if (appParam === 'limpeza')    { window.location.href = 'limpeza.html?condominio='    + encodeURIComponent(nipc); return; }
+    if (appParam === 'ocorrencia') { window.location.href = 'ocorrencia.html?condominio=' + encodeURIComponent(nipc); return; }
+    if (appParam === 'manutencao') { window.location.href = 'https://impar.pt'; return; }
+  }
 
-      const perfil = getPerfil();
-      if (!perfil) { renderProfileSelect(); return; }
+  const perfil = getPerfil();
+  if (!perfil) { renderProfileSelect(); return; }
 
-      if (perfil === 'impar') {
-        sessionStorage.getItem('imparPinOk') === condId ? renderMenu(condId, 'impar') : renderPin(condId, 'impar');
-      } else if (perfil === 'limpeza') {
-        sessionStorage.getItem('limpezaPinOk') === condId ? renderMenu(condId, 'limpeza') : renderPin(condId, 'limpeza');
-      } else {
-        sessionStorage.getItem('condomino_PinOk') === condId ? renderMenu(condId, 'condomino') : renderPin(condId, 'condomino');
-      }
-    }
-
+  if (perfil === 'impar') {
+    sessionStorage.getItem('imparPinOk') === nipc ? renderMenu(nipc, 'impar') : renderPin(nipc, 'impar');
+  } else if (perfil === 'limpeza') {
+    sessionStorage.getItem('limpezaPinOk') === nipc ? renderMenu(nipc, 'limpeza') : renderPin(nipc, 'limpeza');
+  } else {
+    sessionStorage.getItem('condomino_PinOk') === nipc ? renderMenu(nipc, 'condomino') : renderPin(nipc, 'condomino');
+  }
+}
     init();
   </script>
 </body>
