@@ -60,14 +60,6 @@
     .btn-profile.impar { border-color: var(--header-bg); color: var(--header-bg); }
     .btn-profile.impar:hover { background: #f1f5f9; }
 
-    /* Nome do condomínio no ecrã de perfil */
-    .condo-name-banner {
-      width: 100%; background: white; border: 1px solid var(--slate-200);
-      border-radius: 10px; padding: 0.875rem 1rem; text-align: center;
-    }
-    .condo-name-banner .label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate-400); margin-bottom: 0.25rem; }
-    .condo-name-banner .nome { font-family: 'DM Serif Display', serif; font-size: 1rem; color: var(--slate-800); line-height: 1.3; }
-
     /* Ecrã de inserção de ID (Ímpar sem QR) */
     .id-screen { display: flex; flex-direction: column; gap: 1.5rem; }
     .id-screen h2 { font-size: 1.1rem; font-weight: 600; color: var(--slate-800); text-align: center; }
@@ -161,7 +153,7 @@
          class="logo-img" id="logo" alt="Ímpar"
          onerror="document.getElementById('logo').style.display='none'; document.getElementById('logoFallback').style.display='block'"/>
     <span class="logo-fallback" id="logoFallback">ÍMPAR</span>
-    <span class="version">v3.4</span>
+    <span class="version">v3.3</span>
   </header>
   <main>
     <div class="wrapper" id="app"></div>
@@ -169,36 +161,27 @@
   <footer>App do Condomínio © 2026 · Ímpar</footer>
 
   <script>
-    const WORKER_URL = 'https://impar-api.formigaplicada.workers.dev';
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzJIsPnMLyUDal_Kn9FQyL9WDMhLSEQ5o-njJ-b5yjkzi2n_VxczPbRd4JwDzcyLBA0/exec';
 
     const params = new URLSearchParams(window.location.search);
     const condominioIdFromUrl = params.get('condominio');
     const appParam = params.get('app');
 
-    function getPerfil()         { return sessionStorage.getItem('perfil'); }
-    function setPerfil(p)        { sessionStorage.setItem('perfil', p); }
-    function getCondominioId()   { return sessionStorage.getItem('condominioId'); }
+    function getPerfil()       { return sessionStorage.getItem('perfil'); }
+    function setPerfil(p)      { sessionStorage.setItem('perfil', p); }
+    function getCondominioId() { return sessionStorage.getItem('condominioId'); }
     function setCondominioId(id) { sessionStorage.setItem('condominioId', id); }
 
-    // ── PINs — suporta n_impar (legado) e NIPC (novo) ────────
+    // PIN Condómino: '9' + ID invertido
     function generateCondominoPin(condominioId) {
-      const id = String(condominioId).trim()
-      if (id.length === 9 && /^\d+$/.test(id)) {
-        return id.slice(-5) // NIPC: 5 últimos dígitos
-      }
-      return '9' + id.split('').reverse().join('') // legado: '9' + ID invertido
+      return '9' + String(condominioId).split('').reverse().join('');
     }
 
+    // PIN Limpeza: ID + '3'
     function generateLimpezaPin(condominioId) {
-      const id = String(condominioId).trim()
-      if (id.length === 9 && /^\d+$/.test(id)) {
-        return id.slice(0, 5) // NIPC: 5 primeiros dígitos
-      }
-      return id + '3' // legado: ID + '3'
+      return String(condominioId) + '3';
     }
 
-    // ── Nome do condomínio ────────────────────────────────────
     function splitCondominioName(name) {
       const marker = 'Condomínio Sito na';
       const idx = name.indexOf(marker);
@@ -212,18 +195,10 @@
 
     async function loadCondominioName(condominioId) {
       try {
-        const res = await fetch(WORKER_URL + '/condominio/info?id=' + encodeURIComponent(condominioId));
-        if (!res.ok) throw new Error();
+        const res = await fetch(WEBHOOK_URL + '?action=getNome&condominio=' + encodeURIComponent(condominioId));
         const data = await res.json();
         return data.nome || condominioId;
-      } catch(e) {
-        // Fallback para GAS (legado)
-        try {
-          const res = await fetch(WEBHOOK_URL + '?action=getNome&condominio=' + encodeURIComponent(condominioId));
-          const data = await res.json();
-          return data.nome || condominioId;
-        } catch(e2) { return condominioId; }
-      }
+      } catch(e) { return condominioId; }
     }
 
     async function validarPinImpar(pin) {
@@ -232,20 +207,9 @@
     }
 
     // ── RENDER PROFILE SELECT ─────────────────────────────────
-    async function renderProfileSelect() {
-      const condId = getCondominioId();
-      let bannerHTML = '';
-      if (condId) {
-        const nome = await loadCondominioName(condId);
-        bannerHTML =
-          '<div class="condo-name-banner">' +
-          '<p class="label">Condomínio</p>' +
-          '<p class="nome">' + nome + '</p>' +
-          '</div>';
-      }
+    function renderProfileSelect() {
       document.getElementById('app').innerHTML =
         '<div class="profile-screen">' +
-          bannerHTML +
           '<div class="profile-title"><p>Bem-vindo</p><h1>Quem é você?</h1></div>' +
           '<div class="profile-buttons">' +
             '<button class="btn-profile condomino" onclick="chooseProfile(\'condomino\')">🏠 &nbsp;Condómino</button>' +
@@ -271,6 +235,7 @@
         expectedPin = generateLimpezaPin(condominioId);
         pinLength = expectedPin.length;
       }
+      // Ímpar: sempre 4 dígitos (PIN pessoal da sheet Pins)
 
       document.getElementById('app').innerHTML =
         '<div class="pin-screen">' +
@@ -295,6 +260,7 @@
           if (val.length !== pinLength) return;
 
           if (isImpar) {
+            // Validação remota via GAS
             input.disabled = true;
             document.getElementById('pinError').innerHTML =
               '<span style="display:flex;align-items:center;justify-content:center;gap:0.4rem;color:var(--slate-400)"><span class="spinner"></span> A validar...</span>';
@@ -319,6 +285,7 @@
               }, 1500);
             }
           } else {
+            // Validação local (Condómino / Limpeza)
             if (val === expectedPin) {
               sessionStorage.setItem(sessionKey, condominioId);
               renderMenu(condominioId, perfil);
@@ -383,6 +350,7 @@
           '<div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>' +
           '<div class="card-text"><p class="card-title">Manutenção</p><p class="card-sub">Solicitar intervenção técnica</p></div>' + svgArrow + '</a>';
 
+      // Ímpar vê tudo; Limpeza só vê Limpeza; Condómino só vê Ocorrência
       const cardsHTML = perfil === 'impar'    ? cardLimpeza + cardOcorrencia + cardManutencao
                       : perfil === 'limpeza'  ? cardLimpeza
                       : cardOcorrencia;
@@ -413,6 +381,7 @@
         return;
       }
 
+      // Condómino e Limpeza precisam de condomínio no URL/sessão
       if (!condId) {
         document.getElementById('app').innerHTML =
           '<div class="error-box"><strong>Condomínio não identificado</strong>Verifica o QR Code e tenta novamente.</div>';

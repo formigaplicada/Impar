@@ -4085,6 +4085,55 @@ app.post('/analyze-image', async (c) => {
   return c.json({ descricao })
 })
 
+// ── GET /condominio/info ──────────────────────────────────────
+// Recebe ?id=XXXXX (n_impar ou NIPC de 9 dígitos)
+// Devolve { nome, nipc, n_impar } — sem autenticação, usado pelo frontend público
+
+app.get('/condominio/info', async (c) => {
+  const id = c.req.query('id')
+  if (!id) return c.json({ error: 'ID em falta' }, 400)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const idStr = String(id).trim()
+  const idInt = parseInt(idStr, 10)
+  let rows = []
+
+  if (idStr.length === 9 && !isNaN(idInt)) {
+    // NIPC — 9 dígitos
+    rows = await sql`
+      SELECT nome, nipc, n_impar FROM condominios
+      WHERE nipc = ${idStr} AND ativo = true
+      LIMIT 1
+    `
+  }
+
+  if (rows.length === 0 && !isNaN(idInt)) {
+    // n_impar (integer)
+    rows = await sql`
+      SELECT nome, nipc, n_impar FROM condominios
+      WHERE n_impar = ${idInt} AND ativo = true
+      LIMIT 1
+    `
+  }
+
+  if (rows.length === 0) {
+    // old_n_impar (text)
+    rows = await sql`
+      SELECT nome, nipc, n_impar FROM condominios
+      WHERE old_n_impar = ${idStr} AND ativo = true
+      LIMIT 1
+    `
+  }
+
+  if (rows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+
+  return c.json({
+    nome:    rows[0].nome,
+    nipc:    rows[0].nipc,
+    n_impar: rows[0].n_impar
+  })
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CRON HANDLER — substitui o export default existente no index.js
 //

@@ -34,7 +34,6 @@
     .logo-img { height: 36px; width: auto; mix-blend-mode: screen; }
     .logo-fallback { font-size: 1.125rem; font-weight: 700; color: white; display: none; }
     .version-badge { background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; }
-    .condo-name-header { font-size: 0.8rem; color: rgba(255,255,255,0.85); font-weight: 500; max-width: 180px; text-align: right; line-height: 1.3; }
     main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
     .card-wrapper { width: 100%; max-width: 28rem; }
     .card {
@@ -87,12 +86,15 @@
     .spinner { width: 18px; height: 18px; border: 2px solid var(--slate-200); border-top-color: var(--blue-600); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading-row { display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.875rem; color: var(--slate-500); padding: 0.75rem 0; }
+
+    /* Categorias */
     .categorias-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
     .categoria-btn {
       background: var(--slate-50); border: 2px solid var(--slate-200);
       border-radius: 0.75rem; padding: 0.75rem 0.5rem;
       display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
-      cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; width: 100%;
+      cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+      width: 100%;
     }
     .categoria-btn:hover { border-color: var(--amber); background: var(--amber-100); }
     .categoria-btn.selected { border-color: var(--amber); background: var(--amber-100); }
@@ -102,6 +104,8 @@
     .categoria-nome { font-size: 0.72rem; font-weight: 500; color: var(--slate-700); text-align: center; line-height: 1.2; }
     .ai-sugestao-label { font-size: 0.65rem; color: var(--purple-600); font-weight: 600; }
     .categoria-outra { grid-column: 1 / -1; }
+
+    /* Confirmação */
     .confirm-box { background: var(--slate-50); border-radius: 0.75rem; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
     .confirm-id { text-align: center; background: var(--amber-100); border-radius: 0.5rem; padding: 0.75rem; }
     .confirm-id-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--amber-700); }
@@ -110,6 +114,7 @@
     .confirm-label { color: var(--slate-600); flex-shrink: 0; }
     .confirm-value { font-weight: 600; color: var(--slate-900); text-align: right; word-break: break-word; }
     .confirm-descricao { background: white; border: 1px solid var(--slate-200); border-radius: 0.5rem; padding: 0.75rem; font-size: 0.875rem; color: var(--slate-700); text-align: center; line-height: 1.5; }
+
     footer { background: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
   </style>
 </head>
@@ -121,9 +126,8 @@
            onerror="document.getElementById('logo').style.display='none'; document.getElementById('logoFallback').style.display='block'"/>
       <span class="logo-fallback" id="logoFallback">ÍMPAR</span>
       <div style="display:flex; align-items:center; gap:0.75rem;">
-        <span class="condo-name-header" id="condoNameHeader"></span>
         <span style="font-size:0.875rem; color:rgba(255,255,255,0.8);">Reportar Ocorrência</span>
-        <span class="version-badge">v2.1</span>
+        <span class="version-badge">v2.0</span>
       </div>
     </header>
     <main>
@@ -140,29 +144,47 @@
   </div>
 
   <script>
-    const WORKER_URL = 'https://impar-api.formigaplicada.workers.dev';
     const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzJIsPnMLyUDal_Kn9FQyL9WDMhLSEQ5o-njJ-b5yjkzi2n_VxczPbRd4JwDzcyLBA0/exec';
     const MAX_PHOTO_SIZE = 1024 * 1024;
 
     let state = {
-      step: 'init', condominioId: '', condominioNome: '',
-      location: null, photoBase64: null, photoSize: 0,
-      categorias: [], categoriaAI: '', categoriaSelected: '', categoriaOutra: '',
-      descricaoAI: '', descricaoFinal: '',
-      nome: '', telefone: '', email: '', ocId: '',
-      loading: false, errorMsg: '', errors: {}
+      step: 'init',
+      condominioId: '',
+      location: null,
+      photoBase64: null,
+      photoSize: 0,
+      categorias: [],
+      categoriaAI: '',
+      categoriaSelected: '',
+      categoriaOutra: '',
+      descricaoAI: '',
+      descricaoFinal: '',
+      nome: '',
+      telefone: '',
+      email: '',
+      ocId: '',
+      loading: false,
+      errorMsg: '',
+      errors: {}
     };
 
     function cleanAIText(text) {
-      return text.replace(/#{1,6}\s*/g, '').replace(/\*\*/g, '').replace(/\*/g, '')
-        .replace(/\r\n/g, ' ').replace(/\n/g, ' ').trim();
+      return text
+        .replace(/#{1,6}\s*/g, '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/\r\n/g, ' ')
+        .replace(/\n/g, ' ')
+        .trim();
     }
 
     function gerarIdLocal(condominioId) {
       var now = new Date();
-      var data = now.getFullYear().toString() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+      var data = now.getFullYear().toString() +
+        String(now.getMonth()+1).padStart(2,'0') +
+        String(now.getDate()).padStart(2,'0');
       var rand = Math.floor(Math.random() * 9000) + 1000;
-      return 'OC-' + condominioId + '-' + data + '-' + rand;
+      return "OC-" + condominioId + "-" + data + "-" + rand;
     }
 
     function compressImage(base64Image, callback) {
@@ -180,31 +202,16 @@
         let quality = 0.8;
         let compressed = canvas.toDataURL('image/jpeg', quality);
         while (compressed.length > MAX_PHOTO_SIZE && quality > 0.1) {
-          quality -= 0.1; compressed = canvas.toDataURL('image/jpeg', quality);
+          quality -= 0.1;
+          compressed = canvas.toDataURL('image/jpeg', quality);
         }
         callback(compressed, compressed.length);
       };
       img.src = base64Image;
     }
 
-    async function loadCondominioName(condominioId) {
-      try {
-        const res = await fetch(WORKER_URL + '/condominio/info?id=' + encodeURIComponent(condominioId));
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        return data.nome || condominioId;
-      } catch(e) {
-        try {
-          const res = await fetch(WEBHOOK_URL + '?action=getNome&condominio=' + encodeURIComponent(condominioId));
-          const data = await res.json();
-          return data.nome || condominioId;
-        } catch(e2) { return condominioId; }
-      }
-    }
-
-    // ── Analyze image via Worker ──────────────────────────────
     async function analyzeImage(base64) {
-      const res = await fetch(WORKER_URL + '/analyze-image', {
+      const res = await fetch('/.netlify/functions/analyze-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageBase64: base64 })
@@ -238,7 +245,7 @@
       if (!descricao || categorias.length === 0) return '';
       try {
         const nomes = categorias.map(function(c) { return c.nome; }).join(', ');
-        const res = await fetch(WORKER_URL + '/analyze-image', {
+        const res = await fetch('/.netlify/functions/analyze-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -247,29 +254,26 @@
         });
         const data = await res.json();
         const sugestao = cleanAIText(data.descricao || '');
-        const match = categorias.find(function(c) { return sugestao.toLowerCase().includes(c.nome.toLowerCase()); });
+        const match = categorias.find(function(c) {
+          return sugestao.toLowerCase().includes(c.nome.toLowerCase());
+        });
         return match ? match.nome : '';
-      } catch(e) { return ''; }
+      } catch(e) {
+        return '';
+      }
     }
 
     async function init() {
       const params = new URLSearchParams(window.location.search);
       const cond = params.get('condominio') || localStorage.getItem('condominioId');
-      if (!cond) {
+      if (cond) {
+        state.condominioId = cond;
+        localStorage.setItem('condominioId', cond);
+        state.step = 'location';
+      } else {
         state.step = 'error';
         state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
-        render();
-        return;
       }
-      state.condominioId = cond;
-      localStorage.setItem('condominioId', cond);
-
-      // Carregar nome
-      state.condominioNome = await loadCondominioName(cond);
-      const header = document.getElementById('condoNameHeader');
-      if (header) header.textContent = state.condominioNome;
-
-      state.step = 'location';
       render();
     }
 
@@ -285,7 +289,6 @@
           '<div class="card">' +
             '<div class="card-header"><div class="card-icon amber">📍</div>' +
             '<h1 class="card-title">Localização</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p>' +
             '<p class="card-subtitle">Precisamos da tua localização para registar a ocorrência</p></div>' +
             '<button onclick="handleLocationRequest()" class="btn-amber"' + (state.loading ? ' disabled' : '') + '>' +
             (state.loading ? '<span style="display:flex;align-items:center;justify-content:center;gap:0.5rem;"><span class="spinner"></span> A obter localização...</span>' : '📍 Obter Localização') +
@@ -299,7 +302,6 @@
           '<div class="card">' +
             '<div class="card-header"><div class="card-icon purple">📸</div>' +
             '<h1 class="card-title">Foto da Ocorrência</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p>' +
             '<p class="card-subtitle">Tire uma foto do problema para ajudar na análise</p></div>' +
             '<div class="form-group">' +
             '<input id="photoInput" type="file" accept="image/*" capture="environment"/>' +
@@ -344,11 +346,11 @@
             (isAI ? '<span class="ai-sugestao-label">✦ IA sugere</span>' : '') +
             '</button>';
         });
+
         app.innerHTML =
           '<div class="card">' +
             '<div class="card-header"><div class="card-icon amber">🏷️</div>' +
             '<h1 class="card-title">Categoria</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p>' +
             '<p class="card-subtitle">Seleciona o tipo de ocorrência' + (state.categoriaAI ? ' (a IA sugere a destacada)' : '') + '</p></div>' +
             '<div class="categorias-grid">' + gridHTML +
             '<div class="categoria-outra">' +
@@ -359,6 +361,7 @@
             '<button onclick="handleBackTo(\'photo\')" class="btn-secondary">← Voltar</button>' +
             '</div>' +
           '</div>';
+
         setTimeout(function() {
           const outraInput = document.getElementById('categoriaOutra');
           if (outraInput) {
@@ -377,7 +380,6 @@
           '<div class="card">' +
             '<div class="card-header"><div class="card-icon purple">✏️</div>' +
             '<h1 class="card-title">Descrição</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p>' +
             '<p class="card-subtitle">Revê e edita a descrição da ocorrência</p></div>' +
             '<div class="form-group">' +
             (state.photoBase64 ? '<div class="ai-badge">✦ Sugestão da IA</div>' : '') +
@@ -399,7 +401,6 @@
           '<div class="card">' +
             '<div class="card-header"><div class="card-icon blue">👤</div>' +
             '<h1 class="card-title">Contacto</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p>' +
             '<p class="card-subtitle">Precisamos de pelo menos um contacto para acompanhar a ocorrência</p></div>' +
             '<div class="form-group"><label for="nomeInput">Nome *</label>' +
             '<input type="text" id="nomeInput" placeholder="O seu nome" value="' + state.nome + '"/>' +
@@ -424,9 +425,11 @@
             '<div class="card-header"><div class="card-icon amber">✓</div>' +
             '<h1 class="card-title">Confirmar Ocorrência</h1></div>' +
             '<div class="confirm-box">' +
-            '<div class="confirm-id"><p class="confirm-id-label">ID da Ocorrência</p>' +
-            '<p class="confirm-id-value">' + state.ocId + '</p></div>' +
-            '<div class="confirm-row"><span class="confirm-label">Condomínio:</span><span class="confirm-value">' + (state.condominioNome || state.condominioId) + '</span></div>' +
+            '<div class="confirm-id">' +
+            '<p class="confirm-id-label">ID da Ocorrência</p>' +
+            '<p class="confirm-id-value">' + state.ocId + '</p>' +
+            '</div>' +
+            '<div class="confirm-row"><span class="confirm-label">Condomínio:</span><span class="confirm-value">' + state.condominioId + '</span></div>' +
             '<div class="confirm-row"><span class="confirm-label">Hora:</span><span class="confirm-value">' + new Date().toLocaleTimeString('pt-PT') + '</span></div>' +
             '<div class="confirm-row"><span class="confirm-label">Categoria:</span><span class="confirm-value">' + (categoriaFinal || '—') + '</span></div>' +
             '<div class="confirm-row"><span class="confirm-label">Foto:</span><span class="confirm-value">' + (state.photoBase64 ? '✓ Sim' : '✗ Sem foto') + '</span></div>' +
@@ -469,7 +472,11 @@
       }
     }
 
-    function selecionarCategoria(nome) { state.categoriaSelected = nome; state.categoriaOutra = ''; render(); }
+    function selecionarCategoria(nome) {
+      state.categoriaSelected = nome;
+      state.categoriaOutra = '';
+      render();
+    }
 
     function handleLocationRequest() {
       state.loading = true; render();
@@ -490,22 +497,33 @@
         const textoAI = await analyzeImage(state.photoBase64);
         state.descricaoAI = cleanAIText(textoAI);
         state.descricaoFinal = state.descricaoAI;
-        if (state.categorias.length === 0) state.categorias = await carregarCategorias();
+
+        // Carregar categorias e sugerir
+        if (state.categorias.length === 0) {
+          state.categorias = await carregarCategorias();
+        }
         state.categoriaAI = await sugerirCategoria(state.descricaoAI, state.categorias);
         if (state.categoriaAI) state.categoriaSelected = state.categoriaAI;
+
       } catch(e) {
         state.descricaoAI = ''; state.descricaoFinal = '';
         if (state.categorias.length === 0) state.categorias = await carregarCategorias();
       }
-      state.loading = false; state.step = 'categoria'; render();
+      state.loading = false;
+      state.step = 'categoria';
+      render();
     }
 
     async function handleSkipPhoto() {
       state.photoBase64 = null; state.photoSize = 0;
       state.descricaoAI = ''; state.descricaoFinal = '';
       state.loading = true; render();
-      if (state.categorias.length === 0) state.categorias = await carregarCategorias();
-      state.loading = false; state.step = 'categoria'; render();
+      if (state.categorias.length === 0) {
+        state.categorias = await carregarCategorias();
+      }
+      state.loading = false;
+      state.step = 'categoria';
+      render();
     }
 
     function handleCategoriaContinue() {
@@ -536,32 +554,32 @@
 
     function handleBackTo(step) { state.step = step; render(); }
 
-    async function handleSubmit() {
-      state.loading = true; render();
-      const timestamp = new Date().toLocaleString('pt-PT');
-      const categoriaFinal = state.categoriaOutra || state.categoriaSelected;
+   async function handleSubmit() {
+  state.loading = true; render();
+  const timestamp = new Date().toLocaleString('pt-PT');
+  const categoriaFinal = state.categoriaOutra || state.categoriaSelected;
 
-      const formData = new FormData();
-      formData.append('sheet', 'Ocorrencias');
-      formData.append('ocId', state.ocId);
-      formData.append('condominio', state.condominioId);
-      formData.append('timestamp', timestamp);
-      formData.append('latitude', state.location.latitude);
-      formData.append('longitude', state.location.longitude);
-      formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
-      formData.append('photoBase64', state.photoBase64 || '');
-      formData.append('categoria', categoriaFinal);
-      formData.append('descricaoAI', state.descricaoAI);
-      formData.append('descricaoFinal', state.descricaoFinal);
-      formData.append('nome', state.nome);
-      formData.append('telefone', state.telefone);
-      formData.append('email', state.email);
+  const formData = new FormData();
+  formData.append('sheet', 'Ocorrencias');
+  formData.append('ocId', state.ocId);
+  formData.append('condominio', state.condominioId);
+  formData.append('timestamp', timestamp);
+  formData.append('latitude', state.location.latitude);
+  formData.append('longitude', state.location.longitude);
+  formData.append('temFoto', state.photoBase64 ? 'true' : 'false');
+  formData.append('photoBase64', state.photoBase64 || '');
+  formData.append('categoria', categoriaFinal);
+  formData.append('descricaoAI', state.descricaoAI);
+  formData.append('descricaoFinal', state.descricaoFinal);
+  formData.append('nome', state.nome);
+  formData.append('telefone', state.telefone);
+  formData.append('email', state.email);
 
-      // GAS (existente)
-      fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
+  // GAS (existente)
+  fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: formData });
 
-      state.step = 'success'; render();
-    }
+  state.step = 'success'; render();
+}
 
     init();
   </script>
