@@ -4134,6 +4134,348 @@ app.get('/condominio/info', async (c) => {
   })
 })
 
+// ── GET /public/categorias ────────────────────────────────────
+// Devolve lista de categorias activas, ordenadas
+// Sem autenticação — usado pelo frontend público (ocorrencia.html)
+
+app.get('/public/categorias', async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const rows = await sql`
+    SELECT id, nome, emoji
+    FROM categorias
+    WHERE ativo = true
+    ORDER BY ordem ASC, nome ASC
+  `
+  return c.json({ categorias: rows })
+})
+
+
+// ── GET /public/validar-pin ───────────────────────────────────
+// Valida PIN de utilizador Ímpar
+// Sem autenticação — usado pelo frontend público (index.html)
+
+app.get('/public/validar-pin', async (c) => {
+  const pin = c.req.query('pin')
+  if (!pin) return c.json({ valido: false, user: '' })
+
+  const sql = neon(c.env.DATABASE_URL)
+  const rows = await sql`
+    SELECT nome FROM utilizadores
+    WHERE pin = ${pin.trim()} AND ativo = true
+    LIMIT 1
+  `
+  if (rows.length === 0) return c.json({ valido: false, user: '' })
+  return c.json({ valido: true, user: rows[0].nome })
+})
+
+
+// ── POST /public/limpezas ─────────────────────────────────────
+// Regista check-in de limpeza
+// Sem autenticação — chamado pelo limpeza.html e pelo GAS (transitório)
+
+app.post('/public/limpezas', async (c) => {
+  let d
+  try {
+    // Suporta JSON e form-data (GAS envia form-data)
+    const ct = c.req.header('Content-Type') || ''
+    if (ct.includes('application/json')) {
+      d = await c.req.json()
+    } else {
+      const form = await c.req.formData()
+      d = Object.fromEntries(form.entries())
+    }
+  } catch {
+    return c.json({ error: 'Body inválido' }, 400)
+  }
+
+  const sql = neon(c.env.DATABASE_URL)
+
+  // Resolver condominio_id e loja_id a partir do identificador recebido
+  const condId = String(d.condominio || '').trim()
+  const idInt  = parseInt(condId, 10)
+  let condRows = []
+
+  if (condId.length === 9 && /^\d+$/.test(condId)) {
+    condRows = await sql`SELECT id, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
+  }
+  if (condRows.length === 0 && !isNaN(idInt)) {
+    condRows = await sql`SELECT id, loja_id FROM condominios WHERE n_impar = ${idInt} AND ativo = true LIMIT 1`
+  }
+  if (condRows.length === 0) {
+    condRows = await sql`SELECT id, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
+  }
+
+  const condominioId = condRows[0]?.id    || null
+  const lojaId       = condRows[0]?.loja_id || null
+
+  // Upload foto para SharePoint (se existir)
+  let fotoUrl = d.fotoUrl || null
+  if (d.photoBase64 && d.photoBase64.length > 100) {
+    try {
+      fotoUrl = await uploadFotoSharePoint(c.env, d.photoBase64, 'Limpeza', condId, lojaId)
+    } catch (err) {
+      fotoUrl = null
+    }
+  }
+
+  const mapsLink  = d.mapsLink || (d.latitude && d.longitude
+    ? `https://www.google.com/maps/search/?api=1&query=${d.latitude},${d.longitude}`
+    : null)
+
+  const tsCheckin = d.timestamp
+    ? new Date(d.timestamp.split(', ').reverse().join('T') + ':00')
+    : new Date()
+
+  await sql`
+    INSERT INTO limpezas (
+      condominio_id, loja_id, latitude, longitude, precisao_m,
+      maps_link, tem_foto, foto_url, pin_validado, ts_checkin
+    ) VALUES (
+      ${condominioId},
+      ${lojaId},
+      ${parseFloat(d.latitude)  || null},
+      ${parseFloat(d.longitude) || null},
+      ${parseFloat(d.accuracy)  || null},
+      ${mapsLink},
+      ${d.temFoto === 'true' || !!fotoUrl},
+      ${fotoUrl},
+      true,
+      NOW()
+    )
+  `
+
+  // Email via Graph API
+  try {
+    await enviarEmailLimpeza(c.env, d, lojaId)
+  } catch (_) {}
+
+  return c.json({ ok: true })
+})
+
+
+// ── POST /public/ocorrencias ──────────────────────────────────
+// Regista ocorrência
+// Sem autenticação — chamado pelo ocorrencia.html e pelo GAS (transitório)
+
+app.post('/public/ocorrencias', async (c) => {
+  let d
+  try {
+    const ct = c.req.header('Content-Type') || ''
+    if (ct.includes('application/json')) {
+      d = await c.req.json()
+    } else {
+      const form = await c.req.formData()
+      d = Object.fromEntries(form.entries())
+    }
+  } catch {
+    return c.json({ error: 'Body inválido' }, 400)
+  }
+
+  const sql = neon(c.env.DATABASE_URL)
+
+  // Resolver condominio_id e loja_id
+  const condId = String(d.condominio || '').trim()
+  const idInt  = parseInt(condId, 10)
+  let condRows = []
+
+  if (condId.length === 9 && /^\d+$/.test(condId)) {
+    condRows = await sql`SELECT id, loja_id, morada FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
+  }
+  if (condRows.length === 0 && !isNaN(idInt)) {
+    condRows = await sql`SELECT id, loja_id, morada FROM condominios WHERE n_impar = ${idInt} AND ativo = true LIMIT 1`
+  }
+  if (condRows.length === 0) {
+    condRows = await sql`SELECT id, loja_id, morada FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
+  }
+
+  const condominioId = condRows[0]?.id      || null
+  const lojaId       = condRows[0]?.loja_id  || null
+  const morada       = condRows[0]?.morada   || d.morada || null
+
+  // Upload foto para SharePoint
+  let fotoUrl = d.fotoUrl || null
+  if (d.photoBase64 && d.photoBase64.length > 100) {
+    try {
+      fotoUrl = await uploadFotoSharePoint(c.env, d.photoBase64, 'Ocorrencia', condId, lojaId)
+    } catch (err) {
+      fotoUrl = null
+    }
+  }
+
+  const mapsLink = d.mapsLink || (d.latitude && d.longitude
+    ? `https://www.google.com/maps/search/?api=1&query=${d.latitude},${d.longitude}`
+    : null)
+
+  // Resolver categoria_id se existir
+  let categoriaId = null
+  if (d.categoria) {
+    const catRows = await sql`
+      SELECT id FROM categorias WHERE nome = ${d.categoria} AND ativo = true LIMIT 1
+    `
+    categoriaId = catRows[0]?.id || null
+  }
+
+  // Gerar ocId se não vier do frontend
+  const ocId = d.ocId || `OC-${condId}-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random()*9000)+1000}`
+
+  await sql`
+    INSERT INTO ocorrencias (
+      id, condominio_id, loja_id, morada,
+      categoria_id, categoria_texto, descricao_ai, descricao_final,
+      latitude, longitude, maps_link,
+      nome_reportante, telefone_reportante, email_reportante,
+      status, tem_foto, foto_url, ts_registo
+    ) VALUES (
+      ${ocId},
+      ${condominioId},
+      ${lojaId},
+      ${morada},
+      ${categoriaId},
+      ${d.categoria      || null},
+      ${d.descricaoAI    || null},
+      ${d.descricaoFinal || null},
+      ${parseFloat(d.latitude)  || null},
+      ${parseFloat(d.longitude) || null},
+      ${mapsLink},
+      ${d.nome     || null},
+      ${d.telefone || null},
+      ${d.email    || null},
+      'Aberto',
+      ${d.temFoto === 'true' || !!fotoUrl},
+      ${fotoUrl},
+      NOW()
+    )
+  `
+
+  // Emails via Graph API
+  try {
+    await enviarEmailOcorrencia(c.env, ocId, d, condRows[0], mapsLink)
+    if (d.email) await enviarEmailConfirmacaoUtilizador(c.env, ocId, d, condRows[0])
+  } catch (_) {}
+
+  return c.json({ ok: true, ocId })
+})
+
+
+// ── HELPER — Upload foto SharePoint ──────────────────────────
+
+async function uploadFotoSharePoint(env, photoBase64, tipo, condId, lojaId) {
+  const token = await getMicrosoftToken(env)
+
+  // Obter loja nome para o path
+  const sql = neon(env.DATABASE_URL)
+  const lojaRows = lojaId
+    ? await sql`SELECT nome FROM lojas WHERE id = ${lojaId} LIMIT 1`
+    : []
+  const lojaNome = lojaRows[0]?.nome || 'SemLoja'
+
+  // Obter drive ID
+  const siteRes  = await fetch(`https://graph.microsoft.com/v1.0/sites/redeimparcond.sharepoint.com`, { headers: { Authorization: `Bearer ${token}` } })
+  const siteData = await siteRes.json()
+  const driveRes = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteData.id}/drive`, { headers: { Authorization: `Bearer ${token}` } })
+  const driveId  = (await driveRes.json()).id
+
+  const base64Data = photoBase64.includes(',') ? photoBase64.split(',')[1] : photoBase64
+  const bytes      = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+  const nomeFile   = `${tipo}_${condId}_${Date.now()}.jpg`
+  const pasta      = `Clientes/${lojaNome}/Fotos/${tipo}s/${nomeFile}`
+
+  const uploadRes = await fetch(
+    `https://graph.microsoft.com/v1.0/drives/${driveId}/root:/${pasta}:/content`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'image/jpeg' },
+      body: bytes
+    }
+  )
+
+  if (!uploadRes.ok) throw new Error(`Upload foto HTTP ${uploadRes.status}`)
+  const fileData = await uploadRes.json()
+  return fileData.webUrl || null
+}
+
+
+// ── HELPER — Emails via Graph API ─────────────────────────────
+
+async function enviarEmailGraph(env, para, assunto, corpo, cc) {
+  const token = await getMicrosoftToken(env)
+  const EMAIL_REMETENTE = 'geral@impar.pt'
+
+  const mensagem = {
+    message: {
+      subject: assunto,
+      body: { contentType: 'Text', content: corpo },
+      toRecipients: [{ emailAddress: { address: para } }],
+      ...(cc ? { ccRecipients: cc.split(',').map(e => ({ emailAddress: { address: e.trim() } })).filter(e => e.emailAddress.address) } : {})
+    },
+    saveToSentItems: true
+  }
+
+  await fetch(`https://graph.microsoft.com/v1.0/users/${EMAIL_REMETENTE}/sendMail`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(mensagem)
+  })
+}
+
+async function enviarEmailLimpeza(env, d, lojaId) {
+  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${d.latitude},${d.longitude}`
+  const assunto  = `✅ Limpeza registada — Condomínio ${d.condominio || 'N/A'}`
+  const corpo    = [
+    'Nova limpeza registada pelo sistema Ímpar.',
+    '',
+    `Condomínio: ${d.condominio || 'N/A'}`,
+    `Hora: ${d.timestamp || 'N/A'}`,
+    `Localização: ${mapsLink}`,
+    `Foto: ${d.temFoto === 'true' ? '✅ Sim' : '❌ Não'}`
+  ].join('\n')
+  await enviarEmailGraph(env, 'formigaplicada@gmail.com', assunto, corpo)
+}
+
+async function enviarEmailOcorrencia(env, ocId, d, condInfo, mapsLink) {
+  const emailGestor = condInfo?.email_gestor || ''
+  const assunto = `🚨 Nova Ocorrência ${ocId} — Condomínio ${d.condominio || 'N/A'}`
+  const corpo   = [
+    'Nova ocorrência registada pelo sistema Ímpar.',
+    '',
+    `ID: ${ocId}`,
+    `Condomínio: ${d.condominio || 'N/A'}`,
+    `Hora: ${d.timestamp || 'N/A'}`,
+    `Localização: ${mapsLink}`,
+    `Foto: ${d.temFoto === 'true' ? '✅ Sim' : '❌ Não'}`,
+    `Categoria: ${d.categoria || '—'}`,
+    '',
+    `Descrição: ${d.descricaoFinal || 'Sem descrição'}`,
+    '',
+    'Contacto:',
+    `  Nome: ${d.nome || 'N/A'}`,
+    `  Telefone: ${d.telefone || '—'}`,
+    `  Email: ${d.email || '—'}`
+  ].join('\n')
+  await enviarEmailGraph(env, 'formigaplicada@gmail.com', assunto, corpo, emailGestor)
+}
+
+async function enviarEmailConfirmacaoUtilizador(env, ocId, d, condInfo) {
+  const emailGestor = condInfo?.email_gestor || ''
+  const assunto = `Ocorrência registada — ${ocId}`
+  const corpo   = [
+    `Olá ${d.nome || ''},`,
+    '',
+    'A sua ocorrência foi registada com sucesso.',
+    '',
+    `ID de referência: ${ocId}`,
+    `Condomínio: ${d.condominio || 'N/A'}`,
+    `Data/Hora: ${d.timestamp || 'N/A'}`,
+    `Categoria: ${d.categoria || '—'}`,
+    `Descrição: ${d.descricaoFinal || '—'}`,
+    '',
+    'Entraremos em contacto brevemente.',
+    '',
+    'Ímpar — Gestão de Condomínios'
+  ].join('\n')
+  await enviarEmailGraph(env, d.email, assunto, corpo, emailGestor)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CRON HANDLER — substitui o export default existente no index.js
 //
