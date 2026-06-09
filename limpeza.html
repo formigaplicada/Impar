@@ -274,7 +274,15 @@ if (perfilAtual === 'impar' && imparPinOk === cond) {
     const res = await fetch(WORKER_URL + '/public/limpezas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ... })
+      body: JSON.stringify({
+        condominio:  state.condominioId,
+        latitude:    state.location.latitude,
+        longitude:   state.location.longitude,
+        accuracy:    state.location.accuracy,
+        temFoto:     state.photoBase64 ? 'true' : 'false',
+        photoBase64: state.photoBase64 || '',
+        timestamp:   new Date().toLocaleString('pt-PT')
+      })
     })
     const data = await res.json()
     if (!res.ok || !data.ok) {
