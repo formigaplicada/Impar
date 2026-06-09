@@ -146,6 +146,7 @@
       if (!cond) {
         state.step = 'error'; state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.'; render(); return;
       }
+
       state.condominioId = cond;
       sessionStorage.setItem('condominioId', cond);
 
@@ -154,8 +155,14 @@
       state.condominioNipc = info.nipc || '';
       mostrarBanner(info);
 
-      const pinOk = sessionStorage.getItem('limpezaPinOk');
-      state.step = (pinOk === cond) ? 'location' : 'pin';
+      const perfilAtual = sessionStorage.getItem('perfil');
+const imparPinOk  = sessionStorage.getItem('imparPinOk');
+if (perfilAtual === 'impar' && imparPinOk === cond) {
+  state.step = 'location';
+} else {
+  const pinOk = sessionStorage.getItem('limpezaPinOk');
+  state.step = (pinOk === cond) ? 'location' : 'pin';
+}
       render();
     }
 
