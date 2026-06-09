@@ -226,10 +226,10 @@
       }
     }
 
-    async function validarPinImpar(pin) {
-      const res = await fetch(WEBHOOK_URL + '?action=validarPin&pin=' + encodeURIComponent(pin));
-      return await res.json(); // { valido: true/false, user: "..." }
-    }
+async function validarPinImpar(pin) {
+  const res = await fetch(WORKER_URL + '/public/validar-pin?pin=' + encodeURIComponent(pin))
+  return await res.json() // { valido: true/false, user: "..." }
+}
 
     // ── RENDER PROFILE SELECT ─────────────────────────────────
     async function renderProfileSelect() {
