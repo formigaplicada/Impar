@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Check-in Limpeza - Ímpar</title>
+  <title>Check-in Limpeza - CondExpress</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -17,26 +17,24 @@
       --red-600: #dc2626;
     }
     html, body { height: 100%; width: 100%; }
-    body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: linear-gradient(to bottom right, var(--slate-50), var(--slate-100));
-      color: var(--slate-900); font-size: 16px; line-height: 1.5;
-    }
+    body { font-family: 'DM Sans', -apple-system, sans-serif; background: linear-gradient(to bottom right, var(--slate-50), var(--slate-100)); color: var(--slate-900); font-size: 16px; line-height: 1.5; }
     .container { display: flex; flex-direction: column; min-height: 100vh; }
-    header { background: #64748b; padding: 0.875rem 1.5rem; }
-    .header-content { max-width: 56rem; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
-    .logo-img { height: 2.5rem; object-fit: contain; }
-    .logo-fallback { font-size: 1.125rem; font-weight: 700; color: white; }
-    .version-badge { background: rgba(255,255,255,0.2); color: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; }
-    .condo-name-header { font-size: 0.8rem; color: rgba(255,255,255,0.85); font-weight: 500; max-width: 180px; text-align: right; line-height: 1.3; }
+
+    /* Header — só logo + versão */
+    header { background: #64748b; padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+    .logo-img { height: 32px; object-fit: contain; }
+    .logo-fallback { font-size: 1rem; font-weight: 700; color: white; }
+    .version-badge { background: rgba(255,255,255,0.2); color: white; padding: 2px 7px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; }
+
+    /* Banner condomínio */
+    .condo-banner { background: white; border-bottom: 1px solid var(--slate-200); padding: 0.6rem 1.25rem; display: none; }
+    .condo-banner.visible { display: block; }
+    .condo-banner-nome { font-size: 0.875rem; font-weight: 600; color: var(--slate-800); line-height: 1.3; }
+    .condo-banner-nipc { font-size: 0.7rem; color: var(--slate-400); margin-top: 1px; }
+
     main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
     .card-wrapper { width: 100%; max-width: 28rem; }
-    .card {
-      background-color: white; border-radius: 1rem;
-      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-      padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem;
-      animation: fadeIn 0.3s ease-in;
-    }
+    .card { background-color: white; border-radius: 1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; animation: fadeIn 0.3s ease-in; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .card-header { text-align: center; display: flex; flex-direction: column; gap: 0.5rem; }
     .card-icon { width: 3rem; height: 3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 1.5rem; }
@@ -46,26 +44,18 @@
     .card-icon.purple { background-color: #f3e8ff; }
     .card-title { font-size: 1.5rem; font-weight: 700; color: var(--slate-900); }
     .card-subtitle { font-size: 0.875rem; color: var(--slate-600); }
-    .form-group { display: flex; flex-direction: column; gap: 0.5rem; }
-    label { font-size: 0.875rem; font-weight: 500; color: var(--slate-700); }
-    input[type="password"], input[type="text"], input[type="file"] {
-      padding: 0.75rem 1rem; font-size: 1rem; border: 2px solid var(--slate-300);
-      border-radius: 0.5rem; font-family: 'DM Sans', sans-serif; transition: border-color 0.2s;
-    }
-    input[type="password"]:focus, input[type="text"]:focus { outline: none; border-color: var(--blue-600); }
+    input[type="password"], input[type="text"], input[type="file"] { padding: 0.75rem 1rem; font-size: 1rem; border: 2px solid var(--slate-300); border-radius: 0.5rem; font-family: 'DM Sans', sans-serif; transition: border-color 0.2s; width: 100%; }
     input[type="password"] { text-align: center; font-size: 1.5rem; letter-spacing: 0.3em; }
-    input::placeholder { color: var(--slate-400); }
+    input[type="password"]:focus, input[type="text"]:focus { outline: none; border-color: var(--blue-600); }
+    input[type="password"]::placeholder { letter-spacing: normal; font-size: 1rem; color: var(--slate-400); }
+    input[type="text"]::placeholder { color: var(--slate-400); }
     .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.5rem; font-weight: 500; }
     .info-box { background-color: var(--slate-50); border-radius: 0.5rem; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.875rem; }
     .info-row { display: flex; justify-content: space-between; }
     .info-label { color: var(--slate-600); }
     .info-value { font-weight: 600; color: var(--slate-900); }
     .button-group { display: flex; flex-direction: column; gap: 0.75rem; }
-    button {
-      padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border: none;
-      border-radius: 0.5rem; cursor: pointer; transition: all 0.2s;
-      font-family: 'DM Sans', sans-serif; width: 100%;
-    }
+    button { padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif; width: 100%; }
     button:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn-success { background-color: var(--green-600); color: white; }
     .btn-success:hover:not(:disabled) { background-color: var(--green-700); }
@@ -74,77 +64,64 @@
     .btn-secondary { background-color: var(--slate-300); color: var(--slate-900); }
     .btn-secondary:hover:not(:disabled) { background-color: var(--slate-400); }
     .btn-primary { background-color: var(--blue-600); color: white; }
-    .btn-primary:hover:not(:disabled) { background-color: var(--blue-700); }
     .helper-text { font-size: 0.75rem; color: var(--slate-500); text-align: center; }
     footer { background-color: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
     .hidden { display: none; }
     .photo-preview { width: 100%; max-height: 200px; border-radius: 0.5rem; margin-top: 0.5rem; object-fit: cover; }
     .photo-size { font-size: 0.7rem; color: var(--slate-500); margin-top: 0.25rem; }
     .back-link { text-align: center; margin-top: 0.5rem; }
-    .back-link a { font-size: 0.78rem; color: var(--slate-400); text-decoration: none; }
-    .back-link a:hover { color: var(--slate-600); }
+    .back-link a { font-size: 0.78rem; color: var(--slate-400); text-decoration: none; cursor: pointer; }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <div class="header-content">
-        <div style="display:flex; align-items:center; gap:0.5rem;">
-          <img src="https://www.impar.pt/wp-content/uploads/2025/01/logo-impar-2048x807.png" alt="Ímpar" class="logo-img" id="logo" onerror="this.style.display='none'; document.getElementById('logoFallback').classList.remove('hidden')"/>
-          <span class="logo-fallback hidden" id="logoFallback">ÍMPAR</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:1rem;">
-          <span class="condo-name-header" id="condoNameHeader"></span>
-          <span style="font-size:0.875rem; color:rgba(255,255,255,0.8);">Check-in Limpeza</span>
-          <span class="version-badge">v2.5</span>
-        </div>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <img src="https://www.impar.pt/wp-content/uploads/2025/01/logo-impar-2048x807.png" alt="Ímpar" class="logo-img" id="logo" onerror="this.style.display='none';document.getElementById('logoFallback').classList.remove('hidden')"/>
+        <span class="logo-fallback hidden" id="logoFallback">ÍMPAR</span>
       </div>
+      <span class="version-badge">v2.6</span>
     </header>
+    <div class="condo-banner" id="condoBanner">
+      <div class="condo-banner-nome" id="condoBannerNome"></div>
+      <div class="condo-banner-nipc" id="condoBannerNipc"></div>
+    </div>
     <main>
       <div class="card-wrapper" id="app">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-icon blue">⏳</div>
-            <h1 class="card-title">Carregando...</h1>
-          </div>
-        </div>
+        <div class="card"><div class="card-header"><div class="card-icon blue">⏳</div><h1 class="card-title">A carregar...</h1></div></div>
       </div>
     </main>
-    <footer><p>Sistema de Check-in de Limpezas © 2026</p></footer>
+    <footer><p>Check-in Limpeza © 2026 · CondExpress</p></footer>
   </div>
 
   <script>
-    const WORKER_URL = 'https://impar-api.formigaplicada.workers.dev';
-    const WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbzJIsPnMLyUDal_Kn9FQyL9WDMhLSEQ5o-njJ-b5yjkzi2n_VxczPbRd4JwDzcyLBA0/exec';
+    const WORKER_URL  = 'https://impar-api.formigaplicada.workers.dev';
     const MAX_PHOTO_SIZE = 1024 * 1024;
 
-    let state = {
-      step: 'init', condominioId: '', condominioNome: '', pin: '', location: null,
-      photoBase64: null, photoSize: 0, loading: false, errorMsg: '', successMsg: ''
-    };
+    let state = { step: 'init', condominioId: '', condominioNome: '', condominioNipc: '', pin: '', location: null, photoBase64: null, photoSize: 0, loading: false, errorMsg: '', successMsg: '' };
 
-    // ── PINs — suporta n_impar (legado) e NIPC (novo) ────────
-    function generateCorrectPin(condominioId) {
-      const id = String(condominioId).trim()
-      if (id.length === 9 && /^\d+$/.test(id)) {
-        return id.slice(0, 5) // NIPC: 5 primeiros dígitos
-      }
-      return id + '3' // legado: ID + '3'
+    function generateCorrectPin(id) {
+      const s = String(id).trim();
+      return (s.length === 9 && /^\d+$/.test(s)) ? s.slice(0, 5) : s + '3';
     }
 
-    async function loadCondominioName(condominioId) {
+    async function loadCondominioInfo(condominioId) {
+      const cached = sessionStorage.getItem('condominioInfo');
+      if (cached) { try { return JSON.parse(cached); } catch(_) {} }
       try {
-        const res = await fetch(WORKER_URL + '/condominio/info?id=' + encodeURIComponent(condominioId));
+        const res  = await fetch(WORKER_URL + '/condominio/info?id=' + encodeURIComponent(condominioId));
         if (!res.ok) throw new Error();
         const data = await res.json();
-        return data.nome || condominioId;
-      } catch(e) {
-        try {
-          const res = await fetch(WEBHOOK_URL + '?action=getNome&condominio=' + encodeURIComponent(condominioId));
-          const data = await res.json();
-          return data.nome || condominioId;
-        } catch(e2) { return condominioId; }
-      }
+        sessionStorage.setItem('condominioInfo', JSON.stringify(data));
+        return data;
+      } catch(e) { return { nome: condominioId, nipc: '', n_impar: null }; }
+    }
+
+    function mostrarBanner(info) {
+      const banner = document.getElementById('condoBanner');
+      document.getElementById('condoBannerNome').textContent = info.nome || '';
+      document.getElementById('condoBannerNipc').textContent = info.nipc ? 'NIPC ' + info.nipc : '';
+      if (info.nome) banner.classList.add('visible');
     }
 
     function compressImage(base64Image, callback) {
@@ -153,18 +130,11 @@
         const canvas = document.createElement('canvas');
         let width = img.width, height = img.height;
         const maxWidth = 1920, maxHeight = 1440;
-        if (width > maxWidth || height > maxHeight) {
-          const ratio = Math.min(maxWidth / width, maxHeight / height);
-          width = width * ratio; height = height * ratio;
-        }
+        if (width > maxWidth || height > maxHeight) { const ratio = Math.min(maxWidth/width, maxHeight/height); width *= ratio; height *= ratio; }
         canvas.width = width; canvas.height = height;
         canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-        let quality = 0.8;
-        let compressed = canvas.toDataURL('image/jpeg', quality);
-        while (compressed.length > MAX_PHOTO_SIZE && quality > 0.1) {
-          quality -= 0.1;
-          compressed = canvas.toDataURL('image/jpeg', quality);
-        }
+        let quality = 0.8, compressed = canvas.toDataURL('image/jpeg', quality);
+        while (compressed.length > MAX_PHOTO_SIZE && quality > 0.1) { quality -= 0.1; compressed = canvas.toDataURL('image/jpeg', quality); }
         callback(compressed, compressed.length);
       };
       img.src = base64Image;
@@ -172,54 +142,44 @@
 
     async function init() {
       const params = new URLSearchParams(window.location.search);
-      const cond = params.get('condominio') || sessionStorage.getItem('condominioId');
+      const cond   = params.get('condominio') || sessionStorage.getItem('condominioId');
       if (!cond) {
-        state.step = 'error';
-        state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.';
-        render();
-        return;
+        state.step = 'error'; state.errorMsg = 'Condomínio não identificado. Verifica o QR Code.'; render(); return;
       }
       state.condominioId = cond;
       sessionStorage.setItem('condominioId', cond);
 
-      // Carregar nome
-      state.condominioNome = await loadCondominioName(cond);
-      const header = document.getElementById('condoNameHeader');
-      if (header) header.textContent = state.condominioNome;
+      const info = await loadCondominioInfo(cond);
+      state.condominioNome = info.nome || cond;
+      state.condominioNipc = info.nipc || '';
+      mostrarBanner(info);
 
       const pinOk = sessionStorage.getItem('limpezaPinOk');
       state.step = (pinOk === cond) ? 'location' : 'pin';
       render();
     }
 
-    function backToIndex() {
-      window.location.href = 'index.html?condominio=' + encodeURIComponent(state.condominioId);
-    }
+    function backToIndex() { window.location.href = 'index.html?condominio=' + encodeURIComponent(state.condominioId); }
 
     function render() {
       const app = document.getElementById('app');
 
       if (state.step === 'pin') {
         const expectedPin = generateCorrectPin(state.condominioId);
-        const pinLength = expectedPin.length;
         app.innerHTML =
-          '<div class="card">' +
-            '<div class="card-header"><div class="card-icon blue">🔒</div>' +
-            '<h1 class="card-title">Validação</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p></div>' +
-            '<div class="form-group">' +
-            '<input type="password" id="pinInput" inputmode="numeric" maxlength="' + pinLength + '" placeholder="PIN de limpeza" autocomplete="off"/>' +
-            (state.errorMsg ? '<p class="error-message">❌ ' + state.errorMsg + '</p>' : '') +
-            '</div>' +
-            '<div class="back-link"><a href="#" onclick="backToIndex(); return false;">← Voltar ao início</a></div>' +
-          '</div>';
+          '<div class="card"><div class="card-header"><div class="card-icon blue">🔒</div>' +
+          '<h1 class="card-title">Validação</h1>' +
+          '<p class="card-subtitle">PIN de acesso à limpeza</p></div>' +
+          '<input type="password" id="pinInput" inputmode="numeric" maxlength="' + expectedPin.length + '" placeholder="••••" autocomplete="off"/>' +
+          (state.errorMsg ? '<p class="error-message">❌ ' + state.errorMsg + '</p>' : '') +
+          '<div class="back-link"><a onclick="backToIndex()">← Voltar ao início</a></div></div>';
         setTimeout(() => {
           const pinInput = document.getElementById('pinInput');
           if (pinInput) {
             pinInput.addEventListener('input', (e) => {
-              state.pin = e.target.value.replace(/\D/g, '').slice(0, pinLength);
+              state.pin = e.target.value.replace(/\D/g, '').slice(0, expectedPin.length);
               e.target.value = state.pin;
-              if (state.pin.length === pinLength) handlePinSubmit();
+              if (state.pin.length === expectedPin.length) handlePinSubmit();
             });
             pinInput.focus();
           }
@@ -228,106 +188,69 @@
 
       else if (state.step === 'location') {
         app.innerHTML =
-          '<div class="card">' +
-            '<div class="card-header"><div class="card-icon green">📍</div>' +
-            '<h1 class="card-title">Localização</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p>' +
-            '<p class="card-subtitle">Permite o acesso ao GPS do telemóvel</p></div>' +
-            '<button onclick="handleLocationRequest()" class="btn-success"' + (state.loading ? ' disabled' : '') + '>' +
-            (state.loading ? '⏳ A obter localização...' : '📍 Obter Localização') + '</button>' +
-            '<div class="back-link"><a href="#" onclick="backToIndex(); return false;">← Voltar ao início</a></div>' +
-          '</div>';
+          '<div class="card"><div class="card-header"><div class="card-icon green">📍</div>' +
+          '<h1 class="card-title">Localização</h1>' +
+          '<p class="card-subtitle">Permite o acesso ao GPS do telemóvel</p></div>' +
+          '<button onclick="handleLocationRequest()" class="btn-success"' + (state.loading ? ' disabled' : '') + '>' +
+          (state.loading ? '⏳ A obter localização...' : '📍 Obter Localização') + '</button>' +
+          '<div class="back-link"><a onclick="backToIndex()">← Voltar ao início</a></div></div>';
       }
 
       else if (state.step === 'photo') {
         app.innerHTML =
-          '<div class="card">' +
-            '<div class="card-header"><div class="card-icon purple">📸</div>' +
-            '<h1 class="card-title">Capturar Foto</h1>' +
-            '<p class="card-subtitle">' + (state.condominioNome || state.condominioId) + '</p>' +
-            '<p class="card-subtitle">Tire uma foto do local da limpeza</p></div>' +
-            '<div class="form-group">' +
-            '<input id="photoInput" type="file" accept="image/*" capture="environment"/>' +
-            (state.photoBase64 ? '<img src="' + state.photoBase64 + '" alt="Foto capturada" class="photo-preview"/><p class="photo-size">Tamanho: ' + Math.round(state.photoSize / 1024) + 'KB</p>' : '') +
-            '<p class="helper-text">Clique para tirar uma foto ou selecione uma da galeria</p></div>' +
-            '<div class="button-group">' +
-            '<button onclick="handlePhotoContinue()" class="btn-confirm"' + (!state.photoBase64 || state.loading ? ' disabled' : '') + '>' +
-            (state.loading ? '⏳ A processar...' : '✓ Continuar') + '</button>' +
-            '<button onclick="goToLocation()" class="btn-secondary">← Voltar</button></div>' +
-          '</div>';
+          '<div class="card"><div class="card-header"><div class="card-icon purple">📸</div>' +
+          '<h1 class="card-title">Capturar Foto</h1>' +
+          '<p class="card-subtitle">Tire uma foto do local da limpeza</p></div>' +
+          '<div style="display:flex;flex-direction:column;gap:0.5rem;">' +
+          '<input id="photoInput" type="file" accept="image/*" capture="environment"/>' +
+          (state.photoBase64 ? '<img src="' + state.photoBase64 + '" class="photo-preview"/><p class="photo-size">' + Math.round(state.photoSize/1024) + 'KB</p>' : '') +
+          '<p class="helper-text">Clique para tirar uma foto</p></div>' +
+          '<div class="button-group">' +
+          '<button onclick="handlePhotoContinue()" class="btn-confirm"' + (!state.photoBase64 || state.loading ? ' disabled' : '') + '>' +
+          (state.loading ? '⏳ A processar...' : '✓ Continuar') + '</button>' +
+          '<button onclick="goToLocation()" class="btn-secondary">← Voltar</button></div></div>';
         setTimeout(() => {
           const photoInput = document.getElementById('photoInput');
-          if (photoInput) {
-            photoInput.addEventListener('change', (e) => {
-              const file = e.target.files[0];
-              if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                  compressImage(event.target.result, (compressed, size) => {
-                    state.photoBase64 = compressed; state.photoSize = size; render();
-                  });
-                };
-                reader.readAsDataURL(file);
-              }
-            });
-          }
+          if (photoInput) photoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) { const reader = new FileReader(); reader.onload = (ev) => compressImage(ev.target.result, (c, s) => { state.photoBase64 = c; state.photoSize = s; render(); }); reader.readAsDataURL(file); }
+          });
         }, 0);
       }
 
-      else if (state.step === 'confirm' && state.location) {
+      else if (state.step === 'confirm') {
         app.innerHTML =
-          '<div class="card">' +
-            '<div class="card-header"><div class="card-icon amber">✓</div>' +
-            '<h1 class="card-title">Confirmar Registo</h1></div>' +
-            '<div class="info-box">' +
-            '<div class="info-row"><span class="info-label">Condomínio:</span><span class="info-value">' + (state.condominioNome || state.condominioId) + '</span></div>' +
-            '<div class="info-row"><span class="info-label">Precisão:</span><span class="info-value">' + Math.round(state.location.accuracy) + 'm</span></div>' +
-            '<div class="info-row"><span class="info-label">Hora:</span><span class="info-value">' + new Date().toLocaleTimeString('pt-PT') + '</span></div>' +
-            '<div class="info-row"><span class="info-label">Foto:</span><span class="info-value">' + (state.photoBase64 ? '✓ Sim (' + Math.round(state.photoSize / 1024) + 'KB)' : '✗ Não') + '</span></div>' +
-            '</div>' +
-            '<div class="button-group">' +
-            '<button onclick="handleSubmitLimpeza()" class="btn-confirm"' + (state.loading ? ' disabled' : '') + '>' +
-            (state.loading ? '⏳ A registar...' : '✓ Registar Limpeza') + '</button>' +
-            '<button onclick="goToPhoto()" class="btn-secondary">← Voltar</button></div>' +
-          '</div>';
+          '<div class="card"><div class="card-header"><div class="card-icon amber">✓</div><h1 class="card-title">Confirmar Registo</h1></div>' +
+          '<div class="info-box">' +
+          '<div class="info-row"><span class="info-label">Precisão:</span><span class="info-value">' + Math.round(state.location.accuracy) + 'm</span></div>' +
+          '<div class="info-row"><span class="info-label">Hora:</span><span class="info-value">' + new Date().toLocaleTimeString('pt-PT') + '</span></div>' +
+          '<div class="info-row"><span class="info-label">Foto:</span><span class="info-value">' + (state.photoBase64 ? '✓ Sim (' + Math.round(state.photoSize/1024) + 'KB)' : '✗ Não') + '</span></div></div>' +
+          '<div class="button-group">' +
+          '<button onclick="handleSubmitLimpeza()" class="btn-confirm"' + (state.loading ? ' disabled' : '') + '>' +
+          (state.loading ? '⏳ A registar...' : '✓ Registar Limpeza') + '</button>' +
+          '<button onclick="goToPhoto()" class="btn-secondary">← Voltar</button></div></div>';
       }
 
       else if (state.step === 'success') {
-        app.innerHTML =
-          '<div class="card"><div class="card-header">' +
-          '<div style="font-size:2rem;">✅</div>' +
-          '<h1 class="card-title">Sucesso!</h1>' +
-          '<p class="card-subtitle">' + state.successMsg + '</p></div></div>';
+        app.innerHTML = '<div class="card"><div class="card-header"><div style="font-size:2rem;">✅</div><h1 class="card-title">Sucesso!</h1><p class="card-subtitle">' + state.successMsg + '</p></div></div>';
       }
 
       else if (state.step === 'error') {
-        app.innerHTML =
-          '<div class="card"><div class="card-header">' +
-          '<div style="font-size:2rem;">⚠️</div>' +
-          '<h1 class="card-title">Erro</h1>' +
-          '<p class="card-subtitle">' + state.errorMsg + '</p></div>' +
-          '<button onclick="reset()" class="btn-primary">Tentar Novamente</button></div>';
+        app.innerHTML = '<div class="card"><div class="card-header"><div style="font-size:2rem;">⚠️</div><h1 class="card-title">Erro</h1><p class="card-subtitle">' + state.errorMsg + '</p></div><button onclick="reset()" class="btn-primary">Tentar Novamente</button></div>';
       }
     }
 
     function handlePinSubmit() {
       const expectedPin = generateCorrectPin(state.condominioId);
-      if (state.pin === expectedPin) {
-        sessionStorage.setItem('limpezaPinOk', state.condominioId);
-        state.step = 'location'; state.errorMsg = '';
-      } else {
-        state.errorMsg = 'PIN inválido.'; state.pin = '';
-      }
+      if (state.pin === expectedPin) { sessionStorage.setItem('limpezaPinOk', state.condominioId); state.step = 'location'; state.errorMsg = ''; }
+      else { state.errorMsg = 'PIN inválido.'; state.pin = ''; }
       render();
     }
 
     function handleLocationRequest() {
       state.loading = true; render();
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          state.location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
-          state.step = 'photo'; state.loading = false; render();
-        },
+        (pos) => { state.location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }; state.step = 'photo'; state.loading = false; render(); },
         () => { state.errorMsg = 'Ative o GPS.'; state.step = 'error'; state.loading = false; render(); },
         { enableHighAccuracy: true }
       );
@@ -336,34 +259,26 @@
     function handlePhotoContinue() { if (state.photoBase64) { state.step = 'confirm'; render(); } }
     function goToLocation() { state.step = 'location'; render(); }
     function goToPhoto() { state.step = 'photo'; render(); }
-
-    function reset() {
-      state = { step: 'pin', condominioId: state.condominioId, condominioNome: state.condominioNome, pin: '', location: null, photoBase64: null, photoSize: 0, loading: false, errorMsg: '', successMsg: '' };
-      render();
-    }
+    function reset() { state = { ...state, step: 'pin', pin: '', location: null, photoBase64: null, photoSize: 0, loading: false, errorMsg: '', successMsg: '' }; render(); }
 
     async function handleSubmitLimpeza() {
-  state.loading = true; render()
-  const timestamp = new Date().toLocaleString('pt-PT')
- 
-  await fetch(WORKER_URL + '/public/limpezas', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      condominio:  state.condominioId,
-      latitude:    state.location.latitude,
-      longitude:   state.location.longitude,
-      accuracy:    state.location.accuracy,
-      temFoto:     state.photoBase64 ? 'true' : 'false',
-      photoBase64: state.photoBase64 || '',
-      timestamp
-    })
-  })
- 
-  state.successMsg = 'Limpeza registada com sucesso!'
-  state.step = 'success'
-  render()
-}
+      state.loading = true; render();
+      await fetch(WORKER_URL + '/public/limpezas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          condominio:  state.condominioId,
+          latitude:    state.location.latitude,
+          longitude:   state.location.longitude,
+          accuracy:    state.location.accuracy,
+          temFoto:     state.photoBase64 ? 'true' : 'false',
+          photoBase64: state.photoBase64 || '',
+          timestamp:   new Date().toLocaleString('pt-PT')
+        })
+      });
+      state.successMsg = 'Limpeza registada com sucesso!';
+      state.step = 'success'; render();
+    }
 
     init();
   </script>
