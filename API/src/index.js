@@ -37,6 +37,7 @@ const allowed = [
   'http://localhost:5173',
   'https://condexpress.pages.dev',
   'https://app.condexpress.com',
+  'https://my.condexpress.com', 
   'https://impar.formigaplicada.work',
   'https://jovial-otter-0ad2b9.netlify.app'
 ]
@@ -3927,16 +3928,20 @@ app.get('/prestadores/por-servico/:servico_id', requireAuth, async (c) => {
 
   // 2 — Prestadores não associados a este serviço+loja (para associar)
   const naoAssociados = await sql`
-    SELECT p.id, p.nome, p.telefone, p.email, p.cidade
-    FROM prestadores p
-    WHERE p.ativo = true
-      AND p.id NOT IN (
-        SELECT prestador_id FROM prestador_servicos
-        WHERE servico_id = ${servico_id}
-          AND loja_id = ${Number(loja_id)}
-      )
-    ORDER BY p.nome ASC
-  `
+  SELECT p.id, p.nome, p.telefone, p.email, p.cidade
+  FROM prestadores p
+  WHERE p.ativo = true
+    AND p.id IN (
+      SELECT DISTINCT prestador_id FROM prestador_servicos
+      WHERE servico_id = ${servico_id}
+    )
+    AND p.id NOT IN (
+      SELECT prestador_id FROM prestador_servicos
+      WHERE servico_id = ${servico_id}
+        AND loja_id = ${Number(loja_id)}
+    )
+  ORDER BY p.nome ASC
+`
 
   return c.json({ associados, nao_associados: naoAssociados })
 })
@@ -3957,6 +3962,127 @@ app.post('/prestador-servicos', requireAuth, async (c) => {
   `
 
   return c.json({ ok: true })
+})
+
+// ── GET /qr ───────────────────────────────────────────────────
+// Recebe ?id=XXXXX (n_impar ou old_n_impar), faz lookup na Neon,
+// redireciona para https://app.condexpress.com/?condominio=NIPC
+// Sem autenticação — é chamado pelos QR codes públicos
+
+app.get('/qr', async (c) => {
+  const id = c.req.query('id')
+  if (!id) {
+    return c.html(`
+      <!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
+      <title>Erro</title></head><body>
+      <p>QR Code inválido — ID em falta.</p>
+      </body></html>
+    `, 400)
+  }
+
+  const sql = neon(c.env.DATABASE_URL)
+
+  // Tenta n_impar (integer) primeiro; se não for número, tenta old_n_impar (text)
+  const idInt = parseInt(id, 10)
+  let rows = []
+
+  if (!isNaN(idInt)) {
+    rows = await sql`
+      SELECT nipc FROM condominios
+      WHERE n_impar = ${idInt} AND ativo = true
+      LIMIT 1
+    `
+  }
+
+  if (rows.length === 0) {
+    rows = await sql`
+      SELECT nipc FROM condominios
+      WHERE old_n_impar = ${id} AND ativo = true
+      LIMIT 1
+    `
+  }
+
+  if (rows.length === 0 || !rows[0].nipc) {
+    return c.html(`
+      <!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8">
+      <title>Não encontrado</title></head><body>
+      <p>Condomínio não encontrado. Verifica o QR Code.</p>
+      </body></html>
+    `, 404)
+  }
+
+  const nipc = rows[0].nipc
+  const destino = `https://my.condexpress.com/?condominio=${encodeURIComponent(nipc)}`
+
+  return new Response(null, {
+    status: 302,
+    headers: { 'Location': destino }
+  })
+})
+
+
+// ── POST /analyze-image ───────────────────────────────────────
+// Proxy para a API Anthropic — análise de foto ou sugestão de categoria
+// Sem autenticação — é chamado pelo frontend público (ocorrencia.html)
+
+app.post('/analyze-image', async (c) => {
+  let body
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Body inválido' }, 400)
+  }
+
+  let messages
+
+  if (body.prompt) {
+    // Modo texto — sugestão de categoria
+    messages = [{ role: 'user', content: body.prompt }]
+  } else if (body.imageBase64) {
+    // Modo imagem — análise de foto
+    const base64Data = body.imageBase64.includes(',')
+      ? body.imageBase64.split(',')[1]
+      : body.imageBase64
+
+    messages = [{
+      role: 'user',
+      content: [
+        {
+          type: 'image',
+          source: { type: 'base64', media_type: 'image/jpeg', data: base64Data }
+        },
+        {
+          type: 'text',
+          text: 'És um assistente de gestão de condomínios. Analisa esta foto e descreve de forma clara e objetiva a ocorrência ou problema que está visível, em português europeu. Sê conciso (máximo 2 frases). Se não conseguires identificar nenhum problema claro, diz isso de forma simples.'
+        }
+      ]
+    }]
+  } else {
+    return c.json({ error: 'Parâmetros em falta' }, 400)
+  }
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': c.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages
+    })
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    return c.json({ error: 'Erro da API Anthropic', detail: data }, 502)
+  }
+
+  const descricao = data.content?.[0]?.text || 'Não foi possível analisar.'
+  return c.json({ descricao })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
