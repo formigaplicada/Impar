@@ -4166,13 +4166,13 @@ const idInt  = parseInt(condId, 10)
 let condRows = []
 
 if (condId.length === 9 && /^\d+$/.test(condId)) {
-  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id, morada FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
 }
 if (condRows.length === 0 && !isNaN(idInt)) {
-  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id, morada FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
 }
 if (condRows.length === 0) {
-  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id, morada  FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
 }
 
 if (condRows.length === 0) {
@@ -4181,6 +4181,7 @@ if (condRows.length === 0) {
 
 const condominioId = condRows[0]?.n_impar || null
 const lojaId       = condRows[0]?.loja_id  || null
+const morada       = condRows[0]?.morada  || null
 
   // Upload foto para SharePoint
   let fotoUrl = d.fotoUrl || null
@@ -4230,7 +4231,7 @@ const lojaId       = condRows[0]?.loja_id  || null
       ${d.nome     || null},
       ${d.telefone || null},
       ${d.email    || null},
-      'Aberto',
+      'aberta',
       ${d.temFoto === 'true' || !!fotoUrl},
       ${fotoUrl},
       NOW()
@@ -4304,11 +4305,16 @@ async function enviarEmailGraph(env, para, assunto, corpo, cc) {
     saveToSentItems: true
   }
 
-  await fetch(`https://graph.microsoft.com/v1.0/users/${EMAIL_REMETENTE}/sendMail`, {
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${EMAIL_REMETENTE}/sendMail`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(mensagem)
   })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Graph sendMail HTTP ${res.status}: ${err}`)
+  }
 }
 
 async function enviarEmailLimpeza(env, d, lojaId) {
@@ -4368,6 +4374,22 @@ async function enviarEmailConfirmacaoUtilizador(env, ocId, d, condInfo) {
   ].join('\n')
   await enviarEmailGraph(env, d.email, assunto, corpo, emailGestor)
 }
+
+app.get('/test/email', async (c) => {
+  try {
+    const token = await getMicrosoftToken(c.env)
+    // Decodificar payload do JWT (base64)
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return c.json({ 
+      ok: true,
+      roles: payload.roles,
+      app_id: payload.appid,
+      tenant: payload.tid
+    })
+  } catch (err) {
+    return c.json({ error: err.message }, 500)
+  }
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRON HANDLER — substitui o export default existente no index.js

@@ -1,13 +1,13 @@
-[build]
-  command = "echo 'No build needed for static site'"
-  publish = "."
-
 [[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+  from = "/"
+  to = "https://my.condexpress.com/:splat"
+  status = 302
+  force = true
+  [redirects.query]
+    condominio = ":condominio"
 
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
+  to = "https://my.condexpress.com/:splat"
+  status = 302
+  force = true
