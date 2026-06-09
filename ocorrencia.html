@@ -308,23 +308,25 @@
 
     function handleBackTo(step) { state.step = step; render(); }
 
-    async function handleSubmit() {
-      state.loading = true; render();
-      await fetch(WORKER_URL + '/public/ocorrencias', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ocId: state.ocId, condominio: state.condominioId,
-          timestamp: new Date().toLocaleString('pt-PT'),
-          latitude: state.location.latitude, longitude: state.location.longitude,
-          temFoto: state.photoBase64 ? 'true' : 'false', photoBase64: state.photoBase64 || '',
-          categoria: state.categoriaOutra || state.categoriaSelected,
-          descricaoAI: state.descricaoAI, descricaoFinal: state.descricaoFinal,
-          nome: state.nome, telefone: state.telefone, email: state.email
-        })
-      });
-      state.step = 'success'; render();
-    }
+      async function handleSubmit() {
+        state.loading = true; render()
+        try {
+          const res = await fetch(WORKER_URL + '/public/ocorrencias', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ... })
+          })
+          const data = await res.json()
+          if (!res.ok || !data.ok) {
+            state.errorMsg = data.error || 'Erro ao registar. Tenta novamente.'
+            state.step = 'error'; render(); return
+          }
+          state.step = 'success'; render()
+        } catch(e) {
+          state.errorMsg = 'Erro de ligação. Tenta novamente.'
+          state.step = 'error'; render()
+        }
+      }
 
     init();
   </script>

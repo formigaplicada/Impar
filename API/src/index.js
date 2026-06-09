@@ -4055,6 +4055,7 @@ app.get('/public/validar-pin', async (c) => {
 // Sem autenticação — chamado pelo limpeza.html e pelo GAS (transitório)
 
 app.post('/public/limpezas', async (c) => {
+  try {
   let d
   try {
     const ct = c.req.header('Content-Type') || ''
@@ -4075,21 +4076,21 @@ const idInt  = parseInt(condId, 10)
 let condRows = []
 
 if (condId.length === 9 && /^\d+$/.test(condId)) {
-  condRows = await sql`SELECT id, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
 }
 if (condRows.length === 0 && !isNaN(idInt)) {
-  condRows = await sql`SELECT id, loja_id FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
 }
 if (condRows.length === 0) {
-  condRows = await sql`SELECT id, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
 }
 
 if (condRows.length === 0) {
   return c.json({ error: 'Condomínio não encontrado: ' + condId }, 404)
 }
 
-  const condominioId = condRows[0]?.id    || null
-  const lojaId       = condRows[0]?.loja_id || null
+const condominioId = condRows[0]?.n_impar || null
+const lojaId       = condRows[0]?.loja_id  || null
 
   // Upload foto para SharePoint (se existir)
   let fotoUrl = d.fotoUrl || null
@@ -4133,6 +4134,9 @@ if (condRows.length === 0) {
   } catch (_) {}
 
   return c.json({ ok: true })
+ } catch (err) {
+    return c.json({ error: err.message, stack: err.stack?.split('\n').slice(0,3) }, 500)
+  }
 })
 
 
@@ -4141,6 +4145,7 @@ if (condRows.length === 0) {
 // Sem autenticação — chamado pelo ocorrencia.html e pelo GAS (transitório)
 
 app.post('/public/ocorrencias', async (c) => {
+  try {
   let d
   try {
         const ct = c.req.header('Content-Type') || ''
@@ -4161,22 +4166,21 @@ const idInt  = parseInt(condId, 10)
 let condRows = []
 
 if (condId.length === 9 && /^\d+$/.test(condId)) {
-  condRows = await sql`SELECT id, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
 }
 if (condRows.length === 0 && !isNaN(idInt)) {
-  condRows = await sql`SELECT id, loja_id FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
 }
 if (condRows.length === 0) {
-  condRows = await sql`SELECT id, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
+  condRows = await sql`SELECT id, n_impar, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
 }
 
 if (condRows.length === 0) {
   return c.json({ error: 'Condomínio não encontrado: ' + condId }, 404)
 }
 
-  const condominioId = condRows[0]?.id      || null
-  const lojaId       = condRows[0]?.loja_id  || null
-  const morada       = condRows[0]?.morada   || d.morada || null
+const condominioId = condRows[0]?.n_impar || null
+const lojaId       = condRows[0]?.loja_id  || null
 
   // Upload foto para SharePoint
   let fotoUrl = d.fotoUrl || null
@@ -4239,7 +4243,10 @@ if (condRows.length === 0) {
     if (d.email) await enviarEmailConfirmacaoUtilizador(c.env, ocId, d, condRows[0])
   } catch (_) {}
 
-  return c.json({ ok: true, ocId })
+      return c.json({ ok: true, ocId })
+  } catch (err) {
+    return c.json({ error: err.message }, 500)
+  }
 })
 
 
