@@ -640,125 +640,6 @@ sql`
 
 // ── Rotas públicas (sem autenticação) ─────────────────────────
 
-app.post('/public/ocorrencias', async (c) => {
-  const sql = neon(c.env.DATABASE_URL)
-  
-  const formData = await c.req.formData()
-  console.log('condominio recebido:', formData.get('condominio'))
-  console.log('ocId recebido:', formData.get('ocId'))
-
-  const ocId           = formData.get('ocId') || ''
-  const condominioNImpar = formData.get('condominio') || ''
-  const timestamp      = formData.get('timestamp') || ''
-  const latitude       = formData.get('latitude') || null
-  const longitude      = formData.get('longitude') || null
-  const temFoto        = formData.get('temFoto') === 'true'
-  const fotoUrl        = formData.get('fotoUrl') || null
-  const mapsLink       = formData.get('mapsLink') || null
-  const morada         = formData.get('morada') || null
-  const categoria      = formData.get('categoria') || null
-  const descricaoAI    = formData.get('descricaoAI') || null
-  const descricaoFinal = formData.get('descricaoFinal') || null
-  const nome           = formData.get('nome') || null
-  const telefone       = formData.get('telefone') || null
-  const email          = formData.get('email') || null
-
-  // Lookup condominio_id e loja_id a partir do n_impar
-  const cond = await sql`
-    SELECT id, loja_id FROM condominios
-    WHERE n_impar = ${parseInt(condominioNImpar)} OR old_n_impar = ${condominioNImpar}
-    LIMIT 1
-  `
-  if (cond.length === 0) {
-    return c.json({ error: 'Condomínio não encontrado' }, 404)
-  }
-  const condominioId = cond[0].id
-  const lojaId       = cond[0].loja_id
-
-  // Lookup categoria
-  const cat = await sql`
-    SELECT id FROM categorias WHERE nome = ${categoria} LIMIT 1
-  `
-  const categoriaId = cat.length > 0 ? cat[0].id : null
-
-  await sql`
-    INSERT INTO ocorrencias (
-      id, condominio_id, loja_id, morada,
-      categoria_id, categoria_texto,
-      descricao_ai, descricao_final,
-      latitude, longitude, maps_link,
-      tem_foto, foto_url,
-      nome_reportante, telefone_reportante, email_reportante,
-      status, ts_registo
-    ) VALUES (
-      ${ocId}, ${condominioId}, ${lojaId}, ${morada},
-      ${categoriaId}, ${categoria},
-      ${descricaoAI}, ${descricaoFinal},
-      ${latitude ? parseFloat(latitude) : null},
-      ${longitude ? parseFloat(longitude) : null},
-      ${mapsLink},
-      ${temFoto}, ${fotoUrl},
-      ${nome}, ${telefone}, ${email},
-      'aberta',
-      NOW()
-    )
-    ON CONFLICT (id) DO NOTHING
-  `
-
-  return c.json({ ok: true })
-})
-
-app.post('/public/limpezas', async (c) => {
-  const sql = neon(c.env.DATABASE_URL)
-
-  const formData = await c.req.formData()
-  console.log('limpeza recebida:', {
-    condominio: formData.get('condominio'),
-    latitude: formData.get('latitude'),
-    temFoto: formData.get('temFoto')
-  })
-
-  const condominioNImpar = formData.get('condominio') || ''
-  const latitude  = formData.get('latitude') || null
-  const longitude = formData.get('longitude') || null
-  const accuracy  = formData.get('accuracy') || null
-  const temFoto   = formData.get('temFoto') === 'true'
-  const timestamp = formData.get('timestamp') || null
-  const mapsLink  = formData.get('mapsLink') || null
-  const fotoUrl   = formData.get('fotoUrl') || null
-
-  // Lookup condominio_id a partir do n_impar
-  const cond = await sql`
-    SELECT id, loja_id FROM condominios
-    WHERE n_impar = ${parseInt(condominioNImpar)} OR old_n_impar = ${condominioNImpar}
-    LIMIT 1
-  `
-  if (cond.length === 0) {
-    return c.json({ error: 'Condomínio não encontrado' }, 404)
-  }
-
-  await sql`
-    INSERT INTO limpezas (
-      condominio_id, loja_id,
-      latitude, longitude, precisao_m,
-      maps_link, tem_foto, foto_url,
-      pin_validado, ts_checkin
-    ) VALUES (
-      ${cond[0].id}, ${cond[0].loja_id},
-      ${latitude ? parseFloat(latitude) : null},
-      ${longitude ? parseFloat(longitude) : null},
-      ${accuracy ? parseFloat(accuracy) : null},
-      ${mapsLink},
-      ${temFoto},
-      ${fotoUrl},
-      true,
-      NOW()
-    )
-  `
-
-  return c.json({ ok: true })
-})
-
 // ── Prestadores ───────────────────────────────────────────────
 
 app.get('/prestadores', requireAuth, async (c) => {
@@ -4189,20 +4070,23 @@ app.post('/public/limpezas', async (c) => {
 
   const sql = neon(c.env.DATABASE_URL)
 
-  // Resolver condominio_id e loja_id a partir do identificador recebido
-  const condId = String(d.condominio || '').trim()
-  const idInt  = parseInt(condId, 10)
-  let condRows = []
+ const condId = String(d.condominio || '').trim()
+const idInt  = parseInt(condId, 10)
+let condRows = []
 
-  if (condId.length === 9 && /^\d+$/.test(condId)) {
-    condRows = await sql`SELECT id, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
-  }
-  if (condRows.length === 0 && !isNaN(idInt)) {
-    condRows = await sql`SELECT id, loja_id FROM condominios WHERE n_impar = ${idInt} AND ativo = true LIMIT 1`
-  }
-  if (condRows.length === 0) {
-    condRows = await sql`SELECT id, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
-  }
+if (condId.length === 9 && /^\d+$/.test(condId)) {
+  condRows = await sql`SELECT id, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
+}
+if (condRows.length === 0 && !isNaN(idInt)) {
+  condRows = await sql`SELECT id, loja_id FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
+}
+if (condRows.length === 0) {
+  condRows = await sql`SELECT id, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
+}
+
+if (condRows.length === 0) {
+  return c.json({ error: 'Condomínio não encontrado: ' + condId }, 404)
+}
 
   const condominioId = condRows[0]?.id    || null
   const lojaId       = condRows[0]?.loja_id || null
@@ -4272,20 +4156,23 @@ app.post('/public/ocorrencias', async (c) => {
 
   const sql = neon(c.env.DATABASE_URL)
 
-  // Resolver condominio_id e loja_id
   const condId = String(d.condominio || '').trim()
-  const idInt  = parseInt(condId, 10)
-  let condRows = []
+const idInt  = parseInt(condId, 10)
+let condRows = []
 
-  if (condId.length === 9 && /^\d+$/.test(condId)) {
-    condRows = await sql`SELECT id, loja_id, morada FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
-  }
-  if (condRows.length === 0 && !isNaN(idInt)) {
-    condRows = await sql`SELECT id, loja_id, morada FROM condominios WHERE n_impar = ${idInt} AND ativo = true LIMIT 1`
-  }
-  if (condRows.length === 0) {
-    condRows = await sql`SELECT id, loja_id, morada FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
-  }
+if (condId.length === 9 && /^\d+$/.test(condId)) {
+  condRows = await sql`SELECT id, loja_id FROM condominios WHERE nipc = ${condId} AND ativo = true LIMIT 1`
+}
+if (condRows.length === 0 && !isNaN(idInt)) {
+  condRows = await sql`SELECT id, loja_id FROM condominios WHERE n_impar = ${idInt}::integer AND ativo = true LIMIT 1`
+}
+if (condRows.length === 0) {
+  condRows = await sql`SELECT id, loja_id FROM condominios WHERE old_n_impar = ${condId} AND ativo = true LIMIT 1`
+}
+
+if (condRows.length === 0) {
+  return c.json({ error: 'Condomínio não encontrado: ' + condId }, 404)
+}
 
   const condominioId = condRows[0]?.id      || null
   const lojaId       = condRows[0]?.loja_id  || null
