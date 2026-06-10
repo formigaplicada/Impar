@@ -1,8 +1,4 @@
 // ── TabContratos ──────────────────────────────────────────────────────────────
-// Uso em Condominios.jsx:
-//   import TabContratos from './TabContratos'
-//   {tab === 'contratos' && <TabContratos condominioId={condominio.id} />}
-
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 
@@ -60,18 +56,15 @@ function Badge({ label, color, bg }) {
   )
 }
 
-
 // ── PrestadorPorServico ───────────────────────────────────────────────────────
-// Fluxo: selecciona serviço → lista prestadores associados → escolhe ou associa novo
-
 function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl, lojaId }) {
-  const [servicoSelId,   setServicoSelId]   = useState('')
-  const [associados,     setAssociados]     = useState([])
-  const [naoAssociados,  setNaoAssociados]  = useState([])
-  const [loadingPrest,   setLoadingPrest]   = useState(false)
-  const [mostrarAssoc,   setMostrarAssoc]   = useState(false)
-  const [prestAssocId,   setPrestAssocId]   = useState('')
-  const [salvandoAssoc,  setSalvandoAssoc]  = useState(false)
+  const [servicoSelId,  setServicoSelId]  = useState('')
+  const [associados,    setAssociados]    = useState([])
+  const [naoAssociados, setNaoAssociados] = useState([])
+  const [loadingPrest,  setLoadingPrest]  = useState(false)
+  const [mostrarAssoc,  setMostrarAssoc]  = useState(false)
+  const [prestAssocId,  setPrestAssocId]  = useState('')
+  const [salvandoAssoc, setSalvandoAssoc] = useState(false)
 
   async function carregarPrestadores(servicoId) {
     if (!servicoId) { setAssociados([]); setNaoAssociados([]); return }
@@ -92,42 +85,27 @@ function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl, lojaId }) 
     setSalvandoAssoc(false)
   }
 
-  const prestadorSel = associados.find(p => String(p.id) === String(form.prestador_id))
-
   return (
     <div style={{ marginBottom: '1rem' }}>
-      {/* 1 — Seleccionar serviço */}
       <label style={lbl}>Serviço prestado</label>
-      <select
-        style={inp}
-        value={servicoSelId}
-        onChange={e => {
-          setServicoSelId(e.target.value)
-          set('prestador_id', '')
-          carregarPrestadores(e.target.value)
-        }}
-      >
+      <select style={inp} value={servicoSelId} onChange={e => {
+        setServicoSelId(e.target.value)
+        set('prestador_id', '')
+        carregarPrestadores(e.target.value)
+      }}>
         <option value="">— Seleccionar serviço —</option>
         {servicosCatalogo.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
       </select>
 
-      {/* 2 — Lista de prestadores (após serviço seleccionado) */}
       {servicoSelId && (
         <div style={{ marginTop: '0.75rem' }}>
           <label style={lbl}>Prestador</label>
-
           {loadingPrest ? (
-            <div style={{ fontSize: '0.82rem', color: '#6b7a90', padding: '0.5rem' }}>A carregar…</div>
+            <div style={{ fontSize: '0.82rem', color: C.muted, padding: '0.5rem' }}>A carregar…</div>
           ) : associados.length === 0 ? (
-            <div style={{ fontSize: '0.82rem', color: '#9aa3b0', padding: '0.5rem 0' }}>
-              Sem prestadores associados a este serviço.
-            </div>
+            <div style={{ fontSize: '0.82rem', color: C.subtle, padding: '0.5rem 0' }}>Sem prestadores associados.</div>
           ) : (
-            <select
-              style={inp}
-              value={form.prestador_id}
-              onChange={e => set('prestador_id', e.target.value)}
-            >
+            <select style={inp} value={form.prestador_id} onChange={e => set('prestador_id', e.target.value)}>
               <option value="">— Seleccionar prestador —</option>
               {associados.map(p => (
                 <option key={p.id} value={p.id}>
@@ -136,44 +114,27 @@ function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl, lojaId }) 
               ))}
             </select>
           )}
-
-          {/* Associar novo prestador a este serviço */}
           {!mostrarAssoc ? (
-            <button
-              type="button"
-              onClick={() => setMostrarAssoc(true)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: '#2563eb', fontSize: '0.78rem', padding: '0.35rem 0',
-                fontFamily: 'DM Sans, sans-serif', marginTop: '0.35rem',
-              }}
-            >+ Associar prestador a este serviço</button>
+            <button type="button" onClick={() => setMostrarAssoc(true)} style={{
+              background: 'none', border: 'none', cursor: 'pointer', color: C.blue,
+              fontSize: '0.78rem', padding: '0.35rem 0', fontFamily: 'DM Sans, sans-serif', marginTop: '0.35rem',
+            }}>+ Associar prestador a este serviço</button>
           ) : (
             <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-              <select
-                style={{ ...inp, flex: 1 }}
-                value={prestAssocId}
-                onChange={e => setPrestAssocId(e.target.value)}
-              >
+              <select style={{ ...inp, flex: 1 }} value={prestAssocId} onChange={e => setPrestAssocId(e.target.value)}>
                 <option value="">— Seleccionar prestador —</option>
                 {naoAssociados.map(p => <option key={p.id} value={p.id}>{p.nome}{p.cidade ? ` — ${p.cidade}` : ''}</option>)}
               </select>
-              <button
-                type="button"
-                onClick={associarPrestador}
-                disabled={!prestAssocId || salvandoAssoc}
-                style={{
-                  background: '#011640', color: '#fff', border: 'none', borderRadius: '0.5rem',
-                  padding: '0.5rem 0.875rem', fontSize: '0.78rem', fontWeight: 600,
-                  cursor: prestAssocId ? 'pointer' : 'not-allowed',
-                  opacity: prestAssocId ? 1 : 0.5, fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
-                }}
-              >{salvandoAssoc ? '…' : 'Associar'}</button>
-              <button
-                type="button"
-                onClick={() => { setMostrarAssoc(false); setPrestAssocId('') }}
-                style={{ background: 'none', border: '1px solid #e4e8ef', borderRadius: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.78rem', cursor: 'pointer', color: '#6b7a90' }}
-              >✕</button>
+              <button type="button" onClick={associarPrestador} disabled={!prestAssocId || salvandoAssoc} style={{
+                background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
+                padding: '0.5rem 0.875rem', fontSize: '0.78rem', fontWeight: 600,
+                cursor: prestAssocId ? 'pointer' : 'not-allowed',
+                opacity: prestAssocId ? 1 : 0.5, fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+              }}>{salvandoAssoc ? '…' : 'Associar'}</button>
+              <button type="button" onClick={() => { setMostrarAssoc(false); setPrestAssocId('') }} style={{
+                background: 'none', border: `1px solid ${C.border}`, borderRadius: '0.5rem',
+                padding: '0.5rem 0.75rem', fontSize: '0.78rem', cursor: 'pointer', color: C.muted,
+              }}>✕</button>
             </div>
           )}
         </div>
@@ -184,24 +145,17 @@ function PrestadorPorServico({ servicosCatalogo, form, set, inp, lbl, lojaId }) 
 
 // ── Modal Contrato ────────────────────────────────────────────────────────────
 const FORM_VAZIO = {
-  tipo: 'condominio',
-  prestador_id: '',
-  data_inicio: '',
-  data_fim: '',
-  estado: 'ativo',
-  renovacao_automatica: false,
-  documento_url: '',
-  condicoes: '',
+  tipo: 'condominio', prestador_id: '', data_inicio: '', data_fim: '',
+  estado: 'ativo', renovacao_automatica: false, documento_url: '', condicoes: '',
 }
 
 function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
-  const [form, setForm]     = useState(inicial || { ...FORM_VAZIO, tipo })
+  const [form, setForm]       = useState(inicial || { ...FORM_VAZIO, tipo })
   const [servicos, setServicos] = useState(inicial?.servicos || [])
   const [customInput, setCustomInput] = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  // Filtrar catálogo conforme tipo
   const catalogoFiltrado = servicosCatalogo.filter(s =>
     tipo === 'condominio' ? s.em_contrato : s.em_prestador
   )
@@ -210,37 +164,20 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
     setServicos(prev => {
       const existe = prev.find(sv => sv.servico_id === s.id)
       if (existe) return prev.filter(sv => sv.servico_id !== s.id)
-      return [...prev, {
-        servico_id: s.id,
-        nome_custom: null,
-        valor_mensal: '',
-        periodicidade: 'mensal',
-        estimativa: false,
-        observacoes: '',
-      }]
+      return [...prev, { servico_id: s.id, nome_custom: null, valor_mensal: '', periodicidade: 'mensal', estimativa: false, observacoes: '' }]
     })
   }
 
   function addCustom() {
     const nome = customInput.trim()
     if (!nome) return
-    setServicos(prev => [...prev, {
-      servico_id: null,
-      nome_custom: nome,
-      valor_mensal: '',
-      periodicidade: 'mensal',
-      estimativa: false,
-      observacoes: '',
-    }])
+    setServicos(prev => [...prev, { servico_id: null, nome_custom: nome, valor_mensal: '', periodicidade: 'mensal', estimativa: false, observacoes: '' }])
     setCustomInput('')
   }
 
-  function removeCustom(idx) {
-    setServicos(prev => prev.filter((_, i) => i !== idx))
-  }
+  function removeCustom(idx) { setServicos(prev => prev.filter((_, i) => i !== idx)) }
 
   function updateServico(identifier, campo, valor) {
-    // identifier é servico_id (string) ou index (number) para custom
     setServicos(prev => prev.map((s, i) => {
       const match = typeof identifier === 'number' ? i === identifier : s.servico_id === identifier
       return match ? { ...s, [campo]: valor } : s
@@ -248,31 +185,23 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
   }
 
   const lbl = {
-    fontSize: '0.72rem', fontWeight: 600, color: C.muted,
-    marginBottom: '0.3rem', display: 'block',
-    textTransform: 'uppercase', letterSpacing: '0.06em',
+    fontSize: '0.72rem', fontWeight: 600, color: C.muted, marginBottom: '0.3rem',
+    display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em',
   }
   const inp = {
-    width: '100%', padding: '0.5rem 0.75rem',
-    border: `1px solid ${C.border}`, borderRadius: '0.5rem',
-    fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif',
+    width: '100%', padding: '0.5rem 0.75rem', border: `1px solid ${C.border}`,
+    borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif',
     color: C.text, background: C.white, boxSizing: 'border-box',
   }
   const row2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }
 
-  // Render campos de detalhe de um serviço seleccionado
-  function DetalheServico({ sv, identifier, nome }) {
+  function DetalheServico({ sv, identifier }) {
     return (
       <div style={{ padding: '0 0.875rem 0.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
         <div>
           <label style={{ ...lbl, marginBottom: '0.2rem' }}>Valor (€)</label>
-          <input
-            type="number" min="0" step="0.01"
-            style={{ ...inp, fontSize: '0.82rem' }}
-            value={sv.valor_mensal}
-            onChange={e => updateServico(identifier, 'valor_mensal', e.target.value)}
-            placeholder="0.00"
-          />
+          <input type="number" min="0" step="0.01" style={{ ...inp, fontSize: '0.82rem' }}
+            value={sv.valor_mensal} onChange={e => updateServico(identifier, 'valor_mensal', e.target.value)} placeholder="0.00" />
         </div>
         <div>
           <label style={{ ...lbl, marginBottom: '0.2rem' }}>Periodicidade</label>
@@ -281,18 +210,14 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
           </select>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <input
-            type="checkbox"
-            id={`est-${identifier}`}
-            checked={sv.estimativa}
-            onChange={e => updateServico(identifier, 'estimativa', e.target.checked)}
-            style={{ width: 14, height: 14 }}
-          />
+          <input type="checkbox" id={`est-${identifier}`} checked={sv.estimativa}
+            onChange={e => updateServico(identifier, 'estimativa', e.target.checked)} style={{ width: 14, height: 14 }} />
           <label htmlFor={`est-${identifier}`} style={{ fontSize: '0.78rem', color: C.muted, cursor: 'pointer' }}>Valor estimado</label>
         </div>
         <div>
           <label style={{ ...lbl, marginBottom: '0.2rem' }}>Observações</label>
-          <input style={{ ...inp, fontSize: '0.82rem' }} value={sv.observacoes} onChange={e => updateServico(identifier, 'observacoes', e.target.value)} placeholder="Notas..." />
+          <input style={{ ...inp, fontSize: '0.82rem' }} value={sv.observacoes}
+            onChange={e => updateServico(identifier, 'observacoes', e.target.value)} placeholder="Notas..." />
         </div>
       </div>
     )
@@ -301,8 +226,7 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
   return (
     <div onClick={e => { if (e.target === e.currentTarget) onFechar() }} style={{
       position: 'fixed', inset: 0, background: 'rgba(1,22,64,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 1000, padding: '1rem',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem',
     }}>
       <div style={{
         background: C.white, borderRadius: '1rem', width: '100%', maxWidth: 680,
@@ -316,19 +240,10 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
           <button onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.4rem', color: C.muted }}>×</button>
         </div>
 
-        {/* Prestador — fluxo: serviço primeiro, depois lista filtrada */}
         {tipo === 'prestador' && (
-          <PrestadorPorServico
-            servicosCatalogo={catalogoFiltrado}
-            form={form}
-            set={set}
-            inp={inp}
-            lbl={lbl}
-            lojaId={lojaId}
-          />
+          <PrestadorPorServico servicosCatalogo={catalogoFiltrado} form={form} set={set} inp={inp} lbl={lbl} lojaId={lojaId} />
         )}
 
-        {/* Datas */}
         <div style={row2}>
           <div>
             <label style={lbl}>Data de início *</label>
@@ -340,7 +255,6 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
           </div>
         </div>
 
-        {/* Estado + Renovação */}
         <div style={row2}>
           <div>
             <label style={lbl}>Estado</label>
@@ -349,24 +263,23 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
             </select>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '1.5rem' }}>
-            <input type="checkbox" id="renovacao" checked={form.renovacao_automatica} onChange={e => set('renovacao_automatica', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+            <input type="checkbox" id="renovacao" checked={form.renovacao_automatica}
+              onChange={e => set('renovacao_automatica', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
             <label htmlFor="renovacao" style={{ fontSize: '0.875rem', color: C.text, cursor: 'pointer' }}>Renovação automática</label>
           </div>
         </div>
 
-        {/* Documento */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={lbl}>Documento <span style={{ fontWeight: 400, textTransform: 'none' }}>(link OneDrive — opcional)</span></label>
           <input style={inp} value={form.documento_url} onChange={e => set('documento_url', e.target.value)} placeholder="https://..." />
         </div>
 
-        {/* Condições */}
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={lbl}>Condições gerais</label>
-          <textarea style={{ ...inp, resize: 'vertical', minHeight: '3.5rem' }} value={form.condicoes} onChange={e => set('condicoes', e.target.value)} placeholder="Notas e condições do contrato..." />
+          <textarea style={{ ...inp, resize: 'vertical', minHeight: '3.5rem' }} value={form.condicoes}
+            onChange={e => set('condicoes', e.target.value)} placeholder="Notas e condições do contrato..." />
         </div>
 
-        {/* Serviços do catálogo */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ ...lbl, marginBottom: '0.75rem' }}>Serviços incluídos</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
@@ -374,217 +287,221 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
               const sel = servicos.find(sv => sv.servico_id === s.id)
               return (
                 <div key={s.id} style={{
-                  border: `1px solid ${sel ? C.blue : C.border}`,
-                  borderRadius: '0.5rem', overflow: 'hidden',
-                  background: sel ? C.blueL : C.white,
+                  border: `1px solid ${sel ? C.blue : C.border}`, borderRadius: '0.5rem',
+                  overflow: 'hidden', background: sel ? C.blueL : C.white,
                 }}>
                   <div onClick={() => toggleServico(s)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.875rem', cursor: 'pointer' }}>
                     <input type="checkbox" checked={!!sel} onChange={() => toggleServico(s)} style={{ width: 15, height: 15 }} />
                     <span style={{ fontSize: '0.875rem', fontWeight: sel ? 600 : 400, color: sel ? C.navy : C.text }}>{s.nome}</span>
                   </div>
-                  {sel && <DetalheServico sv={sel} identifier={s.id} nome={s.nome} />}
+                  {sel && <DetalheServico sv={sel} identifier={s.id} />}
                 </div>
               )
             })}
           </div>
         </div>
 
-        {/* Serviços custom (Outros) */}
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={{ ...lbl, marginBottom: '0.75rem' }}>Outros serviços</label>
-
-          {/* Serviços custom já adicionados */}
           {servicos.filter(sv => !sv.servico_id).map((sv, i) => {
             const idx = servicos.indexOf(sv)
             return (
-              <div key={i} style={{
-                border: `1px solid ${C.blue}`, borderRadius: '0.5rem',
-                overflow: 'hidden', background: C.blueL, marginBottom: '0.4rem',
-              }}>
+              <div key={i} style={{ border: `1px solid ${C.blue}`, borderRadius: '0.5rem', overflow: 'hidden', background: C.blueL, marginBottom: '0.4rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.875rem' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: 600, color: C.navy }}>{sv.nome_custom}</span>
                   <button onClick={() => removeCustom(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '1rem' }}>✕</button>
                 </div>
-                <DetalheServico sv={sv} identifier={idx} nome={sv.nome_custom} />
+                <DetalheServico sv={sv} identifier={idx} />
               </div>
             )
           })}
-
-          {/* Input para adicionar novo */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              style={{ ...inp, flex: 1 }}
-              placeholder="Nome do serviço..."
-              value={customInput}
+            <input style={{ ...inp, flex: 1 }} placeholder="Nome do serviço..." value={customInput}
               onChange={e => setCustomInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }}
-            />
-            <button
-              onClick={addCustom}
-              disabled={!customInput.trim()}
-              style={{
-                background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
-                padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600,
-                cursor: customInput.trim() ? 'pointer' : 'not-allowed',
-                opacity: customInput.trim() ? 1 : 0.5,
-                fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
-              }}
-            >+ Adicionar</button>
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }} />
+            <button onClick={addCustom} disabled={!customInput.trim()} style={{
+              background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
+              padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600,
+              cursor: customInput.trim() ? 'pointer' : 'not-allowed',
+              opacity: customInput.trim() ? 1 : 0.5, fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+            }}>+ Adicionar</button>
           </div>
         </div>
 
-        {/* Acções */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <button onClick={onFechar} style={{
             background: 'none', border: `1px solid ${C.border}`, borderRadius: '0.5rem',
             padding: '0.5rem 1.25rem', fontSize: '0.875rem', cursor: 'pointer',
             color: C.muted, fontFamily: 'DM Sans, sans-serif',
           }}>Cancelar</button>
-          <button
-            onClick={() => onGuardar({ ...form, tipo, servicos })}
-            disabled={!form.data_inicio || loading}
-            style={{
-              background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
-              padding: '0.5rem 1.5rem', fontSize: '0.875rem', fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
-              opacity: (!form.data_inicio || loading) ? 0.6 : 1,
-            }}
-          >{loading ? 'A guardar…' : 'Guardar'}</button>
+          <button onClick={() => onGuardar({ ...form, tipo, servicos })} disabled={!form.data_inicio || loading} style={{
+            background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
+            padding: '0.5rem 1.5rem', fontSize: '0.875rem', fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+            opacity: (!form.data_inicio || loading) ? 0.6 : 1,
+          }}>{loading ? 'A guardar…' : 'Guardar'}</button>
         </div>
       </div>
     </div>
   )
 }
 
-// ── Card de Contrato ──────────────────────────────────────────────────────────
-function CardContrato({ contrato, onEditar }) {
-  const [logAberto,   setLogAberto]   = useState(false)
-  const [logs,        setLogs]        = useState([])
-  const [loadingLog,  setLoadingLog]  = useState(false)
-  const estado = cfgEstado(contrato.estado)
+// ── Histórico ─────────────────────────────────────────────────────────────────
+function HistoricoSection({ contratos }) {
+  const [aberto, setAberto]     = useState(false)
+  const [logs, setLogs]         = useState([])
+  const [loading, setLoading]   = useState(false)
+  const [carregado, setCarregado] = useState(false)
 
-  async function carregarLogs() {
-    if (logAberto) { setLogAberto(false); return }
-    if (logs.length === 0) {
-      setLoadingLog(true)
-      const data = await api.get(`/contratos/${contrato.id}/logs`)
-      setLogs(data.logs || [])
-      setLoadingLog(false)
+  async function toggle() {
+    if (aberto) { setAberto(false); return }
+    if (!carregado) {
+      setLoading(true)
+      const resultados = await Promise.all(
+        contratos.map(c => api.get(`/contratos/${c.id}/logs`).then(r => (r.logs || []).map(l => ({ ...l, contrato_id: c.id }))))
+      )
+      const todos = resultados.flat().sort((a, b) => new Date(b.criado_em) - new Date(a.criado_em))
+      setLogs(todos)
+      setCarregado(true)
+      setLoading(false)
     }
-    setLogAberto(true)
+    setAberto(true)
   }
 
-  const totalServicos = contrato.servicos?.reduce((acc, s) => acc + (totalAnual(s.valor_mensal, s.periodicidade) || 0), 0)
+  return (
+    <div style={{ borderTop: `1px solid ${C.borderL}` }}>
+      <button onClick={toggle} style={{
+        width: '100%', background: 'none', border: 'none', padding: '0.6rem 1.25rem',
+        cursor: 'pointer', fontSize: '0.75rem', color: C.muted, textAlign: 'left',
+        fontFamily: 'DM Sans, sans-serif', display: 'flex', justifyContent: 'space-between',
+      }}>
+        <span>🕐 Histórico de alterações</span>
+        <span>{aberto ? '▲' : '▼'}</span>
+      </button>
+      {aberto && (
+        <div style={{ padding: '0 1.25rem 1rem' }}>
+          {loading ? (
+            <div style={{ color: C.subtle, fontSize: '0.78rem', textAlign: 'center', padding: '1rem' }}>A carregar…</div>
+          ) : logs.length === 0 ? (
+            <div style={{ color: C.subtle, fontSize: '0.78rem' }}>Sem alterações registadas.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {logs.map(log => (
+                <div key={log.id} style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem' }}>
+                  <span style={{ color: C.subtle, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {new Date(log.criado_em).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                    {' '}{new Date(log.criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span style={{ color: C.muted, flexShrink: 0 }}>{log.utilizador_nome || '—'}</span>
+                  <span style={{ color: C.text }}>{log.acao}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Tabela de contratos ───────────────────────────────────────────────────────
+function TabelaContratos({ contratos, onEditar }) {
+  const thStyle = {
+    padding: '0.5rem 0.875rem', textAlign: 'left', fontWeight: 600,
+    fontSize: '0.7rem', color: C.subtle, letterSpacing: '0.05em',
+    textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`,
+    whiteSpace: 'nowrap', background: '#f7f9fc',
+  }
+  const tdStyle = {
+    padding: '0.6rem 0.875rem', fontSize: '0.82rem',
+    color: C.text, borderBottom: `1px solid ${C.borderL}`,
+    verticalAlign: 'middle',
+  }
+
+  // Flatten: uma linha por contrato (cada contrato tem 1 serviço neste fluxo)
+  const linhas = contratos.map(c => {
+    const sv = c.servicos?.[0]
+    const anual = sv ? totalAnual(sv.valor_mensal, sv.periodicidade) : null
+    const estado = cfgEstado(c.estado)
+    return { contrato: c, sv, anual, estado }
+  })
+
+  const totalGeral = linhas.reduce((acc, { anual }) => acc + (anual || 0), 0)
+
+  if (linhas.length === 0) return (
+    <div style={{
+      background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.75rem',
+      padding: '3rem', textAlign: 'center', color: C.subtle,
+    }}>
+      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
+      Sem contratos registados.
+    </div>
+  )
 
   return (
-    <div style={{
-      background: C.surface, border: `1px solid ${C.border}`,
-      borderRadius: '0.875rem', overflow: 'hidden',
-      boxShadow: '0 1px 4px rgba(1,22,64,0.06)', marginBottom: '1rem',
-    }}>
-      {/* Cabeçalho */}
-      <div style={{ padding: '1rem 1.25rem', borderBottom: `1px solid ${C.borderL}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Badge label={estado.label} color={estado.color} bg={estado.bg} />
-          {contrato.prestador_nome && (
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: C.text }}>{contrato.prestador_nome}</span>
-          )}
-          <span style={{ fontSize: '0.78rem', color: C.muted }}>
-            {formatDate(contrato.data_inicio)} → {contrato.data_fim ? formatDate(contrato.data_fim) : 'sem fim'}
-          </span>
-          {contrato.renovacao_automatica && <Badge label="Renovação auto." color="#0891b2" bg="#ecfeff" />}
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {contrato.documento_url && (
-            <a href={contrato.documento_url} target="_blank" rel="noreferrer" style={{
-              border: `1px solid ${C.border}`, borderRadius: '0.35rem',
-              padding: '0.2rem 0.6rem', fontSize: '0.72rem', color: C.blue,
-              textDecoration: 'none', fontWeight: 600,
-            }}>📄 Doc</a>
-          )}
-          <button onClick={() => onEditar(contrato)} style={{
-            background: 'none', border: `1px solid ${C.navy}`, borderRadius: '0.35rem',
-            padding: '0.2rem 0.6rem', fontSize: '0.72rem', cursor: 'pointer', color: C.navy, fontWeight: 600,
-          }}>Editar</button>
-        </div>
-      </div>
-
-      {/* Tabela de serviços */}
-      {contrato.servicos?.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-            <thead>
-              <tr style={{ background: '#f7f9fc' }}>
-                {['Serviço', 'Valor', 'Periodicidade', 'Total Anual', ''].map(h => (
-                  <th key={h} style={{ padding: '0.5rem 1rem', textAlign: 'left', fontWeight: 600, fontSize: '0.7rem', color: C.subtle, letterSpacing: '0.04em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.875rem', overflow: 'hidden', boxShadow: '0 1px 4px rgba(1,22,64,0.06)' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Serviço</th>
+              <th style={thStyle}>Estado</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>↺</th>
+              <th style={thStyle}>Data início</th>
+              <th style={thStyle}>Data fim</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Valor</th>
+              <th style={thStyle}>Período</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Total anual</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.map(({ contrato: c, sv, anual, estado }, i) => (
+              <tr key={c.id} style={{ background: i % 2 === 0 ? C.white : '#fafbfc' }}>
+                <td style={{ ...tdStyle, fontWeight: 500, color: C.navy }}>
+                  {sv?.servico_nome || sv?.nome_custom || '—'}
+                  {sv?.estimativa && <span style={{ marginLeft: '0.35rem', fontSize: '0.65rem', color: C.subtle }}>(est.)</span>}
+                </td>
+                <td style={tdStyle}>
+                  <Badge label={estado.label} color={estado.color} bg={estado.bg} />
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  {c.renovacao_automatica
+                    ? <span title="Renovação automática" style={{ fontSize: '0.95rem' }}>✓</span>
+                    : <span style={{ color: C.subtle, fontSize: '0.85rem' }}>—</span>
+                  }
+                </td>
+                <td style={{ ...tdStyle, color: C.muted }}>{formatDate(c.data_inicio)}</td>
+                <td style={{ ...tdStyle, color: C.muted }}>{formatDate(c.data_fim)}</td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>{formatEur(sv?.valor_mensal)}</td>
+                <td style={{ ...tdStyle, color: C.muted }}>
+                  {sv ? (PERIODICIDADES.find(p => p.key === sv.periodicidade)?.label || sv.periodicidade) : '—'}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatEur(anual)}</td>
+                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  <button onClick={() => onEditar(c)} style={{
+                    background: 'none', border: `1px solid ${C.border}`, borderRadius: '0.35rem',
+                    padding: '0.2rem 0.6rem', fontSize: '0.72rem', cursor: 'pointer',
+                    color: C.navy, fontWeight: 600, fontFamily: 'DM Sans, sans-serif',
+                  }}>Editar</button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {contrato.servicos.map((s, i) => (
-                <tr key={s.id} style={{ borderBottom: i < contrato.servicos.length - 1 ? `1px solid ${C.borderL}` : 'none' }}>
-                  <td style={{ padding: '0.5rem 1rem', color: C.text, fontWeight: 500 }}>
-                    {s.servico_nome || s.nome_custom}
-                    {s.nome_custom && <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: C.subtle }}>(outro)</span>}
-                  </td>
-                  <td style={{ padding: '0.5rem 1rem' }}>{formatEur(s.valor_mensal)}</td>
-                  <td style={{ padding: '0.5rem 1rem', color: C.muted }}>{PERIODICIDADES.find(p => p.key === s.periodicidade)?.label || s.periodicidade}</td>
-                  <td style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>
-                    {formatEur(totalAnual(s.valor_mensal, s.periodicidade))}
-                    {s.estimativa && <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', color: C.muted }}>(est.)</span>}
-                  </td>
-                  <td style={{ padding: '0.5rem 1rem' }}>
-                    {s.observacoes && <span style={{ fontSize: '0.72rem', color: C.subtle }} title={s.observacoes}>💬</span>}
-                  </td>
-                </tr>
-              ))}
-              <tr style={{ background: '#f7f9fc', borderTop: `1.5px solid ${C.border}` }}>
-                <td colSpan={3} style={{ padding: '0.5rem 1rem', fontSize: '0.78rem', fontWeight: 700, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Total anual</td>
-                <td colSpan={2} style={{ padding: '0.5rem 1rem', fontWeight: 700, color: C.navy }}>{formatEur(totalServicos)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div style={{ padding: '1.5rem', textAlign: 'center', color: C.subtle, fontSize: '0.82rem' }}>Sem serviços associados.</div>
-      )}
-
-      {/* Condições */}
-      {contrato.condicoes && (
-        <div style={{ padding: '0.75rem 1.25rem', borderTop: `1px solid ${C.borderL}`, fontSize: '0.78rem', color: C.muted }}>
-          <strong style={{ color: C.subtle }}>Condições:</strong> {contrato.condicoes}
-        </div>
-      )}
-
-      {/* Histórico */}
-      <div style={{ borderTop: `1px solid ${C.borderL}` }}>
-        <button onClick={carregarLogs} style={{ width: '100%', background: 'none', border: 'none', padding: '0.6rem 1.25rem', cursor: 'pointer', fontSize: '0.75rem', color: C.muted, textAlign: 'left', fontFamily: 'DM Sans, sans-serif', display: 'flex', justifyContent: 'space-between' }}>
-          <span>🕐 Histórico de alterações</span>
-          <span>{logAberto ? '▲' : '▼'}</span>
-        </button>
-        {logAberto && (
-          <div style={{ padding: '0 1.25rem 1rem' }}>
-            {loadingLog ? (
-              <div style={{ color: C.subtle, fontSize: '0.78rem', textAlign: 'center', padding: '1rem' }}>A carregar…</div>
-            ) : logs.length === 0 ? (
-              <div style={{ color: C.subtle, fontSize: '0.78rem' }}>Sem alterações registadas.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {logs.map(log => (
-                  <div key={log.id} style={{ display: 'flex', gap: '0.75rem', fontSize: '0.75rem' }}>
-                    <span style={{ color: C.subtle, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                      {new Date(log.criado_em).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                      {' '}{new Date(log.criado_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <span style={{ color: C.muted, flexShrink: 0 }}>{log.utilizador_nome || '—'}</span>
-                    <span style={{ color: C.text }}>{log.acao}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: '#f0f3f7', borderTop: `2px solid ${C.border}` }}>
+              <td colSpan={7} style={{ ...tdStyle, borderBottom: 'none', fontWeight: 700, fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Total anual
+              </td>
+              <td style={{ ...tdStyle, borderBottom: 'none', textAlign: 'right', fontWeight: 700, color: C.navy, fontSize: '0.9rem' }}>
+                {formatEur(totalGeral)}
+              </td>
+              <td style={{ ...tdStyle, borderBottom: 'none' }} />
+            </tr>
+          </tfoot>
+        </table>
       </div>
+      <HistoricoSection contratos={contratos} />
     </div>
   )
 }
@@ -595,7 +512,7 @@ export default function TabContratos({ condominioId, lojaId }) {
   const [servicosCatalogo, setServicosCatalogo] = useState([])
   const [prestadores,      setPrestadores]      = useState([])
   const [loading,          setLoading]          = useState(true)
-  const [modal,            setModal]            = useState(null) // null | { tipo, contrato? }
+  const [modal,            setModal]            = useState(null)
   const [loadingGuardar,   setLoadingGuardar]   = useState(false)
   const [secao,            setSecao]            = useState('condominio')
 
@@ -648,49 +565,38 @@ export default function TabContratos({ condominioId, lojaId }) {
 
       {/* Botão adicionar */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-        <button
-          onClick={() => setModal({ tipo: secao })}
-          style={{
-            background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
-            padding: '0.5rem 1.125rem', fontSize: '0.82rem', fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
-          }}
-        >+ {secao === 'condominio' ? 'Novo Contrato' : 'Novo Prestador'}</button>
+        <button onClick={() => setModal({ tipo: secao })} style={{
+          background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
+          padding: '0.5rem 1.125rem', fontSize: '0.82rem', fontWeight: 600,
+          cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+        }}>+ {secao === 'condominio' ? 'Novo Contrato' : 'Novo Prestador'}</button>
       </div>
 
       {/* Lista */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: C.subtle }}>⏳ A carregar…</div>
-      ) : listaActual.length === 0 ? (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: C.subtle }}>
-          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
-          {secao === 'condominio' ? 'Sem contratos registados.' : 'Sem contratos com prestadores.'}
-        </div>
       ) : (
-        listaActual.map(c => (
-          <CardContrato
-            key={c.id}
-            contrato={c}
-            onEditar={contrato => setModal({ tipo: contrato.tipo, contrato })}
-          />
-        ))
+        <TabelaContratos
+          contratos={listaActual}
+          onEditar={contrato => setModal({ tipo: contrato.tipo, contrato })}
+        />
       )}
 
       {/* Modal */}
       {modal && (
         <ModalContrato
           tipo={modal.tipo}
-          lojaId={lojaId} 
+          lojaId={lojaId}
           inicial={modal.contrato ? {
             tipo:                 modal.contrato.tipo,
-            prestador_id:         modal.contrato.prestador_id            || '',
-            data_inicio:          modal.contrato.data_inicio?.slice(0,10) || '',
-            data_fim:             modal.contrato.data_fim?.slice(0,10)    || '',
+            prestador_id:         modal.contrato.prestador_id             || '',
+            data_inicio:          modal.contrato.data_inicio?.slice(0, 10) || '',
+            data_fim:             modal.contrato.data_fim?.slice(0, 10)    || '',
             estado:               modal.contrato.estado,
             renovacao_automatica: modal.contrato.renovacao_automatica,
-            documento_url:        modal.contrato.documento_url            || '',
-            condicoes:            modal.contrato.condicoes                || '',
-            servicos:             modal.contrato.servicos                 || [],
+            documento_url:        modal.contrato.documento_url             || '',
+            condicoes:            modal.contrato.condicoes                 || '',
+            servicos:             modal.contrato.servicos                  || [],
           } : null}
           condominioId={condominioId}
           lojaId={lojaId}

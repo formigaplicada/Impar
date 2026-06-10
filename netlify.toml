@@ -1,6 +1,15 @@
+[build]
+  command = "echo 'No build needed'"
+  publish = "."
+
 [[redirects]]
   from = "/*"
-  to = "https://my.condexpress.com/"
-  status = 302
-  force = true
-  query = {condominio = ":condominio"}
+  to = "/index.html"
+  status = 200[build]
+  command = "echo 'No build needed'"
+  publish = "."
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

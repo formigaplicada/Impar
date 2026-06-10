@@ -4378,14 +4378,20 @@ async function enviarEmailConfirmacaoUtilizador(env, ocId, d, condInfo) {
 app.get('/test/email', async (c) => {
   try {
     const token = await getMicrosoftToken(c.env)
-    // Decodificar payload do JWT (base64)
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    return c.json({ 
-      ok: true,
-      roles: payload.roles,
-      app_id: payload.appid,
-      tenant: payload.tid
+    const res = await fetch('https://graph.microsoft.com/v1.0/users/geral@impar.pt/sendMail', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          subject: '🧪 Teste Worker',
+          body: { contentType: 'Text', content: 'Teste' },
+          toRecipients: [{ emailAddress: { address: 'formigaplicada@gmail.com' } }]
+        },
+        saveToSentItems: true
+      })
     })
+    const body = await res.text()
+    return c.json({ status: res.status, body })
   } catch (err) {
     return c.json({ error: err.message }, 500)
   }
