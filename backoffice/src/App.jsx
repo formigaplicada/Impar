@@ -8,7 +8,8 @@ import Lojas from './pages/Lojas'
 import Dashboard from './pages/Dashboard'
 import Prestadores from './pages/Prestadores'
 import OcorrenciaDetalhe from './pages/OcorrenciaDetalhe'
-import Eventos from './pages/Eventos'  // adicionar no topo
+import Eventos from './pages/Eventos'
+import Suporte from './pages/Suporte'
 
 export default function App() {
   return (
