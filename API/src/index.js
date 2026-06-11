@@ -1,7 +1,11 @@
 import { Hono } from 'hono'
 import { neon } from '@neondatabase/serverless'
+import aiRouter from './ai.js';
+
 
 const app = new Hono()
+
+app.route('/ai', aiRouter);
 
 // ── Utilitários ──────────────────────────────────────────────
 
@@ -4396,6 +4400,8 @@ app.get('/test/email', async (c) => {
     return c.json({ error: err.message }, 500)
   }
 })
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRON HANDLER — substitui o export default existente no index.js
