@@ -477,7 +477,6 @@ function TabelaContratosImpar({ contratos, onEditar }) {
               <th style={thStyle}>Data início</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Valor mensal</th>
               <th style={thStyle}>Período</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Total anual</th>
               <th style={{ ...thStyle, textAlign: 'center' }}></th>
             </tr>
           </thead>
@@ -496,7 +495,6 @@ function TabelaContratosImpar({ contratos, onEditar }) {
                 <td style={{ ...tdStyle, color: C.muted }}>
                   {sv ? periodicidadeLabel(sv.periodicidade, 'condominio') : '—'}
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatEur(anual)}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }}>
                   <button onClick={() => onEditar(c)} style={{
                     background: 'none', border: `1px solid ${C.border}`, borderRadius: '0.35rem',
@@ -507,17 +505,6 @@ function TabelaContratosImpar({ contratos, onEditar }) {
               </tr>
             ))}
           </tbody>
-          <tfoot>
-            <tr style={{ background: '#f0f3f7', borderTop: `2px solid ${C.border}` }}>
-              <td colSpan={5} style={{ ...tdStyle, borderBottom: 'none', fontWeight: 700, fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Total anual
-              </td>
-              <td style={{ ...tdStyle, borderBottom: 'none', textAlign: 'right', fontWeight: 700, color: C.navy, fontSize: '0.9rem' }}>
-                {formatEur(totalGeral)}
-              </td>
-              <td style={{ ...tdStyle, borderBottom: 'none' }} />
-            </tr>
-          </tfoot>
         </table>
       </div>
       <HistoricoSection contratos={contratos} />
