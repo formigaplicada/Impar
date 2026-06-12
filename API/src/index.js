@@ -1,9 +1,16 @@
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 import { neon } from '@neondatabase/serverless'
 import aiRouter from './ai.js';
 
 
 const app = new Hono()
+
+app.use('*', cors({
+  origin: 'https://app.condexpress.com',
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+}))
 
 app.route('/ai', aiRouter);
 

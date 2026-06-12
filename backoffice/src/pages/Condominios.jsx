@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import TabContratos from './TabContratos'
+import TabCondominos from './TabCondominos'
+
 
 // ── Paleta Ímpar ─────────────────────────────────────────────────────────────
 const C = {
@@ -833,6 +835,7 @@ function DetalheCondominio({ condominio, onVoltar }) {
       {tab === 'fracoes'    && <TabPlaceholder icon="🏠" title="Frações e Condóminos" description="Em desenvolvimento." />}
      {tab === 'contratos' && <TabContratos condominioId={condominio.id} lojaId={condominio.loja_id} />}
       {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} />}
+      {tab === 'fracoes' && <TabCondominos condominioId={condominio.id} />}
     </div>
   )
 }

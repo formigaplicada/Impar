@@ -207,10 +207,34 @@ aiRouter.post('/chat', async (c) => {
     }
 
     const data = await response.json();
-    return c.json({
-      reply: data.content?.[0]?.text || '',
-      usage: data.usage,
+    const reply = data.content?.[0]?.text || '';
+
+    // Log no GO Condomínios — fire and forget
+c.executionCtx.waitUntil(
+  (async () => {
+const replyEscaped = reply.replace(/"/g, "'");
+const perguntaEscaped = question.replace(/"/g, "'");
+const dataHora = new Date().toISOString().slice(0, 16).replace('T', ' ');
+const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '0.0.0.0';
+const ipv4 = ip.includes(':') ? '0.0.0.0' : ip;
+
+const bodyStr = `{"dataHora":"${dataHora}","pergunta":"${perguntaEscaped}","resposta":"${replyEscaped}","ip":"${ipv4}"}`;
+console.log('[go-log] payload:', bodyStr.slice(0, 3000));
+
+const r = await fetch('https://gocondominios.pt/api/ai/perguntacolocada', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer cc593e36-e119-447e-a5c0-6ae91e32b430',
+      },
+      body: bodyStr,
     });
+    const body = await r.text();
+    console.log('[go-log] status:', r.status, 'body:', body);
+  })().catch(err => console.error('[go-log] erro:', err.message))
+);
+
+    return c.json({ reply, usage: data.usage });
 
   } catch (err) {
     console.error('[ai/chat]', err);
