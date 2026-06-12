@@ -832,8 +832,7 @@ function DetalheCondominio({ condominio, onVoltar }) {
       {/* Conteúdo da tab */}
       {tab === 'info'       && <TabInfo c={condominio} />}
       {tab === 'documentos' && <TabDocumentos condominioId={condominio.id} />}
-      {tab === 'fracoes'    && <TabPlaceholder icon="🏠" title="Frações e Condóminos" description="Em desenvolvimento." />}
-     {tab === 'contratos' && <TabContratos condominioId={condominio.id} lojaId={condominio.loja_id} />}
+      {tab === 'contratos' && <TabContratos condominioId={condominio.id} lojaId={condominio.loja_id} />}
       {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} />}
       {tab === 'fracoes' && <TabCondominos condominioId={condominio.id} />}
     </div>
