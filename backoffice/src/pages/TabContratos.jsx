@@ -22,24 +22,39 @@ const ESTADOS_CONTRATO = [
   { key: 'terminado', label: 'Terminado', color: '#dc2626', bg: '#fef2f2' },
 ]
 
-const PERIODICIDADES = [
+const PERIODICIDADES_IMPAR = [
   { key: 'mensal',     label: 'Mensal',     meses: 12 },
   { key: 'trimestral', label: 'Trimestral', meses: 4  },
   { key: 'semestral',  label: 'Semestral',  meses: 2  },
   { key: 'anual',      label: 'Anual',      meses: 1  },
 ]
 
+const PERIODICIDADES_SERVICO = [
+  { key: 'diario',    label: 'Diário' },
+  { key: '1xmes',     label: '1x/mês' },
+  { key: '2xmes',     label: '2x/mês' },
+  { key: '3xmes',     label: '3x/mês' },
+  { key: '1xsemana',  label: '1x/semana' },
+  { key: '2xsemana',  label: '2x/semana' },
+  { key: '3xsemana',  label: '3x/semana' },
+]
+
 const cfgEstado = k => ESTADOS_CONTRATO.find(e => e.key === k) || ESTADOS_CONTRATO[0]
 
-function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+function periodicidadeLabel(key, tipo) {
+  const lista = tipo === 'prestador' ? PERIODICIDADES_SERVICO : PERIODICIDADES_IMPAR
+  return lista.find(p => p.key === key)?.label || key
 }
 
 function totalAnual(valor, periodicidade) {
   if (!valor) return null
-  const p = PERIODICIDADES.find(p => p.key === periodicidade)
-  return Number(valor) * (p?.meses || 12)
+  const p = PERIODICIDADES_IMPAR.find(p => p.key === periodicidade)
+  return p ? Number(valor) * p.meses : null
+}
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function formatEur(val) {
@@ -150,9 +165,11 @@ const FORM_VAZIO = {
 }
 
 function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
-  const [form, setForm]       = useState(inicial || { ...FORM_VAZIO, tipo })
+  const [form, setForm]         = useState(inicial || { ...FORM_VAZIO, tipo })
   const [servicos, setServicos] = useState(inicial?.servicos || [])
   const [customInput, setCustomInput] = useState('')
+
+  const periodicidades = tipo === 'prestador' ? PERIODICIDADES_SERVICO : PERIODICIDADES_IMPAR
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -164,14 +181,22 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
     setServicos(prev => {
       const existe = prev.find(sv => sv.servico_id === s.id)
       if (existe) return prev.filter(sv => sv.servico_id !== s.id)
-      return [...prev, { servico_id: s.id, nome_custom: null, valor_mensal: '', periodicidade: 'mensal', estimativa: false, observacoes: '' }]
+      return [...prev, {
+        servico_id: s.id, nome_custom: null, valor_mensal: '',
+        periodicidade: tipo === 'prestador' ? '1xmes' : 'mensal',
+        estimativa: false, observacoes: '',
+      }]
     })
   }
 
   function addCustom() {
     const nome = customInput.trim()
     if (!nome) return
-    setServicos(prev => [...prev, { servico_id: null, nome_custom: nome, valor_mensal: '', periodicidade: 'mensal', estimativa: false, observacoes: '' }])
+    setServicos(prev => [...prev, {
+      servico_id: null, nome_custom: nome, valor_mensal: '',
+      periodicidade: tipo === 'prestador' ? '1xmes' : 'mensal',
+      estimativa: false, observacoes: '',
+    }])
     setCustomInput('')
   }
 
@@ -199,21 +224,26 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
     return (
       <div style={{ padding: '0 0.875rem 0.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
         <div>
-          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Valor (€)</label>
+          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Valor mensal (€)</label>
           <input type="number" min="0" step="0.01" style={{ ...inp, fontSize: '0.82rem' }}
             value={sv.valor_mensal} onChange={e => updateServico(identifier, 'valor_mensal', e.target.value)} placeholder="0.00" />
         </div>
         <div>
-          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Periodicidade</label>
-          <select style={{ ...inp, fontSize: '0.82rem' }} value={sv.periodicidade} onChange={e => updateServico(identifier, 'periodicidade', e.target.value)}>
-            {PERIODICIDADES.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+          <label style={{ ...lbl, marginBottom: '0.2rem' }}>
+            {tipo === 'prestador' ? 'Periodicidade do serviço' : 'Periodicidade'}
+          </label>
+          <select style={{ ...inp, fontSize: '0.82rem' }} value={sv.periodicidade}
+            onChange={e => updateServico(identifier, 'periodicidade', e.target.value)}>
+            {periodicidades.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <input type="checkbox" id={`est-${identifier}`} checked={sv.estimativa}
-            onChange={e => updateServico(identifier, 'estimativa', e.target.checked)} style={{ width: 14, height: 14 }} />
-          <label htmlFor={`est-${identifier}`} style={{ fontSize: '0.78rem', color: C.muted, cursor: 'pointer' }}>Valor estimado</label>
-        </div>
+        {tipo === 'condominio' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <input type="checkbox" id={`est-${identifier}`} checked={sv.estimativa}
+              onChange={e => updateServico(identifier, 'estimativa', e.target.checked)} style={{ width: 14, height: 14 }} />
+            <label htmlFor={`est-${identifier}`} style={{ fontSize: '0.78rem', color: C.muted, cursor: 'pointer' }}>Valor estimado</label>
+          </div>
+        )}
         <div>
           <label style={{ ...lbl, marginBottom: '0.2rem' }}>Observações</label>
           <input style={{ ...inp, fontSize: '0.82rem' }} value={sv.observacoes}
@@ -262,11 +292,13 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
               {ESTADOS_CONTRATO.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '1.5rem' }}>
-            <input type="checkbox" id="renovacao" checked={form.renovacao_automatica}
-              onChange={e => set('renovacao_automatica', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-            <label htmlFor="renovacao" style={{ fontSize: '0.875rem', color: C.text, cursor: 'pointer' }}>Renovação automática</label>
-          </div>
+          {tipo === 'condominio' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '1.5rem' }}>
+              <input type="checkbox" id="renovacao" checked={form.renovacao_automatica}
+                onChange={e => set('renovacao_automatica', e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              <label htmlFor="renovacao" style={{ fontSize: '0.875rem', color: C.text, cursor: 'pointer' }}>Renovação automática</label>
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
@@ -348,9 +380,9 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
 
 // ── Histórico ─────────────────────────────────────────────────────────────────
 function HistoricoSection({ contratos }) {
-  const [aberto, setAberto]     = useState(false)
-  const [logs, setLogs]         = useState([])
-  const [loading, setLoading]   = useState(false)
+  const [aberto, setAberto]       = useState(false)
+  const [logs, setLogs]           = useState([])
+  const [loading, setLoading]     = useState(false)
   const [carregado, setCarregado] = useState(false)
 
   async function toggle() {
@@ -404,8 +436,8 @@ function HistoricoSection({ contratos }) {
   )
 }
 
-// ── Tabela de contratos ───────────────────────────────────────────────────────
-function TabelaContratos({ contratos, onEditar }) {
+// ── Tabela Ímpar ──────────────────────────────────────────────────────────────
+function TabelaContratosImpar({ contratos, onEditar }) {
   const thStyle = {
     padding: '0.5rem 0.875rem', textAlign: 'left', fontWeight: 600,
     fontSize: '0.7rem', color: C.subtle, letterSpacing: '0.05em',
@@ -418,10 +450,9 @@ function TabelaContratos({ contratos, onEditar }) {
     verticalAlign: 'middle',
   }
 
-  // Flatten: uma linha por contrato (cada contrato tem 1 serviço neste fluxo)
   const linhas = contratos.map(c => {
-    const sv = c.servicos?.[0]
-    const anual = sv ? totalAnual(sv.valor_mensal, sv.periodicidade) : null
+    const sv     = c.servicos?.[0]
+    const anual  = sv ? totalAnual(sv.valor_mensal, sv.periodicidade) : null
     const estado = cfgEstado(c.estado)
     return { contrato: c, sv, anual, estado }
   })
@@ -429,10 +460,7 @@ function TabelaContratos({ contratos, onEditar }) {
   const totalGeral = linhas.reduce((acc, { anual }) => acc + (anual || 0), 0)
 
   if (linhas.length === 0) return (
-    <div style={{
-      background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.75rem',
-      padding: '3rem', textAlign: 'center', color: C.subtle,
-    }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: C.subtle }}>
       <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
       Sem contratos registados.
     </div>
@@ -446,10 +474,8 @@ function TabelaContratos({ contratos, onEditar }) {
             <tr>
               <th style={thStyle}>Serviço</th>
               <th style={thStyle}>Estado</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>↺</th>
               <th style={thStyle}>Data início</th>
-              <th style={thStyle}>Data fim</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Valor</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Valor mensal</th>
               <th style={thStyle}>Período</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Total anual</th>
               <th style={{ ...thStyle, textAlign: 'center' }}></th>
@@ -465,17 +491,10 @@ function TabelaContratos({ contratos, onEditar }) {
                 <td style={tdStyle}>
                   <Badge label={estado.label} color={estado.color} bg={estado.bg} />
                 </td>
-                <td style={{ ...tdStyle, textAlign: 'center' }}>
-                  {c.renovacao_automatica
-                    ? <span title="Renovação automática" style={{ fontSize: '0.95rem' }}>✓</span>
-                    : <span style={{ color: C.subtle, fontSize: '0.85rem' }}>—</span>
-                  }
-                </td>
                 <td style={{ ...tdStyle, color: C.muted }}>{formatDate(c.data_inicio)}</td>
-                <td style={{ ...tdStyle, color: C.muted }}>{formatDate(c.data_fim)}</td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>{formatEur(sv?.valor_mensal)}</td>
                 <td style={{ ...tdStyle, color: C.muted }}>
-                  {sv ? (PERIODICIDADES.find(p => p.key === sv.periodicidade)?.label || sv.periodicidade) : '—'}
+                  {sv ? periodicidadeLabel(sv.periodicidade, 'condominio') : '—'}
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{formatEur(anual)}</td>
                 <td style={{ ...tdStyle, textAlign: 'center' }}>
@@ -490,7 +509,7 @@ function TabelaContratos({ contratos, onEditar }) {
           </tbody>
           <tfoot>
             <tr style={{ background: '#f0f3f7', borderTop: `2px solid ${C.border}` }}>
-              <td colSpan={7} style={{ ...tdStyle, borderBottom: 'none', fontWeight: 700, fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <td colSpan={5} style={{ ...tdStyle, borderBottom: 'none', fontWeight: 700, fontSize: '0.75rem', color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Total anual
               </td>
               <td style={{ ...tdStyle, borderBottom: 'none', textAlign: 'right', fontWeight: 700, color: C.navy, fontSize: '0.9rem' }}>
@@ -499,6 +518,80 @@ function TabelaContratos({ contratos, onEditar }) {
               <td style={{ ...tdStyle, borderBottom: 'none' }} />
             </tr>
           </tfoot>
+        </table>
+      </div>
+      <HistoricoSection contratos={contratos} />
+    </div>
+  )
+}
+
+// ── Tabela Prestador ──────────────────────────────────────────────────────────
+function TabelaContratosPrestador({ contratos, onEditar }) {
+  const thStyle = {
+    padding: '0.5rem 0.875rem', textAlign: 'left', fontWeight: 600,
+    fontSize: '0.7rem', color: C.subtle, letterSpacing: '0.05em',
+    textTransform: 'uppercase', borderBottom: `1px solid ${C.border}`,
+    whiteSpace: 'nowrap', background: '#f7f9fc',
+  }
+  const tdStyle = {
+    padding: '0.6rem 0.875rem', fontSize: '0.82rem',
+    color: C.text, borderBottom: `1px solid ${C.borderL}`,
+    verticalAlign: 'middle',
+  }
+
+  if (contratos.length === 0) return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: C.subtle }}>
+      <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
+      Sem contratos de prestador registados.
+    </div>
+  )
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.875rem', overflow: 'hidden', boxShadow: '0 1px 4px rgba(1,22,64,0.06)' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Prestador</th>
+              <th style={thStyle}>Serviço</th>
+              <th style={thStyle}>Estado</th>
+              <th style={thStyle}>Data início</th>
+              <th style={{ ...thStyle, textAlign: 'right' }}>Valor mensal</th>
+              <th style={thStyle}>Periodicidade do serviço</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {contratos.map((c, i) => {
+              const sv     = c.servicos?.[0]
+              const estado = cfgEstado(c.estado)
+              return (
+                <tr key={c.id} style={{ background: i % 2 === 0 ? C.white : '#fafbfc' }}>
+                  <td style={{ ...tdStyle, fontWeight: 600, color: C.navy }}>
+                    {c.prestador_nome || '—'}
+                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 500 }}>
+                    {sv?.servico_nome || sv?.nome_custom || '—'}
+                  </td>
+                  <td style={tdStyle}>
+                    <Badge label={estado.label} color={estado.color} bg={estado.bg} />
+                  </td>
+                  <td style={{ ...tdStyle, color: C.muted }}>{formatDate(c.data_inicio)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>{formatEur(sv?.valor_mensal)}</td>
+                  <td style={{ ...tdStyle, color: C.muted }}>
+                    {sv ? periodicidadeLabel(sv.periodicidade, 'prestador') : '—'}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <button onClick={() => onEditar(c)} style={{
+                      background: 'none', border: `1px solid ${C.border}`, borderRadius: '0.35rem',
+                      padding: '0.2rem 0.6rem', fontSize: '0.72rem', cursor: 'pointer',
+                      color: C.navy, fontWeight: 600, fontFamily: 'DM Sans, sans-serif',
+                    }}>Editar</button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
         </table>
       </div>
       <HistoricoSection contratos={contratos} />
@@ -535,13 +628,12 @@ export default function TabContratos({ condominioId, lojaId }) {
       else                 await api.post('/contratos', payload)
       await carregar()
       setModal(null)
-    } catch (e) { alert('Erro: ' + e.message) }
+    } catch (e) { alert('Erro: ' + (e instanceof Error ? e.message : String(e))) }
     finally { setLoadingGuardar(false) }
   }
 
   const contratosCondominio = contratos.filter(c => c.tipo === 'condominio')
   const contratosPrestador  = contratos.filter(c => c.tipo === 'prestador')
-  const listaActual         = secao === 'condominio' ? contratosCondominio : contratosPrestador
 
   const secaoStyle = ativo => ({
     background: 'none', border: 'none', cursor: 'pointer',
@@ -556,7 +648,7 @@ export default function TabContratos({ condominioId, lojaId }) {
       {/* Sub-navegação */}
       <div style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, marginBottom: '1.25rem' }}>
         <button style={secaoStyle(secao === 'condominio')} onClick={() => setSecao('condominio')}>
-          Contrato ({contratosCondominio.length})
+          Ímpar ({contratosCondominio.length})
         </button>
         <button style={secaoStyle(secao === 'prestador')} onClick={() => setSecao('prestador')}>
           Prestadores ({contratosPrestador.length})
@@ -575,10 +667,15 @@ export default function TabContratos({ condominioId, lojaId }) {
       {/* Lista */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: C.subtle }}>⏳ A carregar…</div>
+      ) : secao === 'condominio' ? (
+        <TabelaContratosImpar
+          contratos={contratosCondominio}
+          onEditar={contrato => setModal({ tipo: 'condominio', contrato })}
+        />
       ) : (
-        <TabelaContratos
-          contratos={listaActual}
-          onEditar={contrato => setModal({ tipo: contrato.tipo, contrato })}
+        <TabelaContratosPrestador
+          contratos={contratosPrestador}
+          onEditar={contrato => setModal({ tipo: 'prestador', contrato })}
         />
       )}
 
