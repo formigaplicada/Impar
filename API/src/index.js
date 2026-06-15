@@ -4755,7 +4755,7 @@ app.post('/dd/mandatos/create', requireAuth, async (c) => {
       RETURNING id, token, adc
     `
     const mandato = rows[0]
-    const link    = `${c.env.DD_BASE_URL}/dd/${token}`
+    const link    = `${c.env.DD_BASE_URL}/dd/assinar?t=${token}`
 
     await enviarEmailMandato(c.env, {
       to: email_devedor, nome: nome_devedor,
@@ -4783,8 +4783,8 @@ app.get('/dd/assinar/:token', async (c) => {
         m.token_expires_at, m.signed_at,
         cond.nome        AS condominio_nome,
         cond.morada      AS condominio_morada,
-        cond.cod_postal  AS condominio_cp,
-        cond.localidade  AS condominio_cidade,
+        cond.codigo_postal  AS condominio_cp,
+        cond.cidade  AS condominio_cidade,
         b.nome           AS banco_nome,
         b.bic            AS banco_bic,
         cr.nome          AS credor_nome,
@@ -4848,8 +4848,8 @@ app.post('/dd/assinar/:token', async (c) => {
       SELECT m.*,
              cond.nome       AS condo_nome,
              cond.morada,
-             cond.cod_postal,
-             cond.localidade,
+             cond.codigo_postal,
+             cond.cidade,
              cr.nome         AS credor_nome,
              cr.creditor_identifier,
              b.bic           AS banco_bic

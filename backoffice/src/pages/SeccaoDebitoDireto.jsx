@@ -99,6 +99,7 @@ function ModalCriarMandato({ condominioId, condominioNome, onCriado, onFechar })
 
       const res = await api.post('/dd/mandatos/create', {
         condominio_id: String(condominioId),
+        iban: condominioIban.replace(/\s/g, '') || '',
         nome_devedor:  form.nome_devedor.trim(),
         email_devedor: form.email_devedor.trim(),
         iban:          form.iban.replace(/\s/g, '') || '',
@@ -424,10 +425,7 @@ function PainelMandato({ mandato, onNovoMandato }) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export default function SeccaoDebitoDireto({
-  condominioId,
-  condominioNome = '',
-}) {
+export default function SeccaoDebitoDireto({ condominioId, condominioNome, condominioIban = '' }) {
   const [mandatos,      setMandatos]      = useState([])
   const [loading,       setLoading]       = useState(true)
   const [modalCriar,    setModalCriar]    = useState(false)
