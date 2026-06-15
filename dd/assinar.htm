@@ -475,8 +475,8 @@
           <div class="field-grid" style="gap:14px">
             <div class="field span2">
               <label>IBAN <span class="req">*</span></label>
-              <input type="text" id="input-iban" class="mono" placeholder="PT50 0000 0000 0000 0000 0000 0" maxlength="30" autocomplete="off">
-              <div class="field-hint">Número de conta bancária do condomínio</div>
+              <input type="text" id="input-iban" class="mono" readonly style="background:#f4f6f9;cursor:not-allowed;color:#6b7a90;border-color:#e4e8ef">
+              <div class="field-hint">Preenchido pela Ímpar — não editável</div>
               <div class="field-error" id="error-iban">IBAN inválido. Deve começar por PT e ter 25 caracteres.</div>
             </div>
             <div class="field span2">
@@ -710,12 +710,7 @@ function showError(title, msg) {
 // =============================================================================
 // IBAN formatting
 // =============================================================================
-document.getElementById('input-iban').addEventListener('input', function() {
-  const raw = this.value.replace(/\s/g, '').toUpperCase()
-  this.value = raw.replace(/(.{4})/g, '$1 ').trim()
-  this.classList.remove('error')
-  document.getElementById('error-iban').style.display = 'none'
-})
+// IBAN preenchido pela Ímpar — campo readonly
 
 // Banco → BIC
 document.getElementById('input-banco').addEventListener('change', function() {
@@ -820,12 +815,7 @@ document.getElementById('dd-form').addEventListener('submit', async function(e) 
 
   let valid = true
 
-  // Validar IBAN
-  if (!validateIBAN(iban)) {
-    document.getElementById('input-iban').classList.add('error')
-    document.getElementById('error-iban').style.display = 'block'
-    valid = false
-  }
+  // IBAN preenchido pela Ímpar — não validar no cliente
 
   // Validar banco
   if (!bancoId) {
