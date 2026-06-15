@@ -696,7 +696,7 @@ function TabFinanceiro({ condominioId, condominioNome, condominioIban }) {
 
       {/* Débito Directo */}
       <div style={{ background: C.surface, borderRadius: '0.75rem', border: `1px solid ${C.border}`, padding: '1.25rem 1.5rem', boxShadow: '0 1px 3px rgba(1,22,64,0.05)' }}>
-        <SeccaoDebitoDireto condominioId={condominioId} condominioNome={condominioNome} condominioIban={condominio.iban} />
+        <SeccaoDebitoDireto condominioId={condominioId} condominioNome={condominioNome} condominioIban={condominioIban} />
       </div>
 
       {/* Cobranças */}
