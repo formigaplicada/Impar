@@ -690,7 +690,7 @@ const TABS = [
   { key: 'financeiro', label: 'Info. Financeira' },
 ]
 
-function TabFinanceiro({ condominioId, condominioNome }) {
+function TabFinanceiro({ condominioId, condominioNome, condominioIban }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
@@ -782,7 +782,7 @@ function DetalheCondominio({ condominio, onVoltar }) {
       {tab === 'info'       && <TabInfo c={condominio} />}
       {tab === 'documentos' && <TabDocumentos condominioId={condominio.id} />}
       {tab === 'contratos' && <TabContratos condominioId={condominio.id} lojaId={condominio.loja_id} />}
-      {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} condominioNome={condominio.nome} />}
+      {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} condominioNome={condominio.nome} condominioIban={condominio.iban} />}
       {tab === 'fracoes' && <TabCondominos condominioId={condominio.id} />}
     </div>
   )
