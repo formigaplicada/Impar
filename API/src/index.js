@@ -10,8 +10,8 @@ const app = new Hono()
 app.route('/condominos', condominos)
 
 app.use('*', cors({
-  origin: 'https://app.condexpress.com',
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  origin: ['https://app.condexpress.com', 'https://my.condexpress.com'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
 }))
 
