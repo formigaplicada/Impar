@@ -596,7 +596,7 @@ const API_BASE = 'https://impar-api.formigaplicada.workers.dev'
 // Utilitários
 // =============================================================================
 function getToken() {
-  return window.location.pathname.split('/dd/')[1]?.replace(/\/$/, '')
+  const p = new URLSearchParams(window.location.search); return p.get('t') || window.location.pathname.split('/dd/')[1]?.replace(/\/$/, '')
 }
 
 function showScreen(id) {
@@ -646,7 +646,7 @@ async function init() {
   try {
     // Carregar bancos da API (se disponível) ou usar lista estática
     try {
-      const bRes = await fetch(`${API_BASE}/bancos`)
+      const bRes = await fetch(`${API_BASE}/dd/bancos`)
       if (bRes.ok) bancosDB = await bRes.json()
     } catch (_) {}
 
@@ -662,7 +662,7 @@ async function init() {
     })
 
     // Carregar mandato
-    const res = await fetch(`${API_BASE}/dd/${token}`)
+    const res = await fetch(`${API_BASE}/dd/assinar/${token}`)
     const data = await res.json()
 
     if (!res.ok) {
@@ -871,7 +871,7 @@ document.getElementById('dd-form').addEventListener('submit', async function(e) 
 
   try {
     const token = getToken()
-    const res = await fetch(`${API_BASE}/dd/${token}/sign`, {
+    const res = await fetch(`${API_BASE}/dd/assinar/${token}/sign`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
