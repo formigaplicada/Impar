@@ -75,7 +75,7 @@ function EstadoBadge({ estado }) {
 
 // ── Modal: Criar mandato DD ───────────────────────────────────────────────────
 
-function ModalCriarMandato({ condominioId, condominioNome, onCriado, onFechar }) {
+function ModalCriarMandato({ condominioId, condominioNome, condominioIban = '', onCriado, onFechar }) {
   const [form, setForm] = useState({
     nome_devedor:  condominioNome || '',
     email_devedor: '',
@@ -545,9 +545,10 @@ export default function SeccaoDebitoDireto({ condominioId, condominioNome, condo
 
       {/* Modais */}
       {modalCriar && (
-        <ModalCriarMandato
+       <ModalCriarMandato
           condominioId={condominioId}
           condominioNome={condominioNome}
+          condominioIban={condominioIban}
           onCriado={handleCriado}
           onFechar={() => setModalCriar(false)}
         />
