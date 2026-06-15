@@ -168,7 +168,7 @@ function ModalCriarMandato({ condominioId, condominioNome, condominioIban = '', 
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-          <label style={lbl}>IBAN (opcional — pode ser preenchido pelo cliente)</label>
+          <label style={lbl}>IBAN</label>
           <input
             style={{ ...inp, fontFamily: "'SF Mono', 'Fira Code', monospace", letterSpacing: '0.5px' }}
             value={form.iban}
