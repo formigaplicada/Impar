@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { api } from '../lib/api'
 import TabContratos from './TabContratos'
 import TabCondominos from './TabCondominos'
+import SeccaoDebitoDireto from './SeccaoDebitoDireto'
 
 
 // ── Paleta Ímpar ─────────────────────────────────────────────────────────────
@@ -689,65 +690,13 @@ const TABS = [
   { key: 'financeiro', label: 'Info. Financeira' },
 ]
 
-function TabFinanceiro({ condominioId }) {
-  const [loading, setLoading] = useState(true)
-  const [mandato, setMandato] = useState(null)
-
-  useEffect(() => {
-    api.get(`/condominios/${condominioId}/financeiro`).then(d => {
-      setMandato(d?.mandato || null)
-      setLoading(false)
-    })
-  }, [condominioId])
-
-  const ESTADO_MANDATO = {
-    activo:    { label: 'Activo',    bg: '#f0fdf4', color: '#16a34a', dot: '#16a34a' },
-    inactivo:  { label: 'Inactivo',  bg: '#f8fafc', color: '#64748b', dot: '#94a3b8' },
-    cancelado: { label: 'Cancelado', bg: '#fef2f2', color: '#dc2626', dot: '#dc2626' },
-  }
-
+function TabFinanceiro({ condominioId, condominioNome }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
       {/* Débito Directo */}
       <div style={{ background: C.surface, borderRadius: '0.75rem', border: `1px solid ${C.border}`, padding: '1.25rem 1.5rem', boxShadow: '0 1px 3px rgba(1,22,64,0.05)' }}>
-        <h3 style={{ fontSize: '0.7rem', fontWeight: 700, color: C.subtle, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 1rem' }}>Débito Directo</h3>
-
-        {loading ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>⏳ A carregar…</div>
-        ) : !mandato ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>
-            <span style={{ display: 'block', fontSize: '1.5rem', marginBottom: '0.5rem' }}>🏦</span>
-            Sem mandato DD configurado.
-          </div>
-        ) : (
-          <div>
-       {[
-            { label: 'Banco',           value: mandato.banco_nome || '—' },
-            { label: 'BIC',             value: mandato.banco_bic  || '—' },
-            { label: 'ADC',             value: mandato.adc        || '—' },
-            { label: 'IBAN',            value: mandato.iban       || '—' },
-            { label: 'Data assinatura', value: mandato.data_assinatura ? new Date(mandato.data_assinatura).toLocaleDateString('pt-PT') : '—' },
-            { label: 'Estado',          value: (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                background: ESTADO_MANDATO[mandato.estado]?.bg || '#f1f5f9',
-                color: ESTADO_MANDATO[mandato.estado]?.color || '#64748b',
-                borderRadius: '0.375rem', padding: '0.2rem 0.6rem',
-                fontSize: '0.72rem', fontWeight: 600
-              }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: ESTADO_MANDATO[mandato.estado]?.dot || '#94a3b8' }} />
-                {ESTADO_MANDATO[mandato.estado]?.label || mandato.estado}
-              </span>
-            )},
-          ].map(({ label, value }) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', borderBottom: `1px solid ${C.borderL}`, gap: '1rem' }}>
-              <span style={{ fontSize: '0.78rem', color: C.subtle, whiteSpace: 'nowrap', flexShrink: 0 }}>{label}</span>
-              <span style={{ fontSize: '0.78rem', color: C.text, textAlign: 'right' }}>{value}</span>
-            </div>
-          ))}
-          </div>
-        )}
+        <SeccaoDebitoDireto condominioId={condominioId} condominioNome={condominioNome} />
       </div>
 
       {/* Cobranças */}
@@ -833,7 +782,7 @@ function DetalheCondominio({ condominio, onVoltar }) {
       {tab === 'info'       && <TabInfo c={condominio} />}
       {tab === 'documentos' && <TabDocumentos condominioId={condominio.id} />}
       {tab === 'contratos' && <TabContratos condominioId={condominio.id} lojaId={condominio.loja_id} />}
-      {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} />}
+      {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} condominioNome={condominio.nome} />}
       {tab === 'fracoes' && <TabCondominos condominioId={condominio.id} />}
     </div>
   )
