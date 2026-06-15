@@ -79,7 +79,7 @@ function ModalCriarMandato({ condominioId, condominioNome, onCriado, onFechar })
   const [form, setForm] = useState({
     nome_devedor:  condominioNome || '',
     email_devedor: '',
-    iban:          '',
+    iban:          condominioIban || '',
   })
   const [loading, setLoading] = useState(false)
   const [erro, setErro]       = useState('')
