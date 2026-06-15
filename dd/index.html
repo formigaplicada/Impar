@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autorização de Débito Direto SEPA — Ímpar</title>
+  <style>
+    :root {
+      --navy: #011640;
+      --lime: #C8DA00;
+      --lime-dim: #a8ba00;
+      --gray: #6b7280;
+      --border: #e5e7eb;
+      --bg: #f8f9fa;
+      --white: #ffffff;
+      --red: #dc2626;
+      --green: #16a34a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      background: var(--navy);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header-logo {
+      background: var(--lime);
+      color: var(--navy);
+      font-weight: 900;
+      font-size: 15px;
+      padding: 5px 10px;
+      letter-spacing: 0.5px;
+    }
+    .header-title {
+      color: var(--white);
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .header-sub {
+      color: var(--lime);
+      font-size: 11px;
+      margin-top: 2px;
+    }
+
+    /* Layout */
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    /* Step indicator */
+    .steps {
+      display: flex;
+      gap: 0;
+      margin-bottom: 28px;
+    }
+    .step {
+      flex: 1;
+      text-align: center;
+      padding: 10px 4px;
+      font-size: 11px;
+      color: var(--gray);
+      border-bottom: 3px solid var(--border);
+      transition: all 0.2s;
+    }
+    .step.active {
+      color: var(--navy);
+      font-weight: 600;
+      border-bottom-color: var(--lime);
+    }
+    .step.done {
+      color: var(--green);
+      border-bottom-color: var(--green);
+    }
+
+    /* Card */
+    .card {
+      background: var(--white);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .card-header {
+      background: var(--navy);
+      color: var(--white);
+      padding: 12px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-header span {
+      color: var(--lime);
+      font-size: 11px;
+      font-weight: 400;
+    }
+    .card-body { padding: 20px; }
+
+    /* Legal notice */
+    .legal {
+      background: #f0f4ff;
+      border-left: 3px solid var(--navy);
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--gray);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      border-radius: 0 4px 4px 0;
+    }
+    .legal strong { color: var(--navy); }
+
+    /* Field grid */
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .field-grid.full { grid-template-columns: 1fr; }
+    @media (max-width: 500px) { .field-grid { grid-template-columns: 1fr; } }
+
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.span2 { grid-column: span 2; }
+    @media (max-width: 500px) { .field.span2 { grid-column: span 1; } }
+
+    label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    label .req { color: var(--red); margin-left: 2px; }
+
+    .field-value {
+      font-size: 14px;
+      color: var(--navy);
+      font-weight: 500;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .field-value.mono {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="text"], input[type="email"], select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+      color: var(--navy);
+      background: var(--white);
+      transition: border-color 0.15s;
+      font-family: inherit;
+    }
+    input[type="text"]:focus, input[type="email"]:focus, select:focus {
+      outline: none;
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(1,22,64,0.08);
+    }
+    input.mono { font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: 0.5px; }
+    input.error { border-color: var(--red); }
+
+    .field-hint {
+      font-size: 11px;
+      color: var(--gray);
+      margin-top: 2px;
+    }
+    .field-error {
+      font-size: 11px;
+      color: var(--red);
+      margin-top: 2px;
+      display: none;
+    }
+
+    /* Tipo pagamento */
+    .payment-type {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #f0f4ff;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .check-box {
+      width: 18px; height: 18px;
+      background: var(--navy);
+      border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .check-box svg { width: 12px; height: 12px; }
+
+    /* Canvas assinatura */
+    .sig-container {
+      border: 2px solid var(--navy);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+      background: var(--white);
+      touch-action: none;
+    }
+    .sig-container canvas {
+      display: block;
+      width: 100%;
+      cursor: crosshair;
+    }
+    .sig-placeholder {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #cbd5e1;
+      font-size: 13px;
+      pointer-events: none;
+      text-align: center;
+    }
+    .sig-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .btn-clear {
+      font-size: 12px;
+      color: var(--gray);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-clear:hover { border-color: var(--navy); color: var(--navy); }
+
+    /* Confirm checkbox */
+    .confirm-box {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 16px;
+      background: #f0f4ff;
+      border-radius: 6px;
+      border: 1px solid #c7d2fe;
+    }
+    .confirm-box input[type="checkbox"] {
+      width: 18px; height: 18px; margin-top: 1px;
+      accent-color: var(--navy);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .confirm-box label {
+      font-size: 13px;
+      color: var(--navy);
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 400;
+      cursor: pointer;
+      line-height: 1.5;
+    }
+
+    /* Submit button */
+    .btn-submit {
+      width: 100%;
+      padding: 15px;
+      background: var(--navy);
+      color: var(--lime);
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+    .btn-submit:hover:not(:disabled) { background: #022060; }
+    .btn-submit:active:not(:disabled) { transform: scale(0.99); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-submit .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(200,218,0,0.3);
+      border-top-color: var(--lime);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* States */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* Success */
+    .success-icon {
+      width: 64px; height: 64px;
+      background: var(--green);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .success-icon svg { width: 32px; height: 32px; }
+    .success-box {
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .success-box h2 { font-size: 22px; color: var(--navy); margin-bottom: 10px; }
+    .success-box p { font-size: 14px; color: var(--gray); line-height: 1.6; margin-bottom: 8px; }
+
+    /* Error state */
+    .error-screen {
+      text-align: center;
+      padding: 60px 24px;
+    }
+    .error-screen .icon { font-size: 48px; margin-bottom: 16px; }
+    .error-screen h2 { font-size: 20px; color: var(--navy); margin-bottom: 10px; }
+    .error-screen p { font-size: 14px; color: var(--gray); line-height: 1.6; }
+
+    /* Loading */
+    .loading-screen {
+      text-align: center;
+      padding: 80px 24px;
+    }
+    .loading-spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--navy);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    /* Divider */
+    .bilingual {
+      font-size: 11px;
+      color: var(--gray);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">ÍMPAR</div>
+  <div>
+    <div class="header-title">Autorização de Débito Direto SEPA</div>
+    <div class="header-sub">SEPA Direct Debit Mandate</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Loading -->
+  <div id="screen-loading" class="screen active">
+    <div class="loading-screen">
+      <div class="loading-spinner"></div>
+      <p style="color:var(--gray);font-size:14px">A carregar o formulário…</p>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="screen-error" class="screen">
+    <div class="card">
+      <div class="error-screen">
+        <div class="icon">⚠️</div>
+        <h2 id="error-title">Link inválido</h2>
+        <p id="error-msg">Este link não é válido ou já expirou.<br>Por favor contacte a Ímpar para obter um novo link.</p>
+        <p style="margin-top:20px;font-size:13px">
+          <a href="mailto:geral@impar.pt" style="color:var(--navy);font-weight:600">geral@impar.pt</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div id="screen-form" class="screen">
+    <div class="steps">
+      <div class="step active" id="step-1">1. Dados</div>
+      <div class="step" id="step-2">2. IBAN</div>
+      <div class="step" id="step-3">3. Assinar</div>
+    </div>
+
+    <form id="dd-form" novalidate>
+
+      <!-- Dados do Devedor -->
+      <div class="card">
+        <div class="card-header">
+          Identificação do Devedor
+          <span>Debtor Identification</span>
+        </div>
+        <div class="card-body">
+          <div class="legal">
+            <strong>Ao subscrever esta autorização</strong>, está a autorizar a Rede Ímpar, Lda a enviar instruções ao seu Banco para debitar a sua conta, de acordo com as instruções do Credor. O reembolso deve ser solicitado até um prazo de <strong>8 semanas</strong> a contar da data do débito.<br><br>
+            <em class="bilingual">By signing this mandate form, you authorise Rede Ímpar, Lda to send instructions to your bank to debit your account. A refund must be claimed within 8 weeks from the date of debit.</em>
+          </div>
+
+          <div class="field-grid full" style="gap:14px">
+            <div class="field">
+              <label>Nome do Devedor / Name of Debtor <span class="req">*</span></label>
+              <div class="field-value" id="display-nome">—</div>
+            </div>
+            <div class="field">
+              <label>Morada / Street Address <span class="req">*</span></label>
+              <div class="field-value" id="display-morada">—</div>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label>Código Postal / Postal Code</label>
+                <div class="field-value" id="display-cp">—</div>
+              </div>
+              <div class="field">
+                <label>Cidade / City</label>
+                <div class="field-value" id="display-cidade">—</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>País / Country</label>
+              <div class="field-value">Portugal</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dados do Credor -->
+      <div class="card">
+        <div class="card-header">
+          Identificação do Credor
+          <span>Creditor Identification</span>
+        </div>
+        <div class="card-body">
+          <div class="field-grid full" style="gap:14px">
+            <div class="field-grid">
+              <div class="field">
+                <label>Nome do Credor / Creditor Name</label>
+                <div class="field-value" id="display-credor-nome">Rede Ímpar, Lda</div>
+              </div>
+              <div class="field">
+                <label>Identificação / Creditor ID</label>
+                <div class="field-value mono" id="display-credor-id">PT18ZZZ114843</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>Morada / Address</label>
+              <div class="field-value">Rua São Tomás de Aquino 18-M, 1600-874 Lisboa, Portugal</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IBAN / BIC -->
+      <div class="card">
+        <div class="card-header">
+          Dados Bancários
+          <span>Bank Account Details</span>
+        </div>
+        <div class="card-body">
+          <div class="field-grid" style="gap:14px">
+            <div class="field span2">
+              <label>IBAN <span class="req">*</span></label>
+              <input type="text" id="input-iban" class="mono" placeholder="PT50 0000 0000 0000 0000 0000 0" maxlength="29" autocomplete="off">
+              <div class="field-hint">Número de conta bancária do condomínio</div>
+              <div class="field-error" id="error-iban">IBAN inválido. Deve começar por PT e ter 25 caracteres.</div>
+            </div>
+            <div class="field span2">
+              <label>Banco / Bank <span class="req">*</span></label>
+              <select id="input-banco">
+                <option value="">Selecione o banco…</option>
+              </select>
+              <div class="field-error" id="error-banco">Por favor selecione o banco.</div>
+            </div>
+            <div class="field span2">
+              <label>BIC / SWIFT</label>
+              <div class="field-value mono" id="display-bic">—</div>
+            </div>
+          </div>
+
+          <div class="payment-type" style="margin-top:18px">
+            <div class="check-box">
+              <svg fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--navy)">Pagamento recorrente / Recurrent payment</div>
+              <div style="font-size:11px;color:var(--gray);margin-top:2px">Débito mensal automático / Monthly automatic debit</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assinatura -->
+      <div class="card">
+        <div class="card-header">
+          Assinatura
+          <span>Signature</span>
+        </div>
+        <div class="card-body">
+          <div class="field" style="margin-bottom:14px">
+            <label>Nome do Signatário <span class="req">*</span></label>
+            <input type="text" id="input-nome-sig" placeholder="Nome completo de quem assina">
+            <div class="field-hint">Representante legal do condomínio</div>
+            <div class="field-error" id="error-nome-sig">Por favor introduza o nome do signatário.</div>
+          </div>
+
+          <div class="field" style="margin-bottom:6px">
+            <label>Assinatura <span class="req">*</span></label>
+          </div>
+          <div class="sig-container">
+            <canvas id="sig-canvas" height="160"></canvas>
+            <div class="sig-placeholder" id="sig-placeholder">
+              Assine aqui com o dedo ou rato<br>
+              <span style="font-size:11px">Sign here with finger or mouse</span>
+            </div>
+          </div>
+          <div class="sig-actions">
+            <button type="button" class="btn-clear" id="btn-clear-sig">Limpar assinatura</button>
+          </div>
+          <div class="field-error" id="error-sig" style="display:block;visibility:hidden">Por favor desenhe a sua assinatura.</div>
+
+          <div style="margin-top:16px">
+            <div class="confirm-box">
+              <input type="checkbox" id="confirm-check">
+              <label for="confirm-check">
+                Confirmo que li e aceito os termos desta Autorização de Débito Direto SEPA e autorizo a Rede Ímpar, Lda a debitar a conta indicada de acordo com as instruções do credor.<br>
+                <em class="bilingual" style="display:block;margin-top:4px">I confirm that I have read and agree to the terms of this SEPA Direct Debit Mandate.</em>
+              </label>
+            </div>
+          </div>
+
+          <div id="form-error" style="display:none;margin-top:12px;padding:10px 14px;background:#fef2f2;border-radius:6px;font-size:13px;color:var(--red);border:1px solid #fecaca"></div>
+
+          <button type="submit" class="btn-submit" id="btn-submit" style="margin-top:20px">
+            Assinar e Submeter Autorização
+          </button>
+          <p style="text-align:center;font-size:11px;color:var(--gray);margin-top:10px">
+            A sua assinatura e dados são transmitidos de forma segura (HTTPS).<br>
+            Receberá uma confirmação por email após a submissão.
+          </p>
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Success -->
+  <div id="screen-success" class="screen">
+    <div class="card">
+      <div class="success-box">
+        <div class="success-icon">
+          <svg fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h2>Autorização assinada com sucesso</h2>
+        <p>A sua Autorização de Débito Direto SEPA foi submetida e registada.<br>
+        Receberá brevemente uma confirmação por email.</p>
+        <p style="margin-top:16px">
+          Para qualquer questão, contacte:<br>
+          <a href="mailto:geral@impar.pt" style="color:var(--navy);font-weight:600">geral@impar.pt</a>
+        </p>
+        <div style="margin-top:28px;padding:16px;background:var(--bg);border-radius:6px;font-size:13px;color:var(--gray)">
+          Referência ADC: <strong id="success-adc" style="color:var(--navy);font-family:monospace"></strong>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// =============================================================================
+// Configuração
+// =============================================================================
+// Substitua pelo URL do seu Worker em produção
+const API_BASE = 'https://impar-api.formigaplicada.workers.dev'
+
+// =============================================================================
+// Utilitários
+// =============================================================================
+function getToken() {
+  return window.location.pathname.split('/dd/')[1]?.replace(/\/$/, '')
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'))
+  document.getElementById('screen-' + id).classList.add('active')
+}
+
+function formatIBAN(v) {
+  const clean = v.replace(/\s/g, '').toUpperCase()
+  return clean.replace(/(.{4})/g, '$1 ').trim()
+}
+
+function validateIBAN(v) {
+  const clean = v.replace(/\s/g, '')
+  return /^PT\d{23}$/.test(clean)
+}
+
+// =============================================================================
+// Bancos (lista estática para seleção — pode ser carregada da API)
+// =============================================================================
+const BANCOS_PT = [
+  { id: null, codigo: 'CGD',  nome: 'Caixa Geral de Depósitos', bic: 'CGDIPTPL' },
+  { id: null, codigo: 'BPI',  nome: 'Banco BPI', bic: 'BBPIPTPL' },
+  { id: null, codigo: 'BCP',  nome: 'Millennium BCP', bic: 'BCOMPTPL' },
+  { id: null, codigo: 'NB',   nome: 'Novo Banco', bic: 'BESCPTPL' },
+  { id: null, codigo: 'SNT',  nome: 'Santander Portugal', bic: 'BSCHPTPL' },
+  { id: null, codigo: 'CA',   nome: 'Crédito Agrícola', bic: 'CCCMPTPL' },
+  { id: null, codigo: 'ING',  nome: 'ING Bank Portugal', bic: 'INGBPTPL' },
+  { id: null, codigo: 'ACT',  nome: 'Activobank', bic: 'MBCAPTPL' },
+  { id: null, codigo: 'EUR',  nome: 'Banco Eurobic', bic: 'EUROPTPL' },
+  { id: null, codigo: 'OUT',  nome: 'Outro banco', bic: '' },
+]
+
+// =============================================================================
+// Inicialização
+// =============================================================================
+let mandatoData = null
+let bancosDB = []
+
+async function init() {
+  const token = getToken()
+  if (!token) {
+    showError('Link inválido', 'O endereço não contém um código de autorização válido.')
+    return
+  }
+
+  try {
+    // Carregar bancos da API (se disponível) ou usar lista estática
+    try {
+      const bRes = await fetch(`${API_BASE}/bancos`)
+      if (bRes.ok) bancosDB = await bRes.json()
+    } catch (_) {}
+
+    // Preencher select de bancos
+    const select = document.getElementById('input-banco')
+    const lista = bancosDB.length ? bancosDB : BANCOS_PT
+    lista.forEach(b => {
+      const opt = document.createElement('option')
+      opt.value = b.id || b.codigo
+      opt.dataset.bic = b.bic
+      opt.textContent = b.nome
+      select.appendChild(opt)
+    })
+
+    // Carregar mandato
+    const res = await fetch(`${API_BASE}/dd/${token}`)
+    const data = await res.json()
+
+    if (!res.ok) {
+      if (data.signed) {
+        showError('Já assinado', 'Esta Autorização de Débito Direto já foi assinada anteriormente.')
+      } else if (data.expired) {
+        showError('Link expirado', 'Este link já não é válido. Por favor contacte a Ímpar para obter um novo link.')
+      } else {
+        showError('Link inválido', data.error || 'Não foi possível carregar o formulário.')
+      }
+      return
+    }
+
+    mandatoData = data
+
+    // Preencher campos
+    document.getElementById('display-nome').textContent = data.nome_devedor || '—'
+    document.getElementById('display-morada').textContent = data.condominio?.morada || '—'
+    document.getElementById('display-cp').textContent = data.condominio?.cod_postal || '—'
+    document.getElementById('display-cidade').textContent = data.condominio?.cidade || '—'
+    document.getElementById('display-credor-nome').textContent = data.credor?.nome || 'Rede Ímpar, Lda'
+    document.getElementById('display-credor-id').textContent = data.credor?.identifier || 'PT18ZZZ114843'
+
+    if (data.iban) {
+      document.getElementById('input-iban').value = data.iban
+    }
+
+    // Pré-preencher nome do signatário
+    document.getElementById('input-nome-sig').value = data.nome_devedor || ''
+
+    showScreen('form')
+    initCanvas()
+
+  } catch (err) {
+    showError('Erro de ligação', 'Não foi possível carregar o formulário. Verifique a sua ligação à internet e tente novamente.')
+  }
+}
+
+function showError(title, msg) {
+  document.getElementById('error-title').textContent = title
+  document.getElementById('error-msg').textContent = msg
+  showScreen('error')
+}
+
+// =============================================================================
+// IBAN formatting
+// =============================================================================
+document.getElementById('input-iban').addEventListener('input', function() {
+  const raw = this.value.replace(/\s/g, '').toUpperCase()
+  this.value = raw.replace(/(.{4})/g, '$1 ').trim()
+  this.classList.remove('error')
+  document.getElementById('error-iban').style.display = 'none'
+})
+
+// Banco → BIC
+document.getElementById('input-banco').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex]
+  const bic = opt.dataset.bic || ''
+  document.getElementById('display-bic').textContent = bic || '—'
+  this.classList.remove('error')
+  document.getElementById('error-banco').style.display = 'none'
+})
+
+// =============================================================================
+// Canvas de assinatura
+// =============================================================================
+function initCanvas() {
+  const canvas = document.getElementById('sig-canvas')
+  const placeholder = document.getElementById('sig-placeholder')
+  const ctx = canvas.getContext('2d')
+  let drawing = false
+  let hasDrawn = false
+  let lastX = 0, lastY = 0
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect()
+    const dpr = window.devicePixelRatio || 1
+    const imgData = hasDrawn ? ctx.getImageData(0, 0, canvas.width, canvas.height) : null
+    canvas.width = rect.width * dpr
+    canvas.height = 160 * dpr
+    ctx.scale(dpr, dpr)
+    ctx.strokeStyle = '#011640'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    if (imgData) ctx.putImageData(imgData, 0, 0)
+  }
+  resize()
+  window.addEventListener('resize', resize)
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect()
+    if (e.touches) {
+      return {
+        x: e.touches[0].clientX - rect.left,
+        y: e.touches[0].clientY - rect.top
+      }
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  function start(e) {
+    e.preventDefault()
+    drawing = true
+    const pos = getPos(e)
+    lastX = pos.x; lastY = pos.y
+    if (!hasDrawn) {
+      hasDrawn = true
+      placeholder.style.display = 'none'
+    }
+  }
+  function move(e) {
+    if (!drawing) return
+    e.preventDefault()
+    const pos = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(lastX, lastY)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+    lastX = pos.x; lastY = pos.y
+  }
+  function end(e) { drawing = false }
+
+  canvas.addEventListener('mousedown', start)
+  canvas.addEventListener('mousemove', move)
+  canvas.addEventListener('mouseup', end)
+  canvas.addEventListener('mouseleave', end)
+  canvas.addEventListener('touchstart', start, { passive: false })
+  canvas.addEventListener('touchmove', move, { passive: false })
+  canvas.addEventListener('touchend', end)
+
+  document.getElementById('btn-clear-sig').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    hasDrawn = false
+    placeholder.style.display = ''
+    document.getElementById('error-sig').style.visibility = 'hidden'
+  })
+
+  canvas._hasDrawn = () => hasDrawn
+  canvas._getPNG = () => canvas.toDataURL('image/png')
+}
+
+// =============================================================================
+// Form submission
+// =============================================================================
+document.getElementById('dd-form').addEventListener('submit', async function(e) {
+  e.preventDefault()
+
+  const canvas = document.getElementById('sig-canvas')
+  const iban = document.getElementById('input-iban').value
+  const bancoSel = document.getElementById('input-banco')
+  const nomeSig = document.getElementById('input-nome-sig').value.trim()
+  const confirmed = document.getElementById('confirm-check').checked
+  const bancoId = bancoSel.value
+
+  let valid = true
+
+  // Validar IBAN
+  if (!validateIBAN(iban)) {
+    document.getElementById('input-iban').classList.add('error')
+    document.getElementById('error-iban').style.display = 'block'
+    valid = false
+  }
+
+  // Validar banco
+  if (!bancoId) {
+    document.getElementById('input-banco').classList.add('error')
+    document.getElementById('error-banco').style.display = 'block'
+    valid = false
+  }
+
+  // Validar nome signatário
+  if (!nomeSig) {
+    document.getElementById('input-nome-sig').classList.add('error')
+    document.getElementById('error-nome-sig').style.display = 'block'
+    valid = false
+  }
+
+  // Validar assinatura
+  if (!canvas._hasDrawn()) {
+    document.getElementById('error-sig').style.visibility = 'visible'
+    document.getElementById('error-sig').textContent = 'Por favor desenhe a sua assinatura.'
+    valid = false
+  }
+
+  // Validar confirmação
+  if (!confirmed) {
+    document.getElementById('form-error').style.display = 'block'
+    document.getElementById('form-error').textContent = 'Por favor confirme que aceita os termos da autorização.'
+    valid = false
+  }
+
+  if (!valid) {
+    document.querySelector('[class*="error"]:not([style*="display: none"]):not([style*="visibility: hidden"])')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
+
+  // Submit
+  const btn = document.getElementById('btn-submit')
+  btn.disabled = true
+  btn.innerHTML = '<span class="spinner"></span>A submeter…'
+  document.getElementById('form-error').style.display = 'none'
+
+  const selectedOpt = bancoSel.options[bancoSel.selectedIndex]
+  const bic = selectedOpt.dataset.bic || ''
+
+  try {
+    const token = getToken()
+    const res = await fetch(`${API_BASE}/dd/${token}/sign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        iban: iban.replace(/\s/g, ''),
+        bic,
+        banco_id: isNaN(parseInt(bancoId)) ? null : parseInt(bancoId),
+        nome_devedor: nomeSig,
+        signature_png: canvas._getPNG(),
+      })
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Erro ao submeter. Tente novamente.')
+    }
+
+    document.getElementById('success-adc').textContent = data.adc || ''
+    showScreen('success')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+
+  } catch (err) {
+    btn.disabled = false
+    btn.innerHTML = 'Assinar e Submeter Autorização'
+    document.getElementById('form-error').style.display = 'block'
+    document.getElementById('form-error').textContent = err.message
+  }
+})
+
+// Iniciar
+init()
+</script>
+</body>
+</html>
