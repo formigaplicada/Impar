@@ -2,9 +2,12 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { neon } from '@neondatabase/serverless'
 import aiRouter from './ai.js';
-
+import condominos from './condominos'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 const app = new Hono()
+
+app.route('/condominos', condominos)
 
 app.use('*', cors({
   origin: 'https://app.condexpress.com',
@@ -4408,7 +4411,520 @@ app.get('/test/email', async (c) => {
   }
 })
 
+// Adicionar ao ficheiro de rotas de prestadores existente
+// GET /prestadores/:id/contratos?data_inicio=YYYY-MM-DD&data_fim=YYYY-MM-DD
 
+app.get('/prestadores/:id/contratos', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const { id } = c.req.param()
+  const { data_inicio, data_fim } = c.req.query()
+
+  try {
+    // Contratos do prestador com info do condomínio e serviços
+    const contratos = await sql(
+      `SELECT
+         c.id,
+         c.estado,
+         c.data_inicio,
+         c.data_fim,
+         cd.id        AS condominio_id,
+         cd.n_impar   AS condominio_n_impar,
+         cd.nome      AS condominio_nome,
+         cs.id        AS contrato_servico_id,
+         cs.periodicidade,
+         s.nome       AS servico_nome
+       FROM contratos c
+       JOIN condominios cd ON cd.id = c.condominio_id
+       JOIN contrato_servicos cs ON cs.contrato_id = c.id
+       LEFT JOIN servicos s ON s.id = cs.servico_id
+       WHERE c.prestador_id = $1
+         AND c.tipo = 'prestador'
+       ORDER BY cd.nome ASC, s.nome ASC`,
+      [id]
+    )
+
+    // Contar limpezas por condomínio no período
+    let limpezasPorCondominio = {}
+    if (data_inicio && data_fim && contratos.length > 0) {
+      const condominioIds = [...new Set(contratos.map(r => r.condominio_id))]
+      const limpezas = await sql(
+        `SELECT condominio_id, COUNT(*) AS total
+         FROM limpezas
+         WHERE condominio_id = ANY($1)
+           AND ts_checkin >= $2
+           AND ts_checkin <= $3
+         GROUP BY condominio_id`,
+        [condominioIds, data_inicio, data_fim + 'T23:59:59Z']
+      )
+      for (const l of limpezas) {
+        limpezasPorCondominio[l.condominio_id] = Number(l.total)
+      }
+    }
+
+    const resultado = contratos.map(r => ({
+      ...r,
+      limpezas_periodo: limpezasPorCondominio[r.condominio_id] ?? null,
+    }))
+
+    return c.json({ contratos: resultado })
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
+  }
+})
+
+// =============================================================================
+// MÓDULO DD SEPA — ASSINATURA DIGITAL
+// Adicionar ao src/index.js do impar-api, antes da linha "export default app"
+//
+// Requer:
+//   - Migration dd_migration.sql já executada no Neon
+//   - pdf-lib instalado: npm install pdf-lib  (na pasta API/)
+//   - Variável DD_BASE_URL no wrangler.toml [vars]:
+//       DD_BASE_URL = "https://my.condexpress.com"
+//   - Import no topo do index.js:
+//       import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+// =============================================================================
+
+// ── Helpers DD ────────────────────────────────────────────────────────────────
+
+function gerarTokenDD() {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function expiresAtDD(days = 7) {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString()
+}
+
+function formatIBANDD(iban) {
+  if (!iban) return '—'
+  return iban.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim()
+}
+
+function formatDatePT(date) {
+  return new Date(date).toLocaleDateString('pt-PT', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  })
+}
+
+async function uploadMandatoPDF(env, condominioId, adc, pdfBytes) {
+  const msToken = await getMicrosoftToken(env)
+  const filename = `Mandato_DD_${adc}_${new Date().toISOString().slice(0, 10)}.pdf`
+  const siteId   = env.SHAREPOINT_SITE_ID
+  const driveId  = env.SHAREPOINT_DRIVE_ID
+  const folder   = `Condomínios/${condominioId}/Débito Direto`
+  const url      = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${folder}/${filename}:/content`
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${msToken}`, 'Content-Type': 'application/pdf' },
+    body: pdfBytes,
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`SharePoint upload falhou: ${err}`)
+  }
+  const data = await res.json()
+  return data.webUrl
+}
+
+async function enviarEmailMandato(env, { to, nome, link, adc, expiresAt }) {
+  const msToken   = await getMicrosoftToken(env)
+  const expiresStr = formatDatePT(expiresAt)
+  const html = `
+    <p>Exmo(a) Sr(a). ${nome},</p>
+    <p>No âmbito da formalização do serviço de gestão de condomínio pela <strong>Rede Ímpar, Lda</strong>,
+    solicitamos que proceda à assinatura da Autorização de Débito Direto SEPA
+    (referência <strong>${adc}</strong>).</p>
+    <p>Por favor clique no botão abaixo para aceder ao formulário seguro:</p>
+    <p style="margin:24px 0">
+      <a href="${link}" style="background:#011640;color:#C8DA00;padding:12px 24px;text-decoration:none;border-radius:4px;font-weight:bold;font-family:sans-serif">
+        Assinar Autorização DD
+      </a>
+    </p>
+    <p style="color:#666;font-size:13px">
+      Este link é válido até <strong>${expiresStr}</strong>.<br>
+      Após essa data, contacte a Ímpar para obter um novo link.
+    </p>
+    <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+    <p style="color:#999;font-size:11px">
+      Rede Ímpar, Lda &bull; Rua São Tomás de Aquino 18-M, 1600-874 Lisboa<br>
+      Este email foi enviado automaticamente.
+    </p>
+  `
+  await fetch(`https://graph.microsoft.com/v1.0/users/propostas@impar.pt/sendMail`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${msToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: {
+        subject: `Ímpar — Autorização de Débito Direto SEPA (${adc})`,
+        body: { contentType: 'HTML', content: html },
+        toRecipients: [{ emailAddress: { address: to } }],
+        from: { emailAddress: { address: 'propostas@impar.pt', name: 'Rede Ímpar' } },
+      },
+      saveToSentItems: true,
+    }),
+  })
+}
+
+async function enviarEmailConfirmacao(env, { toCliente, nomeCliente, adc, signedAt }) {
+  const msToken  = await getMicrosoftToken(env)
+  const dateStr  = formatDatePT(signedAt)
+  const timeStr  = signedAt.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+  const html = `
+    <p>Exmo(a) Sr(a). ${nomeCliente},</p>
+    <p>Confirmamos a receção da sua Autorização de Débito Direto SEPA
+    (referência <strong>${adc}</strong>), assinada em ${dateStr} às ${timeStr}.</p>
+    <p>O documento assinado foi guardado nos nossos sistemas.
+    Brevemente receberá também o contrato de gestão de condomínio.</p>
+    <p>Qualquer dúvida, contacte-nos através de
+    <a href="mailto:geral@impar.pt">geral@impar.pt</a>.</p>
+    <p>Com os melhores cumprimentos,<br><strong>Rede Ímpar, Lda</strong></p>
+  `
+  await fetch(`https://graph.microsoft.com/v1.0/users/propostas@impar.pt/sendMail`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${msToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: {
+        subject: `Confirmação — Autorização DD SEPA assinada (${adc})`,
+        body: { contentType: 'HTML', content: html },
+        toRecipients: [{ emailAddress: { address: toCliente } }],
+        from: { emailAddress: { address: 'propostas@impar.pt', name: 'Rede Ímpar' } },
+      },
+      saveToSentItems: true,
+    }),
+  })
+}
+
+async function gerarMandatoPDF(data) {
+  const { PDFDocument, rgb, StandardFonts } = await import('pdf-lib')
+
+  const pdfDoc  = await PDFDocument.create()
+  const page    = pdfDoc.addPage([595, 842])
+  const { width, height } = page.getSize()
+
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  const fontReg  = await pdfDoc.embedFont(StandardFonts.Helvetica)
+
+  const NAVY  = rgb(0.004, 0.086, 0.251)
+  const LIME  = rgb(0.784, 0.855, 0)
+  const GRAY  = rgb(0.4, 0.4, 0.4)
+  const BLACK = rgb(0, 0, 0)
+  const WHITE = rgb(1, 1, 1)
+
+  let y = height
+
+  // Cabeçalho
+  page.drawRectangle({ x: 0, y: height - 60, width, height: 60, color: NAVY })
+  page.drawText('SEPA Direct Debit Mandate', { x: 30, y: height - 26, size: 13, font: fontBold, color: WHITE })
+  page.drawText('Autorização de Débito Direto SEPA', { x: 30, y: height - 46, size: 9, font: fontReg, color: LIME })
+  y = height - 80
+
+  // Referência
+  page.drawText('Referência (ADC) / Mandate Reference', { x: 30, y, size: 7, font: fontBold, color: GRAY })
+  page.drawText(data.adc, { x: 30, y: y - 11, size: 11, font: fontBold, color: NAVY })
+  y -= 30
+
+  page.drawLine({ start: { x: 30, y }, end: { x: width - 30, y }, thickness: 0.5, color: LIME })
+  y -= 14
+
+  // Texto legal
+  const legal = 'Ao subscrever esta autorização, está a autorizar o credor a enviar instruções ao seu Banco para debitar a sua conta. Reembolso possível em 8 semanas. / By signing this mandate, you authorise the Creditor to send instructions to your bank to debit your account. A refund must be claimed within 8 weeks.'
+  const words = legal.split(' ')
+  let linha = ''
+  for (const w of words) {
+    const test = linha + (linha ? ' ' : '') + w
+    if (fontReg.widthOfTextAtSize(test, 7.5) > width - 60 && linha) {
+      page.drawText(linha, { x: 30, y, size: 7.5, font: fontReg, color: GRAY })
+      y -= 11
+      linha = w
+    } else { linha = test }
+  }
+  if (linha) { page.drawText(linha, { x: 30, y, size: 7.5, font: fontReg, color: GRAY }); y -= 11 }
+  y -= 14
+
+  page.drawLine({ start: { x: 30, y }, end: { x: width - 30, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) })
+  y -= 16
+
+  // Devedor
+  page.drawText('Identificação do Devedor / Debtor Identification', { x: 30, y, size: 10, font: fontBold, color: NAVY })
+  y -= 18
+
+  const campo = (label, valor, x, yPos, maxW) => {
+    page.drawText(label, { x, y: yPos + 2, size: 6.5, font: fontBold, color: GRAY })
+    page.drawText(valor || '—', { x, y: yPos - 10, size: 9.5, font: fontReg, color: BLACK })
+  }
+
+  campo('Nome / Name', data.nomeDevedor, 30, y)
+  y -= 24
+  campo('Morada / Street', data.moradaDevedor, 30, y)
+  y -= 24
+  campo('Código Postal / Postal Code', data.cpDevedor, 30, y)
+  campo('Cidade / City', data.cidadeDevedor, 200, y)
+  y -= 24
+  campo('País / Country', 'Portugal', 30, y)
+  y -= 24
+  campo('IBAN', formatIBANDD(data.iban), 30, y)
+  y -= 24
+  campo('BIC / SWIFT', data.bic || '—', 30, y)
+  y -= 30
+
+  page.drawLine({ start: { x: 30, y }, end: { x: width - 30, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) })
+  y -= 16
+
+  // Credor
+  page.drawText('Identificação do Credor / Creditor Identification', { x: 30, y, size: 10, font: fontBold, color: NAVY })
+  y -= 18
+  campo('Nome do Credor / Creditor Name', 'Rede Ímpar, Lda', 30, y)
+  y -= 24
+  campo('Identificação do Credor / Creditor ID', 'PT18ZZZ114843', 30, y)
+  y -= 24
+  campo('Morada / Address', 'Rua São Tomás de Aquino 18-M, 1600-874 Lisboa, Portugal', 30, y)
+  y -= 30
+
+  page.drawLine({ start: { x: 30, y }, end: { x: width - 30, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) })
+  y -= 16
+
+  // Tipo pagamento
+  page.drawText('Tipo de Pagamento / Type of Payment', { x: 30, y, size: 10, font: fontBold, color: NAVY })
+  y -= 16
+  page.drawText('☑  Pagamento recorrente / Recurrent payment', { x: 30, y, size: 9, font: fontReg, color: BLACK })
+  y -= 30
+
+  page.drawLine({ start: { x: 30, y }, end: { x: width - 30, y }, thickness: 0.5, color: rgb(0.85, 0.85, 0.85) })
+  y -= 16
+
+  // Assinatura
+  page.drawText('Assinatura / Signature', { x: 30, y, size: 10, font: fontBold, color: NAVY })
+  y -= 14
+  page.drawText(`Local: Portugal   |   Data: ${formatDatePT(data.signedAt)}`, { x: 30, y, size: 8, font: fontReg, color: GRAY })
+  y -= 10
+
+  const sigH = 80
+  page.drawRectangle({ x: 30, y: y - sigH, width: 260, height: sigH, borderColor: NAVY, borderWidth: 1, color: rgb(0.98, 0.98, 0.98) })
+
+  if (data.signaturePng) {
+    try {
+      const b64 = data.signaturePng.replace(/^data:image\/png;base64,/, '')
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+      const img = await pdfDoc.embedPng(bytes)
+      page.drawImage(img, { x: 35, y: y - sigH + 5, width: 250, height: sigH - 10 })
+    } catch (_) {}
+  }
+
+  y -= sigH + 16
+
+  // Rodapé
+  page.drawRectangle({ x: 0, y: 0, width, height: 45, color: rgb(0.97, 0.97, 0.97) })
+  page.drawText(`Assinado digitalmente em ${data.signedAt.toISOString()} | IP: ${data.signedIp}`, { x: 30, y: 28, size: 7, font: fontReg, color: GRAY })
+  page.drawText(`Mandato SEPA Core DD | ADC: ${data.adc} | Rede Ímpar, Lda`, { x: 30, y: 16, size: 7, font: fontReg, color: GRAY })
+
+  return await pdfDoc.save()
+}
+
+// ── POST /dd/mandatos/create  (requer auth — chamado pelo backoffice) ──────────
+
+app.post('/dd/mandatos/create', requireAuth, async (c) => {
+  const sql  = neon(c.env.DATABASE_URL)
+  const body = await c.req.json()
+  const { condominio_id, nome_devedor, email_devedor, iban, adc } = body
+
+  if (!condominio_id || !nome_devedor || !email_devedor || !adc) {
+    return c.json({ error: 'Campos obrigatórios: condominio_id, nome_devedor, email_devedor, adc' }, 400)
+  }
+
+  const token     = gerarTokenDD()
+  const expiresAt = expiresAtDD(7)
+
+  try {
+    const rows = await sql`
+      INSERT INTO mandatos_dd (
+        condominio_id, adc, iban,
+        data_assinatura, estado,
+        token, token_expires_at,
+        nome_devedor, email_devedor
+      ) VALUES (
+        ${condominio_id}, ${adc}, ${iban || ''},
+        CURRENT_DATE, 'pendente',
+        ${token}, ${expiresAt},
+        ${nome_devedor}, ${email_devedor}
+      )
+      RETURNING id, token, adc
+    `
+    const mandato = rows[0]
+    const link    = `${c.env.DD_BASE_URL}/dd/${token}`
+
+    await enviarEmailMandato(c.env, {
+      to: email_devedor, nome: nome_devedor,
+      link, adc, expiresAt: new Date(expiresAt),
+    })
+
+    return c.json({ id: mandato.id, token: mandato.token, link, adc: mandato.adc, email: email_devedor })
+  } catch (err) {
+    console.error('[dd/mandatos/create]', err)
+    return c.json({ error: err.message }, 500)
+  }
+})
+
+// ── GET /dd/assinar/:token  (pública — chamada pela página do cliente) ─────────
+
+app.get('/dd/assinar/:token', async (c) => {
+  const sql   = neon(c.env.DATABASE_URL)
+  const token = c.req.param('token')
+
+  try {
+    const rows = await sql`
+      SELECT
+        m.id, m.adc, m.iban, m.estado,
+        m.nome_devedor, m.email_devedor,
+        m.token_expires_at, m.signed_at,
+        cond.nome        AS condominio_nome,
+        cond.morada      AS condominio_morada,
+        cond.cod_postal  AS condominio_cp,
+        cond.localidade  AS condominio_cidade,
+        b.nome           AS banco_nome,
+        b.bic            AS banco_bic,
+        cr.nome          AS credor_nome,
+        cr.creditor_identifier AS credor_id
+      FROM mandatos_dd m
+      JOIN condominios cond ON cond.id = m.condominio_id
+      LEFT JOIN bancos b    ON b.id    = m.banco_id
+      CROSS JOIN dd_creditor cr
+      WHERE m.token = ${token}
+      LIMIT 1
+    `
+
+    if (rows.length === 0) return c.json({ error: 'Link inválido ou expirado' }, 404)
+    const m = rows[0]
+
+    if (m.estado === 'activo') return c.json({ error: 'Este mandato já foi assinado', signed: true }, 410)
+    if (new Date(m.token_expires_at) < new Date()) return c.json({ error: 'Este link expirou. Contacte a Ímpar para obter um novo link.', expired: true }, 410)
+
+    return c.json({
+      adc:          m.adc,
+      iban:         m.iban ? formatIBANDD(m.iban) : '',
+      bic:          m.banco_bic || '',
+      nome_devedor: m.nome_devedor,
+      condominio: {
+        nome:       m.condominio_nome,
+        morada:     m.condominio_morada,
+        cod_postal: m.condominio_cp,
+        cidade:     m.condominio_cidade,
+      },
+      credor: {
+        nome:       m.credor_nome || 'Rede Ímpar, Lda',
+        identifier: m.credor_id  || 'PT18ZZZ114843',
+      },
+    })
+  } catch (err) {
+    console.error('[dd/assinar GET]', err)
+    return c.json({ error: 'Erro interno' }, 500)
+  }
+})
+
+// ── POST /dd/assinar/:token  (pública — submissão da assinatura) ───────────────
+
+app.post('/dd/assinar/:token', async (c) => {
+  const sql   = neon(c.env.DATABASE_URL)
+  const token = c.req.param('token')
+  const ip    = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown'
+  const body  = await c.req.json()
+  const { iban, bic, banco_id, nome_devedor, signature_png } = body
+
+  if (!iban || !signature_png || !nome_devedor) {
+    return c.json({ error: 'Campos obrigatórios: iban, nome_devedor, signature_png' }, 400)
+  }
+
+  const ibanClean = iban.replace(/\s/g, '').toUpperCase()
+  if (!/^PT\d{23}$/.test(ibanClean)) {
+    return c.json({ error: 'IBAN inválido. Deve começar por PT seguido de 23 dígitos.' }, 400)
+  }
+
+  try {
+    const rows = await sql`
+      SELECT m.*,
+             cond.nome       AS condo_nome,
+             cond.morada,
+             cond.cod_postal,
+             cond.localidade,
+             cr.nome         AS credor_nome,
+             cr.creditor_identifier,
+             b.bic           AS banco_bic
+      FROM mandatos_dd m
+      JOIN condominios cond ON cond.id = m.condominio_id
+      CROSS JOIN dd_creditor cr
+      LEFT JOIN bancos b    ON b.id   = m.banco_id
+      WHERE m.token = ${token}
+      LIMIT 1
+    `
+
+    if (rows.length === 0) return c.json({ error: 'Link inválido' }, 404)
+    const m = rows[0]
+
+    if (m.estado === 'activo')                          return c.json({ error: 'Já assinado', signed: true }, 410)
+    if (new Date(m.token_expires_at) < new Date())     return c.json({ error: 'Link expirado' }, 410)
+
+    const signedAt  = new Date()
+    const finalBic  = bic || m.banco_bic || ''
+
+    // Gerar PDF
+    const pdfBytes = await gerarMandatoPDF({
+      adc:          m.adc,
+      nomeDevedor:  nome_devedor,
+      moradaDevedor: m.morada || '',
+      cpDevedor:    m.cod_postal || '',
+      cidadeDevedor: m.localidade || '',
+      iban:         ibanClean,
+      bic:          finalBic,
+      signaturePng: signature_png,
+      signedAt,
+      signedIp:     ip,
+    })
+
+    // Upload SharePoint
+    const pdfUrl = await uploadMandatoPDF(c.env, m.condominio_id, m.adc, pdfBytes)
+
+    // Actualizar registo
+    await sql`
+      UPDATE mandatos_dd SET
+        iban          = ${ibanClean},
+        banco_id      = ${banco_id || m.banco_id},
+        nome_devedor  = ${nome_devedor},
+        signature_png = ${signature_png},
+        signed_at     = ${signedAt.toISOString()},
+        signed_ip     = ${ip},
+        pdf_url       = ${pdfUrl},
+        estado        = 'activo',
+        data_assinatura = CURRENT_DATE,
+        atualizado_em = NOW()
+      WHERE token = ${token}
+    `
+
+    // Email de confirmação
+    await enviarEmailConfirmacao(c.env, {
+      toCliente:   m.email_devedor,
+      nomeCliente: nome_devedor,
+      adc:         m.adc,
+      signedAt,
+    })
+
+    return c.json({ success: true, adc: m.adc })
+  } catch (err) {
+    console.error('[dd/assinar POST]', err)
+    return c.json({ error: err.message }, 500)
+  }
+})
+
+// ── GET /dd/bancos  (pública — para popular o select na página cliente) ────────
+
+app.get('/dd/bancos', async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const rows = await sql`SELECT id, nome, bic FROM bancos ORDER BY nome`
+  return c.json(rows)
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CRON HANDLER — substitui o export default existente no index.js

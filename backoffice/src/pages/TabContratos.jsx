@@ -164,6 +164,47 @@ const FORM_VAZIO = {
   estado: 'ativo', renovacao_automatica: false, documento_url: '', condicoes: '',
 }
 
+// DetalheServico definido FORA do ModalContrato para evitar recriação a cada render
+// (causa perda de foco nos inputs)
+function DetalheServico({ sv, identifier, tipo, periodicidades, updateServico }) {
+  const lbl = {
+    fontSize: '0.72rem', fontWeight: 600, color: C.muted, marginBottom: '0.2rem',
+    display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em',
+  }
+  const inp = {
+    width: '100%', padding: '0.5rem 0.75rem', border: `1px solid ${C.border}`,
+    borderRadius: '0.5rem', fontSize: '0.82rem', fontFamily: 'DM Sans, sans-serif',
+    color: C.text, background: C.white, boxSizing: 'border-box',
+  }
+  return (
+    <div style={{ padding: '0 0.875rem 0.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+      <div>
+        <label style={lbl}>Valor mensal (€)</label>
+        <input type="number" min="0" step="0.01" style={inp}
+          value={sv.valor_mensal} onChange={e => updateServico(identifier, 'valor_mensal', e.target.value)} placeholder="0.00" />
+      </div>
+      <div>
+        <label style={lbl}>{tipo === 'prestador' ? 'Periodicidade do serviço' : 'Periodicidade'}</label>
+        <select style={inp} value={sv.periodicidade} onChange={e => updateServico(identifier, 'periodicidade', e.target.value)}>
+          {periodicidades.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+        </select>
+      </div>
+      {tipo === 'condominio' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <input type="checkbox" id={`est-${identifier}`} checked={sv.estimativa}
+            onChange={e => updateServico(identifier, 'estimativa', e.target.checked)} style={{ width: 14, height: 14 }} />
+          <label htmlFor={`est-${identifier}`} style={{ fontSize: '0.78rem', color: C.muted, cursor: 'pointer' }}>Valor estimado</label>
+        </div>
+      )}
+      <div>
+        <label style={lbl}>Observações</label>
+        <input style={inp} value={sv.observacoes}
+          onChange={e => updateServico(identifier, 'observacoes', e.target.value)} placeholder="Notas..." />
+      </div>
+    </div>
+  )
+}
+
 function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
   const [form, setForm]         = useState(inicial || { ...FORM_VAZIO, tipo })
   const [servicos, setServicos] = useState(inicial?.servicos || [])
@@ -172,6 +213,17 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
   const periodicidades = tipo === 'prestador' ? PERIODICIDADES_SERVICO : PERIODICIDADES_IMPAR
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const lbl = {
+    fontSize: '0.72rem', fontWeight: 600, color: C.muted, marginBottom: '0.3rem',
+    display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em',
+  }
+  const inp = {
+    width: '100%', padding: '0.5rem 0.75rem', border: `1px solid ${C.border}`,
+    borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif',
+    color: C.text, background: C.white, boxSizing: 'border-box',
+  }
+  const row2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }
 
   const catalogoFiltrado = servicosCatalogo.filter(s =>
     tipo === 'condominio' ? s.em_contrato : s.em_prestador
@@ -207,50 +259,6 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
       const match = typeof identifier === 'number' ? i === identifier : s.servico_id === identifier
       return match ? { ...s, [campo]: valor } : s
     }))
-  }
-
-  const lbl = {
-    fontSize: '0.72rem', fontWeight: 600, color: C.muted, marginBottom: '0.3rem',
-    display: 'block', textTransform: 'uppercase', letterSpacing: '0.06em',
-  }
-  const inp = {
-    width: '100%', padding: '0.5rem 0.75rem', border: `1px solid ${C.border}`,
-    borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif',
-    color: C.text, background: C.white, boxSizing: 'border-box',
-  }
-  const row2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }
-
-  function DetalheServico({ sv, identifier }) {
-    return (
-      <div style={{ padding: '0 0.875rem 0.875rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-        <div>
-          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Valor mensal (€)</label>
-          <input type="number" min="0" step="0.01" style={{ ...inp, fontSize: '0.82rem' }}
-            value={sv.valor_mensal} onChange={e => updateServico(identifier, 'valor_mensal', e.target.value)} placeholder="0.00" />
-        </div>
-        <div>
-          <label style={{ ...lbl, marginBottom: '0.2rem' }}>
-            {tipo === 'prestador' ? 'Periodicidade do serviço' : 'Periodicidade'}
-          </label>
-          <select style={{ ...inp, fontSize: '0.82rem' }} value={sv.periodicidade}
-            onChange={e => updateServico(identifier, 'periodicidade', e.target.value)}>
-            {periodicidades.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
-          </select>
-        </div>
-        {tipo === 'condominio' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <input type="checkbox" id={`est-${identifier}`} checked={sv.estimativa}
-              onChange={e => updateServico(identifier, 'estimativa', e.target.checked)} style={{ width: 14, height: 14 }} />
-            <label htmlFor={`est-${identifier}`} style={{ fontSize: '0.78rem', color: C.muted, cursor: 'pointer' }}>Valor estimado</label>
-          </div>
-        )}
-        <div>
-          <label style={{ ...lbl, marginBottom: '0.2rem' }}>Observações</label>
-          <input style={{ ...inp, fontSize: '0.82rem' }} value={sv.observacoes}
-            onChange={e => updateServico(identifier, 'observacoes', e.target.value)} placeholder="Notas..." />
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -323,10 +331,10 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
                   overflow: 'hidden', background: sel ? C.blueL : C.white,
                 }}>
                   <div onClick={() => toggleServico(s)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.875rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={!!sel} onChange={() => toggleServico(s)} style={{ width: 15, height: 15 }} />
+                    <input type="checkbox" checked={!!sel} onChange={() => toggleServico(s)} onClick={e => e.stopPropagation()} style={{ width: 15, height: 15, cursor: 'pointer' }} />
                     <span style={{ fontSize: '0.875rem', fontWeight: sel ? 600 : 400, color: sel ? C.navy : C.text }}>{s.nome}</span>
                   </div>
-                  {sel && <DetalheServico sv={sel} identifier={s.id} />}
+                  {sel && <DetalheServico sv={sel} identifier={s.id} tipo={tipo} periodicidades={periodicidades} updateServico={updateServico} />}
                 </div>
               )
             })}
@@ -343,7 +351,7 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
                   <span style={{ fontSize: '0.875rem', fontWeight: 600, color: C.navy }}>{sv.nome_custom}</span>
                   <button onClick={() => removeCustom(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '1rem' }}>✕</button>
                 </div>
-                <DetalheServico sv={sv} identifier={idx} />
+                <DetalheServico sv={sv} identifier={idx} tipo={tipo} periodicidades={periodicidades} updateServico={updateServico} />
               </div>
             )
           })}
