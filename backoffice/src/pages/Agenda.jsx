@@ -409,7 +409,7 @@ export default function Agenda() {
     Promise.all([
       api.get('/lojas').then(r => r.lojas || []),
       api.get('/condominios').then(r => r.condominios || []),
-      api.get('eventos/gestores').then(r => r.gestores || []),
+      api.get('/eventos/gestores').then(r => r.gestores || []),
     ]).then(([l, c, g]) => {
       setLojas(l)
       setCondominios(c)
