@@ -3721,6 +3721,7 @@ app.post('/contratos', requireAuth, async (c) => {
 
 // ── PUT /contratos/:id ────────────────────────────────────────────────────────
 app.put('/contratos/:id', requireAuth, async (c) => {
+  try {
   const sql  = neon(c.env.DATABASE_URL)
   const user = c.get('user')
   const id   = c.req.param('id')
@@ -3763,7 +3764,7 @@ app.put('/contratos/:id', requireAuth, async (c) => {
     await sql`
       INSERT INTO contrato_servicos (contrato_id, servico_id, valor_mensal, periodicidade, estimativa, observacoes)
       VALUES (${id}, ${s.servico_id}, ${s.valor_mensal || null}, ${s.periodicidade || 'mensal'}, ${s.estimativa || false}, ${s.observacoes || null})
-      ON CONFLICT (contrato_id, servico_id) DO UPDATE SET
+      ON CONFLICT (contrato_id, servico_id) WHERE servico_id IS NOT NULL DO UPDATE SET
         valor_mensal  = EXCLUDED.valor_mensal,
         periodicidade = EXCLUDED.periodicidade,
         estimativa    = EXCLUDED.estimativa,
@@ -3788,6 +3789,9 @@ app.put('/contratos/:id', requireAuth, async (c) => {
   }
 
   return c.json({ ok: true })
+   } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
+  }
 })
 
 

@@ -673,6 +673,7 @@ export default function TabContratos({ condominioId, lojaId }) {
   useEffect(() => { carregar() }, [condominioId])
 
   async function handleGuardar(form) {
+    console.log('payload:', JSON.stringify({ ...form, condominio_id: condominioId }))
     setLoadingGuardar(true)
     try {
       const payload = { ...form, condominio_id: condominioId }
