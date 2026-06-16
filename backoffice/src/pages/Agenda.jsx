@@ -409,7 +409,7 @@ export default function Agenda() {
     Promise.all([
       api.get('/lojas').then(r => r.lojas || []),
       api.get('/condominios').then(r => r.condominios || []),
-      api.get('/reunioes/gestores').then(r => r.gestores || []),
+      api.get('eventos/gestores').then(r => r.gestores || []),
     ]).then(([l, c, g]) => {
       setLojas(l)
       setCondominios(c)
@@ -427,8 +427,8 @@ export default function Agenda() {
       if (filtroLoja)   params.set('loja_id',    filtroLoja)
       if (filtroMes)    params.set('mes',         filtroMes)
       if (filtroAta)    params.set('estado_ata',  filtroAta)
-      const data = await api.get(`/reunioes?${params}`)
-      setReunioes(data.reunioes || [])
+      const data = await api.get(`/eventos?${params}`)
+      setReunioes(data.eventos || [])
     } catch (e) {
       setErro(e.message)
     } finally {
@@ -442,7 +442,7 @@ export default function Agenda() {
   async function handleCriar(form) {
     setLoadingGuardar(true)
     try {
-      await api.post('/reunioes', { ...form, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
+      await api.post('/eventos', { ...form, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
       setModal(null)
       carregar()
     } catch (e) {
@@ -456,7 +456,7 @@ export default function Agenda() {
   async function handleEditar(form) {
     setLoadingGuardar(true)
     try {
-      await api.put(`/reunioes/${reuniaoEditar.id}`, { ...form, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
+      await api.put(`/eventos/${reuniaoEditar.id}`, { ...form, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
       setModal(null)
       setReuniaoEditar(null)
       carregar()
@@ -470,7 +470,7 @@ export default function Agenda() {
   // ── Apagar ─────────────────────────────────────────────────────────────────
   async function handleApagar() {
     try {
-      await api.delete(`/reunioes/${apagarId}`)
+      await api.delete(`/eventos/${apagarId}`)
       setApagarId(null)
       carregar()
     } catch (e) {
