@@ -442,7 +442,7 @@ export default function Agenda() {
   async function handleCriar(form) {
     setLoadingGuardar(true)
     try {
-      await api.post('/eventos', { ...form, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
+      await api.post('/eventos', { ...form, formato: form.tipo_evento, estado: form.estado_ata, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
       setModal(null)
       carregar()
     } catch (e) {
@@ -456,7 +456,7 @@ export default function Agenda() {
   async function handleEditar(form) {
     setLoadingGuardar(true)
     try {
-      await api.put(`/eventos/${reuniaoEditar.id}`, { ...form, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
+      await api.put(`/eventos/${reuniaoEditar.id}`, { ...form, formato: form.tipo_evento, estado: form.estado_ata, data_hora: form.data_hora ? new Date(form.data_hora).toISOString() : null })
       setModal(null)
       setReuniaoEditar(null)
       carregar()
