@@ -34,24 +34,14 @@ function getFimSemana(d) {
   return fim
 }
 
-function toISO(d) {
-  return d.toISOString().slice(0, 10)
-}
+function toISO(d) { return d.toISOString().slice(0, 10) }
 
 function formatDatePt(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function calcEsperado(periodicidade, tipoPeriodo) {
-  if (tipoPeriodo === 'semana') {
-    const map = { 'diario': 7, '3xsemana': 3, '2xsemana': 2, '1xsemana': 1, '3xmes': 0, '2xmes': 0, '1xmes': 0, 'anual': 0 }
-    return map[periodicidade] ?? 0
-  } else {
-    const map = { 'diario': 30, '3xsemana': 12, '2xsemana': 8, '1xsemana': 4, '3xmes': 3, '2xmes': 2, '1xmes': 1, 'anual': 0 }
-    return map[periodicidade] ?? 0
-  }
-}
+function periodoLabel(tipo, data_inicio) {
   const d = new Date(data_inicio)
   if (tipo === 'semana') {
     const inicio = getInicioSemana(d)
@@ -76,18 +66,22 @@ function navegarPeriodo(tipo, data_inicio, direcao) {
 function calcPeriodo(tipo, data_inicio) {
   if (tipo === 'semana') {
     const d = new Date(data_inicio)
-    return {
-      data_inicio: toISO(getInicioSemana(d)),
-      data_fim:    toISO(getFimSemana(d)),
-    }
+    return { data_inicio: toISO(getInicioSemana(d)), data_fim: toISO(getFimSemana(d)) }
   } else {
     const d = new Date(data_inicio)
     const inicio = new Date(d.getFullYear(), d.getMonth(), 1)
     const fim    = new Date(d.getFullYear(), d.getMonth() + 1, 0)
-    return {
-      data_inicio: toISO(inicio),
-      data_fim:    toISO(fim),
-    }
+    return { data_inicio: toISO(inicio), data_fim: toISO(fim) }
+  }
+}
+
+function calcEsperado(periodicidade, tipoPeriodo) {
+  if (tipoPeriodo === 'semana') {
+    const map = { 'diario': 7, '3xsemana': 3, '2xsemana': 2, '1xsemana': 1, '3xmes': 0, '2xmes': 0, '1xmes': 0, 'anual': 0 }
+    return map[periodicidade] ?? 0
+  } else {
+    const map = { 'diario': 30, '3xsemana': 12, '2xsemana': 8, '1xsemana': 4, '3xmes': 3, '2xmes': 2, '1xmes': 1, 'anual': 0 }
+    return map[periodicidade] ?? 0
   }
 }
 
@@ -236,10 +230,10 @@ function Modal({ onClose, onSave }) {
 
 function DetalhePrestador({ prestador, onVoltar }) {
   const hoje = new Date()
-  const [tipoPeriodo,   setTipoPeriodo]   = useState('semana')
+  const [tipoPeriodo,    setTipoPeriodo]    = useState('semana')
   const [dataReferencia, setDataReferencia] = useState(toISO(getInicioSemana(hoje)))
-  const [contratos,     setContratos]     = useState([])
-  const [loading,       setLoading]       = useState(true)
+  const [contratos,      setContratos]      = useState([])
+  const [loading,        setLoading]        = useState(true)
 
   const periodo = calcPeriodo(tipoPeriodo, dataReferencia)
 
@@ -272,11 +266,15 @@ function DetalhePrestador({ prestador, onVoltar }) {
     verticalAlign: 'middle',
   }
 
+  const totalEsperado  = contratos.reduce((acc, r) => acc + calcEsperado(r.periodicidade, tipoPeriodo), 0)
+  const totalRealizado = contratos.some(r => r.limpezas_periodo !== null)
+    ? contratos.reduce((acc, r) => acc + (r.limpezas_periodo || 0), 0)
+    : null
+
   return (
     <div style={{ animation: 'fadeIn 0.18s ease' }}>
       <style>{`@keyframes fadeIn { from { opacity:0; transform:translateY(6px) } to { opacity:1; transform:none } }`}</style>
 
-      {/* Voltar */}
       <button onClick={onVoltar} style={{
         background: 'none', border: 'none', cursor: 'pointer', color: C.blue,
         fontSize: '0.875rem', marginBottom: '1.5rem', display: 'inline-flex',
@@ -287,14 +285,13 @@ function DetalhePrestador({ prestador, onVoltar }) {
         onMouseLeave={e => e.currentTarget.style.background = 'none'}
       >← Voltar aos prestadores</button>
 
-      {/* Cabeçalho */}
       <div style={{ marginBottom: '1.75rem' }}>
         <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.2rem', fontWeight: 700, color: C.text, fontFamily: 'DM Sans, sans-serif' }}>
           {prestador.nome}
         </h2>
         <p style={{ margin: 0, fontSize: '0.82rem', color: C.muted }}>
-          {prestador.nif && <span>NIF {prestador.nif} · </span>}
-          {prestador.email && <span>{prestador.email} · </span>}
+          {prestador.nif     && <span>NIF {prestador.nif} · </span>}
+          {prestador.email   && <span>{prestador.email} · </span>}
           {prestador.telefone && <span>{prestador.telefone}</span>}
         </p>
       </div>
@@ -306,7 +303,6 @@ function DetalhePrestador({ prestador, onVoltar }) {
         display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap',
         boxShadow: '0 1px 3px rgba(1,22,64,0.06)',
       }}>
-        {/* Toggle semana/mês */}
         <div style={{ display: 'flex', background: C.bg, borderRadius: '0.5rem', padding: '0.2rem' }}>
           {['semana', 'mes'].map(t => (
             <button key={t} onClick={() => mudarTipo(t)} style={{
@@ -318,8 +314,6 @@ function DetalhePrestador({ prestador, onVoltar }) {
             }}>{t === 'semana' ? 'Semana' : 'Mês'}</button>
           ))}
         </div>
-
-        {/* Navegação */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button onClick={() => setDataReferencia(navegarPeriodo(tipoPeriodo, dataReferencia, -1))} style={{
             background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.375rem',
@@ -333,7 +327,6 @@ function DetalhePrestador({ prestador, onVoltar }) {
             padding: '0.35rem 0.625rem', cursor: 'pointer', color: C.muted, fontSize: '0.875rem',
           }}>›</button>
         </div>
-
         <button onClick={() => {
           const d = new Date()
           if (tipoPeriodo === 'semana') setDataReferencia(toISO(getInicioSemana(d)))
@@ -345,13 +338,11 @@ function DetalhePrestador({ prestador, onVoltar }) {
         }}>Hoje</button>
       </div>
 
+      {/* Tabela */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: C.subtle }}>⏳ A carregar…</div>
       ) : contratos.length === 0 ? (
-        <div style={{
-          background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.75rem',
-          padding: '3rem', textAlign: 'center', color: C.subtle,
-        }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: '0.75rem', padding: '3rem', textAlign: 'center', color: C.subtle }}>
           <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
           Sem contratos registados para este prestador.
         </div>
@@ -371,13 +362,11 @@ function DetalhePrestador({ prestador, onVoltar }) {
               <tbody>
                 {contratos.map((r, i) => {
                   const esperado  = calcEsperado(r.periodicidade, tipoPeriodo)
-                  const realizado = r.limpezas_periodo ?? null
+                  const realizado = r.limpezas_periodo
                   const ok        = realizado !== null && realizado >= esperado
                   return (
                     <tr key={r.id} style={{ background: i % 2 === 0 ? C.white : '#fafbfc' }}>
-                      <td style={{ ...tdStyle, fontWeight: 600, color: C.navy }}>
-                        {r.condominio_nome}
-                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 600, color: C.navy }}>{r.condominio_nome}</td>
                       <td style={tdStyle}>{r.servico_nome || '—'}</td>
                       <td style={{ ...tdStyle, color: C.muted }}>{r.periodicidade || '—'}</td>
                       <td style={{ ...tdStyle, textAlign: 'center', color: C.muted }}>{esperado || '—'}</td>
@@ -403,14 +392,9 @@ function DetalhePrestador({ prestador, onVoltar }) {
                     Total — {contratos.length} condomínio{contratos.length !== 1 ? 's' : ''}
                   </td>
                   <td colSpan={2} style={tdStyle} />
+                  <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: C.navy }}>{totalEsperado}</td>
                   <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: C.navy }}>
-                    {contratos.reduce((acc, r) => acc + calcEsperado(r.periodicidade, tipoPeriodo), 0)}
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: C.navy }}>
-                    {contratos.some(r => r.limpezas_periodo !== null)
-                      ? contratos.reduce((acc, r) => acc + (r.limpezas_periodo || 0), 0)
-                      : '—'
-                    }
+                    {totalRealizado !== null ? totalRealizado : '—'}
                   </td>
                 </tr>
               </tfoot>
@@ -453,15 +437,11 @@ export default function Prestadores() {
   function handleFiltro(e) { setFiltros(f => ({ ...f, [e.target.name]: e.target.value })) }
 
   if (detalhe) return (
-    <DetalhePrestador
-      prestador={detalhe}
-      onVoltar={() => setDetalhe(null)}
-    />
+    <DetalhePrestador prestador={detalhe} onVoltar={() => setDetalhe(null)} />
   )
 
   return (
     <div>
-      {/* Filtros */}
       <form onSubmit={e => { e.preventDefault(); carregar(filtros) }} style={{
         background: C.surface, borderRadius: '0.875rem',
         padding: '1rem 1.25rem', marginBottom: '1.25rem',
@@ -497,7 +477,6 @@ export default function Prestadores() {
           style={{ background: '#16a34a', color: C.white, border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>+ Novo Prestador</button>
       </form>
 
-      {/* Tabela */}
       <div style={{ background: C.surface, borderRadius: '0.875rem', border: `1px solid ${C.border}`, overflow: 'hidden', boxShadow: '0 1px 4px rgba(1,22,64,0.06)' }}>
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: C.subtle }}>
