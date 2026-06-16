@@ -441,6 +441,7 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
       </div>
     </div>
   )
+}
 
 // ── Histórico ─────────────────────────────────────────────────────────────────
 function HistoricoSection({ contratos }) {
