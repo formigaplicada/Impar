@@ -3720,80 +3720,81 @@ app.post('/contratos', requireAuth, async (c) => {
 
 
 // ── PUT /contratos/:id ────────────────────────────────────────────────────────
+// ── PUT /contratos/:id ────────────────────────────────────────────────────────
 app.put('/contratos/:id', requireAuth, async (c) => {
-  try {
   const sql  = neon(c.env.DATABASE_URL)
   const user = c.get('user')
   const id   = c.req.param('id')
   const body = await c.req.json()
 
-  const antes = await sql`SELECT * FROM contratos WHERE id = ${id}`
-  if (antes.length === 0) return c.json({ error: 'Contrato não encontrado' }, 404)
+  try {
+    const antes = await sql`SELECT * FROM contratos WHERE id = ${id}`
+    if (antes.length === 0) return c.json({ error: 'Contrato não encontrado' }, 404)
 
-  const {
-    tipo, prestador_id,
-    data_inicio, data_fim, estado,
-    renovacao_automatica, documento_url, condicoes,
-    servicos = [],
-  } = body
+    const {
+      tipo, prestador_id,
+      data_inicio, data_fim, estado,
+      renovacao_automatica, documento_url, condicoes,
+      servicos = [],
+    } = body
 
-  await sql`
-    UPDATE contratos SET
-      tipo                 = ${tipo                || antes[0].tipo},
-      prestador_id         = ${prestador_id        ?? null},
-      data_inicio          = ${data_inicio         || antes[0].data_inicio},
-      data_fim             = ${data_fim            ?? null},
-      estado               = ${estado              || antes[0].estado},
-      renovacao_automatica = ${renovacao_automatica ?? antes[0].renovacao_automatica},
-      documento_url        = ${documento_url       ?? null},
-      condicoes            = ${condicoes           ?? null}
-    WHERE id = ${id}
-  `
-
-  // Sincronizar serviços — apagar os que foram removidos, upsert os restantes
-  const idsNovos = servicos.map(s => s.servico_id).filter(Boolean)
-
-  if (idsNovos.length > 0) {
-    await sql`DELETE FROM contrato_servicos WHERE contrato_id = ${id} AND servico_id != ALL(${idsNovos})`
-  } else {
-    await sql`DELETE FROM contrato_servicos WHERE contrato_id = ${id}`
-  }
-
-  for (const s of servicos) {
-    if (!s.servico_id) continue
     await sql`
-      INSERT INTO contrato_servicos (contrato_id, servico_id, valor_mensal, periodicidade, estimativa, observacoes)
-      VALUES (${id}, ${s.servico_id}, ${s.valor_mensal || null}, ${s.periodicidade || 'mensal'}, ${s.estimativa || false}, ${s.observacoes || null})
-      ON CONFLICT (contrato_id, servico_id) WHERE servico_id IS NOT NULL DO UPDATE SET
-        valor_mensal  = EXCLUDED.valor_mensal,
-        periodicidade = EXCLUDED.periodicidade,
-        estimativa    = EXCLUDED.estimativa,
-        observacoes   = EXCLUDED.observacoes
+      UPDATE contratos SET
+        tipo                 = ${tipo                || antes[0].tipo},
+        prestador_id         = ${prestador_id        ?? null},
+        data_inicio          = ${data_inicio         || antes[0].data_inicio},
+        data_fim             = ${data_fim            || null},
+        estado               = ${estado              || antes[0].estado},
+        renovacao_automatica = ${renovacao_automatica ?? antes[0].renovacao_automatica},
+        documento_url        = ${documento_url       || null},
+        condicoes            = ${condicoes           || null}
+      WHERE id = ${id}
     `
-  }
 
-  // Log alterações relevantes
-  const logs = []
-  if (estado && estado !== antes[0].estado)
-    logs.push({ acao: 'estado alterado', detalhe: { antes: antes[0].estado, depois: estado } })
-  if (documento_url !== antes[0].documento_url)
-    logs.push({ acao: 'documento actualizado', detalhe: {} })
-  if (logs.length === 0)
-    logs.push({ acao: 'contrato editado', detalhe: {} })
+    // Sincronizar serviços
+    const idsNovos = servicos.map(s => s.servico_id).filter(Boolean)
 
-  for (const log of logs) {
-    await sql`
-      INSERT INTO contrato_logs (contrato_id, utilizador_id, acao, detalhe)
-      VALUES (${id}, ${user.id}, ${log.acao}, ${JSON.stringify(log.detalhe)}::jsonb)
-    `
-  }
+    if (idsNovos.length > 0) {
+      await sql`DELETE FROM contrato_servicos WHERE contrato_id = ${id} AND servico_id != ALL(${idsNovos})`
+    } else {
+      await sql`DELETE FROM contrato_servicos WHERE contrato_id = ${id}`
+    }
 
-  return c.json({ ok: true })
-   } catch (e) {
+    for (const s of servicos) {
+      if (!s.servico_id) continue
+      await sql`
+        INSERT INTO contrato_servicos (contrato_id, servico_id, valor_mensal, periodicidade, estimativa, observacoes)
+        VALUES (${id}, ${s.servico_id}, ${s.valor_mensal || null}, ${s.periodicidade || 'mensal'}, ${s.estimativa || false}, ${s.observacoes || null})
+        ON CONFLICT (contrato_id, servico_id) WHERE servico_id IS NOT NULL DO UPDATE SET
+          valor_mensal  = EXCLUDED.valor_mensal,
+          periodicidade = EXCLUDED.periodicidade,
+          estimativa    = EXCLUDED.estimativa,
+          observacoes   = EXCLUDED.observacoes
+      `
+    }
+
+    // Log alterações
+    const logs = []
+    if (estado && estado !== antes[0].estado)
+      logs.push({ acao: 'estado alterado', detalhe: { antes: antes[0].estado, depois: estado } })
+    if (documento_url !== antes[0].documento_url)
+      logs.push({ acao: 'documento actualizado', detalhe: {} })
+    if (logs.length === 0)
+      logs.push({ acao: 'contrato editado', detalhe: {} })
+
+    for (const log of logs) {
+      await sql`
+        INSERT INTO contrato_logs (contrato_id, utilizador_id, acao, detalhe)
+        VALUES (${id}, ${user.id}, ${log.acao}, ${JSON.stringify(log.detalhe)}::jsonb)
+      `
+    }
+
+    return c.json({ ok: true })
+
+  } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
 })
-
 
 // ── DELETE /contratos/:id ─────────────────────────────────────────────────────
 app.delete('/contratos/:id', requireAuth, async (c) => {
@@ -4420,49 +4421,41 @@ app.get('/test/email', async (c) => {
 
 // Adicionar ao ficheiro de rotas de prestadores existente
 // GET /prestadores/:id/contratos?data_inicio=YYYY-MM-DD&data_fim=YYYY-MM-DD
-
 app.get('/prestadores/:id/contratos', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
-  const { id } = c.req.param()
+  const id  = c.req.param('id')
   const { data_inicio, data_fim } = c.req.query()
 
   try {
-    // Contratos do prestador com info do condomínio e serviços
-    const contratos = await sql(
-      `SELECT
-         c.id,
-         c.estado,
-         c.data_inicio,
-         c.data_fim,
-         cd.id        AS condominio_id,
-         cd.n_impar   AS condominio_n_impar,
-         cd.nome      AS condominio_nome,
-         cs.id        AS contrato_servico_id,
-         cs.periodicidade,
-         s.nome       AS servico_nome
-       FROM contratos c
-       JOIN condominios cd ON cd.id = c.condominio_id
-       JOIN contrato_servicos cs ON cs.contrato_id = c.id
-       LEFT JOIN servicos s ON s.id = cs.servico_id
-       WHERE c.prestador_id = $1
-         AND c.tipo = 'prestador'
-       ORDER BY cd.nome ASC, s.nome ASC`,
-      [id]
-    )
+    const contratos = await sql`
+      SELECT
+        c.id, c.estado, c.data_inicio, c.data_fim,
+        cd.id      AS condominio_id,
+        cd.n_impar AS condominio_n_impar,
+        cd.nome    AS condominio_nome,
+        cs.id      AS contrato_servico_id,
+        cs.periodicidade,
+        s.nome     AS servico_nome
+      FROM contratos c
+      JOIN condominios cd      ON cd.id = c.condominio_id
+      JOIN contrato_servicos cs ON cs.contrato_id = c.id
+      LEFT JOIN servicos s     ON s.id = cs.servico_id
+      WHERE c.prestador_id = ${Number(id)}
+        AND c.tipo = 'prestador'
+      ORDER BY cd.nome ASC, s.nome ASC
+    `
 
-    // Contar limpezas por condomínio no período
     let limpezasPorCondominio = {}
     if (data_inicio && data_fim && contratos.length > 0) {
       const condominioIds = [...new Set(contratos.map(r => r.condominio_id))]
-      const limpezas = await sql(
-        `SELECT condominio_id, COUNT(*) AS total
-         FROM limpezas
-         WHERE condominio_id = ANY($1)
-           AND ts_checkin >= $2
-           AND ts_checkin <= $3
-         GROUP BY condominio_id`,
-        [condominioIds, data_inicio, data_fim + 'T23:59:59Z']
-      )
+      const limpezas = await sql`
+        SELECT condominio_id, COUNT(*) AS total
+        FROM limpezas
+        WHERE condominio_id = ANY(${condominioIds})
+          AND ts_checkin >= ${data_inicio}
+          AND ts_checkin <= ${data_fim + 'T23:59:59Z'}
+        GROUP BY condominio_id
+      `
       for (const l of limpezas) {
         limpezasPorCondominio[l.condominio_id] = Number(l.total)
       }

@@ -43,7 +43,15 @@ function formatDatePt(iso) {
   return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-function periodoLabel(tipo, data_inicio) {
+function calcEsperado(periodicidade, tipoPeriodo) {
+  if (tipoPeriodo === 'semana') {
+    const map = { 'diario': 7, '3xsemana': 3, '2xsemana': 2, '1xsemana': 1, '3xmes': 0, '2xmes': 0, '1xmes': 0, 'anual': 0 }
+    return map[periodicidade] ?? 0
+  } else {
+    const map = { 'diario': 30, '3xsemana': 12, '2xsemana': 8, '1xsemana': 4, '3xmes': 3, '2xmes': 2, '1xmes': 1, 'anual': 0 }
+    return map[periodicidade] ?? 0
+  }
+}
   const d = new Date(data_inicio)
   if (tipo === 'semana') {
     const inicio = getInicioSemana(d)
@@ -337,7 +345,6 @@ function DetalhePrestador({ prestador, onVoltar }) {
         }}>Hoje</button>
       </div>
 
-      {/* Tabela */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem', color: C.subtle }}>⏳ A carregar…</div>
       ) : contratos.length === 0 ? (
@@ -356,36 +363,57 @@ function DetalhePrestador({ prestador, onVoltar }) {
                 <tr>
                   <th style={thStyle}>Condomínio</th>
                   <th style={thStyle}>Serviço</th>
-                  <th style={thStyle}>Periodicidade do serviço</th>
-                  <th style={{ ...thStyle, textAlign: 'center' }}>
-                    Limpezas no período
-                  </th>
+                  <th style={thStyle}>Periodicidade</th>
+                  <th style={{ ...thStyle, textAlign: 'center' }}>Esperado</th>
+                  <th style={{ ...thStyle, textAlign: 'center' }}>Realizado</th>
                 </tr>
               </thead>
               <tbody>
-                {contratos.map((r, i) => (
-                  <tr key={r.id} style={{ background: i % 2 === 0 ? C.white : '#fafbfc' }}>
-                    <td style={{ ...tdStyle, fontWeight: 600, color: C.navy }}>
-                      <div>{r.condominio_nome}</div>
-                      <div style={{ fontSize: '0.72rem', color: C.subtle, fontWeight: 400 }}>#{r.condominio_n_impar}</div>
-                    </td>
-                    <td style={tdStyle}>{r.servico_nome || '—'}</td>
-                    <td style={{ ...tdStyle, color: C.muted }}>{r.periodicidade || '—'}</td>
-                    <td style={{ ...tdStyle, textAlign: 'center' }}>
-                      {r.limpezas_periodo === null ? (
-                        <span style={{ color: C.subtle }}>—</span>
-                      ) : (
-                        <span style={{
-                          background: r.limpezas_periodo > 0 ? '#dcfce7' : C.bg,
-                          color: r.limpezas_periodo > 0 ? '#16a34a' : C.muted,
-                          borderRadius: '0.375rem', padding: '0.2rem 0.6rem',
-                          fontSize: '0.78rem', fontWeight: 700,
-                        }}>{r.limpezas_periodo}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {contratos.map((r, i) => {
+                  const esperado  = calcEsperado(r.periodicidade, tipoPeriodo)
+                  const realizado = r.limpezas_periodo ?? null
+                  const ok        = realizado !== null && realizado >= esperado
+                  return (
+                    <tr key={r.id} style={{ background: i % 2 === 0 ? C.white : '#fafbfc' }}>
+                      <td style={{ ...tdStyle, fontWeight: 600, color: C.navy }}>
+                        {r.condominio_nome}
+                      </td>
+                      <td style={tdStyle}>{r.servico_nome || '—'}</td>
+                      <td style={{ ...tdStyle, color: C.muted }}>{r.periodicidade || '—'}</td>
+                      <td style={{ ...tdStyle, textAlign: 'center', color: C.muted }}>{esperado || '—'}</td>
+                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                        {realizado === null ? (
+                          <span style={{ color: C.subtle }}>—</span>
+                        ) : (
+                          <span style={{
+                            background: ok ? '#dcfce7' : '#fef2f2',
+                            color: ok ? '#16a34a' : '#dc2626',
+                            borderRadius: '0.375rem', padding: '0.2rem 0.6rem',
+                            fontSize: '0.78rem', fontWeight: 700,
+                          }}>{realizado}</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
+              <tfoot>
+                <tr style={{ background: '#f0f3f7', borderTop: `2px solid ${C.border}` }}>
+                  <td style={{ ...tdStyle, fontWeight: 700, color: C.navy }}>
+                    Total — {contratos.length} condomínio{contratos.length !== 1 ? 's' : ''}
+                  </td>
+                  <td colSpan={2} style={tdStyle} />
+                  <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: C.navy }}>
+                    {contratos.reduce((acc, r) => acc + calcEsperado(r.periodicidade, tipoPeriodo), 0)}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: C.navy }}>
+                    {contratos.some(r => r.limpezas_periodo !== null)
+                      ? contratos.reduce((acc, r) => acc + (r.limpezas_periodo || 0), 0)
+                      : '—'
+                    }
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
