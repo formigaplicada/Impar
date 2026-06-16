@@ -205,7 +205,9 @@ function DetalheServico({ sv, identifier, tipo, periodicidades, updateServico })
   )
 }
 
-function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servicosCatalogo, onGuardar, onFechar, loading }) {
+function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servicosCatalogo, contratosExistentes, onGuardar, onFechar, loading }) {
+  const modoEditar = !!inicial
+
   const [form, setForm]         = useState(inicial || { ...FORM_VAZIO, tipo })
   const [servicos, setServicos] = useState(inicial?.servicos || [])
   const [customInput, setCustomInput] = useState('')
@@ -225,9 +227,20 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
   }
   const row2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }
 
+  // Catálogo filtrado por tipo
   const catalogoFiltrado = servicosCatalogo.filter(s =>
     tipo === 'condominio' ? s.em_contrato : s.em_prestador
   )
+
+  // No modo novo: filtrar pelos serviços que já têm contrato activo neste condomínio
+  const servicosComContrato = new Set(
+    contratosExistentes
+      .filter(c => c.tipo === tipo && c.estado === 'ativo')
+      .flatMap(c => c.servicos?.map(sv => sv.servico_id).filter(Boolean) || [])
+  )
+  const catalogoParaNovo = modoEditar
+    ? catalogoFiltrado
+    : catalogoFiltrado.filter(s => servicosComContrato.has(s.id))
 
   function toggleServico(s) {
     setServicos(prev => {
@@ -273,15 +286,27 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: C.navy, fontFamily: 'DM Sans, sans-serif' }}>
-            {inicial ? 'Editar' : 'Novo'} {tipo === 'condominio' ? 'Contrato' : 'Contrato de Prestador'}
+            {modoEditar ? 'Editar' : 'Novo'} {tipo === 'condominio' ? 'Contrato' : 'Contrato de Prestador'}
           </h2>
           <button onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.4rem', color: C.muted }}>×</button>
         </div>
 
-        {tipo === 'prestador' && (
+        {/* Novo prestador: selector de serviço+prestador */}
+        {tipo === 'prestador' && !modoEditar && (
           <PrestadorPorServico servicosCatalogo={catalogoFiltrado} form={form} set={set} inp={inp} lbl={lbl} lojaId={lojaId} />
         )}
 
+        {/* Editar prestador: mostrar prestador actual (read-only) */}
+        {tipo === 'prestador' && modoEditar && inicial?.prestador_nome && (
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={lbl}>Prestador</label>
+            <div style={{ padding: '0.5rem 0.75rem', background: C.bg, borderRadius: '0.5rem', fontSize: '0.875rem', color: C.text, fontWeight: 600 }}>
+              {inicial.prestador_nome}
+            </div>
+          </div>
+        )}
+
+        {/* Datas */}
         <div style={row2}>
           <div>
             <label style={lbl}>Data de início *</label>
@@ -293,6 +318,7 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
           </div>
         </div>
 
+        {/* Estado + Renovação */}
         <div style={row2}>
           <div>
             <label style={lbl}>Estado</label>
@@ -309,64 +335,95 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
           )}
         </div>
 
+        {/* Documento */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={lbl}>Documento <span style={{ fontWeight: 400, textTransform: 'none' }}>(link OneDrive — opcional)</span></label>
           <input style={inp} value={form.documento_url} onChange={e => set('documento_url', e.target.value)} placeholder="https://..." />
         </div>
 
+        {/* Condições */}
         <div style={{ marginBottom: '1.5rem' }}>
           <label style={lbl}>Condições gerais</label>
           <textarea style={{ ...inp, resize: 'vertical', minHeight: '3.5rem' }} value={form.condicoes}
             onChange={e => set('condicoes', e.target.value)} placeholder="Notas e condições do contrato..." />
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ ...lbl, marginBottom: '0.75rem' }}>Serviços incluídos</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {catalogoFiltrado.map(s => {
-              const sel = servicos.find(sv => sv.servico_id === s.id)
-              return (
-                <div key={s.id} style={{
-                  border: `1px solid ${sel ? C.blue : C.border}`, borderRadius: '0.5rem',
-                  overflow: 'hidden', background: sel ? C.blueL : C.white,
-                }}>
-                  <div onClick={() => toggleServico(s)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.875rem', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={!!sel} onChange={() => toggleServico(s)} onClick={e => e.stopPropagation()} style={{ width: 15, height: 15, cursor: 'pointer' }} />
-                    <span style={{ fontSize: '0.875rem', fontWeight: sel ? 600 : 400, color: sel ? C.navy : C.text }}>{s.nome}</span>
+        {/* Serviços — modo editar: só os do contrato; modo novo: só os com contrato activo */}
+        {modoEditar ? (
+          /* Editar: mostrar serviços existentes do contrato com campos editáveis */
+          servicos.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ ...lbl, marginBottom: '0.75rem' }}>Serviços</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {servicos.map((sv, i) => (
+                  <div key={sv.servico_id || i} style={{
+                    border: `1px solid ${C.blue}`, borderRadius: '0.5rem',
+                    overflow: 'hidden', background: C.blueL,
+                  }}>
+                    <div style={{ padding: '0.6rem 0.875rem', fontSize: '0.875rem', fontWeight: 600, color: C.navy }}>
+                      {sv.servico_nome || sv.nome_custom}
+                    </div>
+                    <DetalheServico sv={sv} identifier={sv.servico_id || i} tipo={tipo} periodicidades={periodicidades} updateServico={updateServico} />
                   </div>
-                  {sel && <DetalheServico sv={sel} identifier={s.id} tipo={tipo} periodicidades={periodicidades} updateServico={updateServico} />}
+                ))}
+              </div>
+            </div>
+          )
+        ) : (
+          /* Novo: checkboxes dos serviços com contrato activo */
+          catalogoParaNovo.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ ...lbl, marginBottom: '0.75rem' }}>Serviços incluídos</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {catalogoParaNovo.map(s => {
+                  const sel = servicos.find(sv => sv.servico_id === s.id)
+                  return (
+                    <div key={s.id} style={{
+                      border: `1px solid ${sel ? C.blue : C.border}`, borderRadius: '0.5rem',
+                      overflow: 'hidden', background: sel ? C.blueL : C.white,
+                    }}>
+                      <div onClick={() => toggleServico(s)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.875rem', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!sel} onChange={() => toggleServico(s)} onClick={e => e.stopPropagation()} style={{ width: 15, height: 15, cursor: 'pointer' }} />
+                        <span style={{ fontSize: '0.875rem', fontWeight: sel ? 600 : 400, color: sel ? C.navy : C.text }}>{s.nome}</span>
+                      </div>
+                      {sel && <DetalheServico sv={sel} identifier={s.id} tipo={tipo} periodicidades={periodicidades} updateServico={updateServico} />}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        )}
+
+        {/* Outros serviços (só no modo novo) */}
+        {!modoEditar && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ ...lbl, marginBottom: '0.75rem' }}>Outros serviços</label>
+            {servicos.filter(sv => !sv.servico_id).map((sv) => {
+              const idx = servicos.indexOf(sv)
+              return (
+                <div key={idx} style={{ border: `1px solid ${C.blue}`, borderRadius: '0.5rem', overflow: 'hidden', background: C.blueL, marginBottom: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.875rem' }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 600, color: C.navy }}>{sv.nome_custom}</span>
+                    <button onClick={() => removeCustom(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '1rem' }}>✕</button>
+                  </div>
+                  <DetalheServico sv={sv} identifier={idx} tipo={tipo} periodicidades={periodicidades} updateServico={updateServico} />
                 </div>
               )
             })}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input style={{ ...inp, flex: 1 }} placeholder="Nome do serviço..."
+                value={customInput} onChange={e => setCustomInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }} />
+              <button onClick={addCustom} disabled={!customInput.trim()} style={{
+                background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
+                padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600,
+                cursor: customInput.trim() ? 'pointer' : 'not-allowed',
+                opacity: customInput.trim() ? 1 : 0.5, fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+              }}>+ Adicionar</button>
+            </div>
           </div>
-        </div>
-
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ ...lbl, marginBottom: '0.75rem' }}>Outros serviços</label>
-          {servicos.filter(sv => !sv.servico_id).map((sv, i) => {
-            const idx = servicos.indexOf(sv)
-            return (
-              <div key={i} style={{ border: `1px solid ${C.blue}`, borderRadius: '0.5rem', overflow: 'hidden', background: C.blueL, marginBottom: '0.4rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.6rem 0.875rem' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 600, color: C.navy }}>{sv.nome_custom}</span>
-                  <button onClick={() => removeCustom(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '1rem' }}>✕</button>
-                </div>
-                <DetalheServico sv={sv} identifier={idx} tipo={tipo} periodicidades={periodicidades} updateServico={updateServico} />
-              </div>
-            )
-          })}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <input style={{ ...inp, flex: 1 }} placeholder="Nome do serviço..." value={customInput}
-              onChange={e => setCustomInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }} />
-            <button onClick={addCustom} disabled={!customInput.trim()} style={{
-              background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem',
-              padding: '0.5rem 1rem', fontSize: '0.82rem', fontWeight: 600,
-              cursor: customInput.trim() ? 'pointer' : 'not-allowed',
-              opacity: customInput.trim() ? 1 : 0.5, fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
-            }}>+ Adicionar</button>
-          </div>
-        </div>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <button onClick={onFechar} style={{
@@ -384,7 +441,6 @@ function ModalContrato({ inicial, tipo, lojaId, condominioId, prestadores, servi
       </div>
     </div>
   )
-}
 
 // ── Histórico ─────────────────────────────────────────────────────────────────
 function HistoricoSection({ contratos }) {
@@ -682,6 +738,7 @@ export default function TabContratos({ condominioId, lojaId }) {
           inicial={modal.contrato ? {
             tipo:                 modal.contrato.tipo,
             prestador_id:         modal.contrato.prestador_id             || '',
+            prestador_nome:       modal.contrato.prestador_nome           || '',
             data_inicio:          modal.contrato.data_inicio?.slice(0, 10) || '',
             data_fim:             modal.contrato.data_fim?.slice(0, 10)    || '',
             estado:               modal.contrato.estado,
@@ -691,9 +748,9 @@ export default function TabContratos({ condominioId, lojaId }) {
             servicos:             modal.contrato.servicos                  || [],
           } : null}
           condominioId={condominioId}
-          lojaId={lojaId}
           prestadores={prestadores}
           servicosCatalogo={servicosCatalogo}
+          contratosExistentes={contratos}
           onGuardar={handleGuardar}
           onFechar={() => setModal(null)}
           loading={loadingGuardar}

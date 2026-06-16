@@ -795,7 +795,7 @@ export default function Condominios() {
   const [lojas, setLojas]             = useState([])
   const [loading, setLoading]         = useState(true)
   const [modalAberto, setModalAberto] = useState(false)
-  const [filtros, setFiltros]         = useState({ n_impar: '', nome: '' })
+  const [filtros, setFiltros] = useState({ n_impar: '', nome: '', loja_id: '' })
   const [detalhe, setDetalhe]         = useState(null)
 
   async function carregar(f = filtros) {
@@ -803,6 +803,7 @@ export default function Condominios() {
     const params = new URLSearchParams()
     if (f.n_impar) params.set('n_impar', f.n_impar)
     if (f.nome)    params.set('nome', f.nome)
+    if (f.loja_id) params.set('loja_id', f.loja_id)
     const data = await api.get(`/condominios?${params}`)
     setCondominios(data?.condominios || [])
     setLoading(false)
@@ -845,8 +846,16 @@ export default function Condominios() {
           <input name="nome" value={filtros.nome} onChange={handleFiltro} placeholder="Pesquisar nome..."
             style={{ ...inputSt, width: '220px' }} />
         </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Loja</label>
+          <select name="loja_id" value={filtros.loja_id} onChange={handleFiltro}
+            style={{ ...inputSt, width: '160px' }}>
+            <option value="">Todas as lojas</option>
+            {lojas.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
+          </select>
+        </div>
         <button type="submit" style={{ ...btnPrimary }}>Filtrar</button>
-        <button type="button" onClick={() => { setFiltros({ n_impar: '', nome: '' }); carregar({}) }} style={{ ...btnSecondary }}>Limpar</button>
+        <button type="button" onClick={() => { setFiltros({ n_impar: '', nome: '', loja_id: '' }); carregar({}) }} style={{ ...btnSecondary }}>Limpar</button>
         <div style={{ flex: 1 }} />
         <button type="button" onClick={() => setModalAberto(true)} style={{ ...btnPrimary, background: '#16a34a' }}>+ Novo Condomínio</button>
       </form>

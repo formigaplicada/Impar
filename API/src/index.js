@@ -210,7 +210,7 @@ app.get('/me', requireAuth, async (c) => {
 app.get('/condominios', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const user = c.get('user')
-  const { n_impar, nome } = c.req.query()
+  const { n_impar, nome, loja_id } = c.req.query()
 
   const rows = await sql`
     SELECT
@@ -224,6 +224,7 @@ app.get('/condominios', requireAuth, async (c) => {
       ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
       ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
       ${nome ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
+      ${loja_id ? sql`AND c.loja_id = ${parseInt(loja_id)}` : sql``}
     ORDER BY c.n_impar ASC
     LIMIT 100
   `
@@ -696,19 +697,19 @@ app.post('/prestadores', requireAuth, async (c) => {
   const body = await c.req.json()
   const { nif, nome, natureza, capital, estado, data_inicio, cae, actividade,
           morada, cidade, codigo_postal, regiao, concelho, freguesia,
-          email, telefone, website } = body
+          email, telefone, website, iban } = body
 
   if (!nome) return c.json({ error: 'Nome é obrigatório' }, 400)
 
   const res = await sql`
     INSERT INTO prestadores (nif, nome, natureza, capital, estado, data_inicio, cae, actividade,
-      morada, cidade, codigo_postal, regiao, concelho, freguesia, email, telefone, website)
+      morada, cidade, codigo_postal, regiao, concelho, freguesia, email, telefone, website, iban)
     VALUES (
       ${nif || null}, ${nome}, ${natureza || null}, ${capital || null},
       ${estado || 'active'}, ${data_inicio || null}, ${cae || null}, ${actividade || null},
       ${morada || null}, ${cidade || null}, ${codigo_postal || null}, ${regiao || null},
       ${concelho || null}, ${freguesia || null}, ${email || null}, ${telefone || null},
-      ${website || null}
+      ${website || null}, ${iban || null}
     )
     RETURNING id
   `
@@ -3343,10 +3344,12 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     }
   }
 
-  function extractPrefix(name) {
-    const match = name.match(/^(\d+)\s*-/)
-    return match ? Number(match[1]) : null
-  }
+ function extractPrefix(name) {
+  const match = name.match(/^(\d+)\s*-/)
+  if (!match) return null
+  if (match[1].length < 5) return null
+  return Number(match[1])
+}
 
   function extractNome(name) {
     return name.replace(/^\d+\s*-\s*/, '').trim()
@@ -4671,11 +4674,12 @@ async function gerarMandatoPDF(data) {
   const hline = (y, color = rgb(0.82,0.82,0.82), thickness = 0.5) =>
     page.drawLine({ start: { x: ML, y }, end: { x: ML + CW, y }, thickness, color })
 
-  const box = (x, y, w, h, fill, border) =>
-    page.drawRectangle({ x, y, width: w, height: h,
-      color: fill, borderColor: border, borderWidth: border ? 0.5 : 0 })
+  const box = (x, y, w, h, fill, border) => {
+    const opts = { x, y, width: w, height: h, color: fill }
+    if (border) { opts.borderColor = border; opts.borderWidth = 0.5 }
+    page.drawRectangle(opts)
+  }
 
-  // Wrap de texto — devolve y final
   const wrap = (text, x, y, maxW, size, font, color = BLACK, lh = size + 2.5) => {
     const words = text.split(' ')
     let line = '', cy = y
@@ -4689,7 +4693,6 @@ async function gerarMandatoPDF(data) {
     return cy
   }
 
-  // Campo com label PT/EN e valor
   const campo = (labelPT, labelEN, valor, x, y, w) => {
     t(labelPT, x, y, 6, fI, GRAY)
     if (labelEN) t(' / ' + labelEN, x + fI.widthOfTextAtSize(labelPT, 6), y, 6, fI, rgb(0.6,0.6,0.6))
@@ -4699,7 +4702,6 @@ async function gerarMandatoPDF(data) {
     return vy - 10
   }
 
-  // Header de secção
   const secHeader = (pt, en, y) => {
     box(ML, y - 13, CW, 14, NAVY, null)
     t(pt, ML + 5, y - 9.5, 8, fB, WHITE)
@@ -4710,35 +4712,48 @@ async function gerarMandatoPDF(data) {
   // ── CABEÇALHO ─────────────────────────────────────────────────────────────
   let y = H - 10
 
-  box(0, y - 56, W, 56, NAVY, null)
+  // Fundo navy para toda a faixa do título
+  box(ML, y - 56, CW, 56, NAVY, null)
 
-  // Título
-  const tp = 'Autorização de Débito Direto SEPA'
-  const te = 'SEPA Direct Debit Mandate'
-  t(tp, (W - fB.widthOfTextAtSize(tp, 13)) / 2, y - 22, 13, fB, WHITE)
-  t(te, (W - fI.widthOfTextAtSize(te, 9)) / 2, y - 35, 9, fI, LIME)
+  // Bloco credor — fundo branco à direita
+  const credorW = 185
+  const credorX = ML + CW - credorW
+  box(credorX, y - 54, credorW - 2, 52, WHITE, null)
 
-  // Bloco credor direita
-  const cx = W - 172
-  box(cx, y - 54, 165, 52, rgb(0.01, 0.04, 0.16), null)
-  t('Rede Impar, Lda', cx + 6, y - 20, 10, fB, LIME)
-  t('NIF 514843  |  PT18ZZZ114843', cx + 6, y - 32, 6.5, fR, WHITE)
-  t('Via do Oriente 5.02 03.B', cx + 6, y - 42, 6, fR, rgb(0.75,0.75,0.75))
-  t('1990-002 Lisboa  |  Portugal', cx + 6, y - 51, 6, fR, rgb(0.75,0.75,0.75))
+  // Dados do credor no bloco branco
+  t('Rede Impar, Lda', credorX + 6, y - 18, 9, fB, NAVY)
+  t('NIF 515261599  |  PT18ZZZ114843', credorX + 6, y - 29, 6, fR, GRAY)
+  t('Via do Oriente 5.02 03.B', credorX + 6, y - 39, 6, fR, GRAY)
+  t('1990-002 Lisboa  |  Portugal', credorX + 6, y - 48, 6, fR, GRAY)
+
+  // Título centrado no espaço à esquerda do bloco credor
+  const titleAreaW = CW - credorW - 10
+  const titlePT = 'Autorização de Débito Direto SEPA'
+  const titleEN = 'SEPA Direct Debit Mandate'
+  const tPTw = fB.widthOfTextAtSize(titlePT, 12)
+  const tENw = fI.widthOfTextAtSize(titleEN, 8.5)
+  t(titlePT, ML + (titleAreaW - tPTw) / 2, y - 22, 12, fB, WHITE)
+  t(titleEN, ML + (titleAreaW - tENw) / 2, y - 35, 8.5, fI, LIME)
+
   y -= 56
+
+  // Espaço entre cabeçalho e linha ADD
+  y -= 6
 
   // Linha ADD
   box(ML, y - 15, CW, 15, LGRAY, null)
   t('Referência da autorização (ADD) / Mandate reference:', ML + 4, y - 10, 6.5, fI, GRAY)
-  t(data.adc || '', ML + 205, y - 10, 7.5, fB, NAVY)
+  t(data.adc || '', ML + 210, y - 10, 7.5, fB, NAVY)
   y -= 15
 
+  // Espaço entre ADD e texto legal
+  y -= 8
+
   // ── TEXTO LEGAL ───────────────────────────────────────────────────────────
-  y -= 5
   const lPT = 'Ao subscrever esta autorização, está a autorizar a Rede Impar, Lda a enviar instruções ao seu Banco para debitar a sua conta, de acordo com as instruções do Credor. O reembolso deve ser solicitado até 8 semanas a contar da data do débito. Preencha os campos com *. Os campos ** são da responsabilidade do Credor.'
   const lEN = 'By signing this mandate form, you authorise Rede Impar, Lda to send instructions to your bank to debit your account. A refund must be claimed within 8 weeks from the date on which your account was debited. Please complete all fields marked *. Fields marked ** must be completed by the Creditor.'
-  y = wrap(lPT, ML, y, CW, 6.5, fR, BLACK) - 1
-  y = wrap(lEN, ML, y, CW, 6, fI, GRAY) - 4
+  y = wrap(lPT, ML, y, CW, 6.5, fR, BLACK) - 2
+  y = wrap(lEN, ML, y, CW, 6, fI, GRAY) - 6
   hline(y); y -= 8
 
   // ── IDENTIFICAÇÃO DO DEVEDOR ──────────────────────────────────────────────
@@ -4747,7 +4762,6 @@ async function gerarMandatoPDF(data) {
   y = campo('* Nome do(s) Devedor(es)', 'Name of the debtor(s)', data.nomeDevedor, ML, y, CW) - 2
   y = campo('Nome da rua e número', 'Street name and number', data.moradaDevedor, ML, y, CW) - 2
 
-  // CP + Cidade
   t('Código Postal / Postal code', ML, y, 6, fI, GRAY)
   t('Cidade / City', ML + 160, y, 6, fI, GRAY)
   const cpvy = y - 10
@@ -4767,13 +4781,13 @@ async function gerarMandatoPDF(data) {
 
   y = campo('** Nome do Credor', 'Creditor name', data.credorNome || 'Rede Impar, Lda', ML, y, CW) - 2
   y = campo('** Código de Identificação do Credor', 'Creditor identifier', data.credorId || 'PT18ZZZ114843', ML, y, CW) - 2
-  y = campo('** Nome da rua e número', 'Street name and number', data.credorMorada || 'Via do Oriente 5.02 03.B', ML, y, CW) - 2
+  y = campo('** Nome da rua e número', 'Street name and number', data.credorMorada || '', ML, y, CW) - 2
 
   t('** Código Postal / Postal code', ML, y, 6, fI, GRAY)
   t('** Cidade / City', ML + 160, y, 6, fI, GRAY)
   const cpcvy = y - 10
-  t((data.credorCp || '1990-002').toUpperCase(), ML, cpcvy, 8.5, fR, BLACK)
-  t((data.credorCidade || 'Lisboa').toUpperCase(), ML + 160, cpcvy, 8.5, fR, BLACK)
+  t((data.credorCp || '').toUpperCase(), ML, cpcvy, 8.5, fR, BLACK)
+  t((data.credorCidade || '').toUpperCase(), ML + 160, cpcvy, 8.5, fR, BLACK)
   page.drawLine({ start: { x: ML, y: cpcvy - 3 }, end: { x: ML + 148, y: cpcvy - 3 }, thickness: 0.4, color: rgb(0.75,0.75,0.75) })
   page.drawLine({ start: { x: ML + 160, y: cpcvy - 3 }, end: { x: ML + CW, y: cpcvy - 3 }, thickness: 0.4, color: rgb(0.75,0.75,0.75) })
   y = cpcvy - 12
@@ -4784,17 +4798,20 @@ async function gerarMandatoPDF(data) {
   // ── TIPO DE PAGAMENTO ─────────────────────────────────────────────────────
   y = secHeader('Tipo de pagamento', 'Type of payment', y)
 
-  // Checkbox recorrente preenchido
-  box(ML, y - 11, 11, 11, NAVY, null)
-  t('✓', ML + 1.5, y - 9, 8, fB, WHITE)
-  t('* Pagamento recorrente / Recurrent payment', ML + 15, y - 4, 8, fR, BLACK)
+  // Checkbox recorrente — fundo branco, cruz preta, alinhado com texto
+  const cbY = y - 11
+  box(ML, cbY, 11, 11, WHITE, BLACK)
+  t('X', ML + 2, cbY + 2, 8, fB, BLACK)
+  t('* Pagamento recorrente / Recurrent payment', ML + 14, y - 4, 8, fR, BLACK)
 
-  // Checkbox pontual vazio
-  box(ML + 280, y - 11, 11, 11, WHITE, NAVY)
-  t('Ou / Or', ML + 250, y - 4, 7, fI, GRAY)
-  t('Pagamento pontual / One-off payment', ML + 295, y - 4, 8, fR, BLACK)
+  // Ou / Or
+  t('Ou / Or', ML + 260, y - 4, 7, fI, GRAY)
 
-  y -= 18
+  // Checkbox pontual — fundo branco vazio, alinhado
+  box(ML + 300, cbY, 11, 11, WHITE, BLACK)
+  t('Pagamento pontual / One-off payment', ML + 314, y - 4, 8, fR, BLACK)
+
+  y -= 20
   hline(y); y -= 8
 
   // ── LOCAL E DATA ──────────────────────────────────────────────────────────
@@ -4840,6 +4857,8 @@ async function gerarMandatoPDF(data) {
 
   // ── SECÇÕES INFORMATIVAS ──────────────────────────────────────────────────
   const infoW = 150
+  const iInfo = 'Informação detalhada subjacente à relação entre o Credor e o Devedor - apenas para efeitos informativos. / Details regarding the underlying relationship - for information purposes only.'
+  y = wrap(iInfo, ML, y, CW, 6, fI, GRAY) - 3
 
   const infoRow = (ptL1, ptL2, enL1, enL2, yy, h) => {
     box(ML, yy - h, infoW, h, LGRAY, null)
@@ -4852,18 +4871,14 @@ async function gerarMandatoPDF(data) {
     return yy - h - 5
   }
 
-  const iInfo = 'Informação detalhada subjacente à relação entre o Credor e o Devedor - apenas para efeitos informativos. / Details regarding the underlying relationship - for information purposes only.'
-  y = wrap(iInfo, ML, y, CW, 6, fI, GRAY) - 3
-
   y = infoRow('Código de Identificação', 'do Devedor', 'Debtor identification code', null, y, 26)
   y = infoRow('Pessoa em representação', 'da qual o pagamento é efetuado', 'Person on whose behalf', 'payment is made', y, 32)
   y = infoRow('Entidade em cujo nome o', 'Credor recebe o pagamento', 'Party on whose behalf the', 'Creditor collects the payment', y, 32)
   y = infoRow('Relativamente ao Contrato', null, 'In respect of the contract', null, y, 26)
 
   // ── RODAPÉ ────────────────────────────────────────────────────────────────
-  box(0, 0, W, 16, LGRAY, null)
-  t('Form SEPA Core DD  |  Rede Impar, Lda  |  PT18ZZZ114843', ML, 10, 6, fR, GRAY)
-  t(`Assinado digitalmente em ${data.signedAt.toISOString()}  |  IP: ${data.signedIp}`, ML, 3, 5.5, fR, GRAY)
+  box(0, 0, W, 14, LGRAY, null)
+  t('Form SEPA Core DD  |  Rede Impar, Lda  |  PT18ZZZ114843', ML, 4, 6, fR, GRAY)
 
   return await pdfDoc.save()
 }
@@ -4962,8 +4977,11 @@ app.get('/dd/assinar/:token', async (c) => {
         cidade:     m.condominio_cidade,
       },
       credor: {
-        nome:       m.credor_nome || 'Rede Ímpar, Lda',
-        identifier: m.credor_id  || 'PT18ZZZ114843',
+        nome:       m.credor_nome || 'Rede Impar, Lda',
+        identifier: m.credor_id   || 'PT18ZZZ114843',
+        morada:     m.credor_morada || '',
+        cod_postal: m.credor_cp     || '',
+        cidade:     m.credor_cidade  || '',
       },
     })
   } catch (err) {
@@ -4981,28 +4999,23 @@ app.post('/dd/assinar/:token', async (c) => {
   const body  = await c.req.json()
   const { iban, bic, banco_id, nome_devedor, signature_png } = body
 
-  if (!iban || !signature_png || !nome_devedor) {
-    return c.json({ error: 'Campos obrigatórios: iban, nome_devedor, signature_png' }, 400)
-  }
-
-  const ibanClean = iban.replace(/\s/g, '').toUpperCase()
-  if (!/^PT\d{23}$/.test(ibanClean)) {
-    return c.json({ error: 'IBAN inválido. Deve começar por PT seguido de 23 dígitos.' }, 400)
+  if (!signature_png || !nome_devedor) {
+    return c.json({ error: 'Campos obrigatórios: nome_devedor, signature_png' }, 400)
   }
 
   try {
     const rows = await sql`
       SELECT m.*,
-            cond.nome       AS condo_nome,
-            cond.morada,
-            cond.codigo_postal,
-            cond.cidade,
-            cr.nome         AS credor_nome,
-            cr.creditor_identifier,
-            cr.morada       AS credor_morada,
-            cr.codigo_postal AS credor_cp,
-            cr.cidade       AS credor_cidade,
-            b.bic           AS banco_bic
+             cond.nome          AS condo_nome,
+             cond.morada,
+             cond.codigo_postal,
+             cond.cidade,
+             cr.nome            AS credor_nome,
+             cr.creditor_identifier,
+             cr.morada          AS credor_morada,
+             cr.codigo_postal   AS credor_cp,
+             cr.cidade          AS credor_cidade,
+             b.bic              AS banco_bic
       FROM mandatos_dd m
       JOIN condominios cond ON cond.id = m.condominio_id
       JOIN lojas l          ON l.id    = cond.loja_id
@@ -5015,9 +5028,10 @@ app.post('/dd/assinar/:token', async (c) => {
     if (rows.length === 0) return c.json({ error: 'Link inválido' }, 404)
     const m = rows[0]
 
-    if (m.estado === 'activo')                          return c.json({ error: 'Já assinado', signed: true }, 410)
-    if (new Date(m.token_expires_at) < new Date())     return c.json({ error: 'Link expirado' }, 410)
+    if (m.estado === 'activo')                      return c.json({ error: 'Já assinado', signed: true }, 410)
+    if (new Date(m.token_expires_at) < new Date())  return c.json({ error: 'Link expirado' }, 410)
 
+    const ibanClean = (iban || m.iban || '').replace(/\s/g, '').toUpperCase()
     const signedAt  = new Date()
     const finalBic  = bic || m.banco_bic || ''
 
@@ -5025,12 +5039,14 @@ app.post('/dd/assinar/:token', async (c) => {
     const pdfBytes = await gerarMandatoPDF({
       adc:          m.adc,
       nomeDevedor:  nome_devedor,
-      moradaDevedor: m.morada || '',
-      cpDevedor:    m.cod_postal || '',
-      cidadeDevedor: m.localidade || '',
-      credorMorada: m.credor_morada || '',
-      credorCp:     m.credor_cp     || '',
-      credorCidade: m.credor_cidade || '',
+      moradaDevedor: m.morada        || '',
+      cpDevedor:    m.codigo_postal  || '',
+      cidadeDevedor: m.cidade        || '',
+      credorNome:   m.credor_nome    || 'Rede Impar, Lda',
+      credorId:     m.creditor_identifier || 'PT18ZZZ114843',
+      credorMorada: m.credor_morada  || '',
+      credorCp:     m.credor_cp      || '',
+      credorCidade: m.credor_cidade  || '',
       iban:         ibanClean,
       bic:          finalBic,
       signaturePng: signature_png,
@@ -5044,16 +5060,16 @@ app.post('/dd/assinar/:token', async (c) => {
     // Actualizar registo
     await sql`
       UPDATE mandatos_dd SET
-        iban          = ${ibanClean},
-        banco_id      = ${banco_id || m.banco_id},
-        nome_devedor  = ${nome_devedor},
-        signature_png = ${signature_png},
-        signed_at     = ${signedAt.toISOString()},
-        signed_ip     = ${ip},
-        pdf_url       = ${pdfUrl},
-        estado        = 'activo',
+        iban            = ${ibanClean},
+        banco_id        = ${banco_id || m.banco_id},
+        nome_devedor    = ${nome_devedor},
+        signature_png   = ${signature_png},
+        signed_at       = ${signedAt.toISOString()},
+        signed_ip       = ${ip},
+        pdf_url         = ${pdfUrl},
+        estado          = 'activo',
         data_assinatura = CURRENT_DATE,
-        atualizado_em = NOW()
+        atualizado_em   = NOW()
       WHERE token = ${token}
     `
 
