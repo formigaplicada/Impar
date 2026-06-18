@@ -313,8 +313,7 @@ function TabInfo({ c }) {
           nipc={c.nipc}
         />
       </div>
-    </div>
-    
+    </div>    
   )
 }
 
