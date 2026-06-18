@@ -10,6 +10,7 @@ import Prestadores from './pages/Prestadores'
 import OcorrenciaDetalhe from './pages/OcorrenciaDetalhe'
 import Eventos from './pages/Eventos'
 import Suporte from './pages/Suporte'
+import Utilizadores from './pages/Utilizadores'
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/backoffice/prestadores" element={<Backoffice page="prestadores" />} />
         <Route path="/backoffice/eventos" element={<Backoffice page="eventos" />} />
         <Route path="/backoffice/lojas" element={<Backoffice page="lojas" />} />
+        <Route path="/backoffice/utilizadores" element={<Backoffice page="utilizadores" />} />
         <Route path="/suporte" element={<Suporte />} />
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>

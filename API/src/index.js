@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { neon } from '@neondatabase/serverless'
 import aiRouter from './ai.js';
 import condominos from './condominos'
+import admin from './routes/admin.js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 const app = new Hono()
@@ -16,6 +17,9 @@ app.use('*', cors({
 }))
 
 app.route('/ai', aiRouter);
+
+app.use('/admin/*', requireAuth)
+app.route('/admin', admin)
 
 // ── Utilitários ──────────────────────────────────────────────
 
@@ -2727,16 +2731,16 @@ app.put('/eventos/:id', requireAuth, async (c) => {
     UPDATE eventos SET
       tipo             = ${tipo             || 'reuniao'},
       tipo_reuniao     = ${tipo_reuniao     ?? null},
-      condominio_id    = ${condominio_id    ?? null},
+      condominio_id    = ${condominio_id    || null},
       condominio_texto = ${condominio_texto ?? null},
       localidade       = ${localidade       ?? null},
-      loja_id          = ${loja_id          ?? null},
+      loja_id          = ${loja_id          || null},
       filial_texto     = ${filial_texto     ?? null},
       data_hora        = ${data_hora},
       formato          = ${formato          || 'presencial'},
       local_evento     = ${local_evento     ?? null},
       gestor           = ${gestor          ?? null},
-      gestor_id        = ${gestor_id       ?? null},
+      gestor_id        = ${gestor_id       || null},
       estado          = ${estado         || 'agendada'},
       comentarios      = ${comentarios      ?? null}
     WHERE id = ${id}
