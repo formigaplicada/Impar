@@ -146,6 +146,123 @@ function Modal({ lojas, onClose, onSave }) {
   )
 }
 
+function ModalEditar({ condominio, lojas, onClose, onSave }) {
+  const [form, setForm] = useState({
+    nome:          condominio.nome          || '',
+    nipc:          condominio.nipc          || '',
+    morada:        condominio.morada        || '',
+    codigo_postal: condominio.codigo_postal || '',
+    telefone:      condominio.telefone      || '',
+    telemovel:     condominio.telemovel     || '',
+    n_fracoes:     condominio.n_fracoes     || '',
+    iban:          condominio.iban          || '',
+    gestor:        condominio.gestor        || '',
+    email_gestor:  condominio.email_gestor  || '',
+    telefone2:     condominio.telefone2     || '',
+  })
+  const [loading, setLoading] = useState(false)
+  const [erro,    setErro]    = useState('')
+
+  useEffect(() => {
+    const handler = e => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  function handleChange(e) {
+    setForm({ ...form, [e.target.name]: e.target.value })
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!form.nome) { setErro('Nome é obrigatório.'); return }
+    setLoading(true); setErro('')
+    const res = await api.put(`/condominios/${condominio.id}`, form)
+    if (res?.ok) { onSave(res.condominio) }
+    else { setErro(res?.error || 'Erro ao guardar.'); setLoading(false) }
+  }
+
+  const inputField = (label, name, type = 'text') => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>{label}</label>
+      <input type={type} name={name} value={form[name]} onChange={handleChange}
+        style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', color: C.text }} />
+    </div>
+  )
+
+  const sectionLabel = (t) => (
+    <p style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: C.subtle, marginBottom: '0.75rem' }}>{t}</p>
+  )
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '1rem' }}
+    >
+      <div style={{ background: C.white, borderRadius: '1rem', width: '100%', maxWidth: '36rem', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding: '1.25rem 1.5rem', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: C.text, margin: 0 }}>Editar Condomínio</h2>
+            <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: C.subtle }}>{condominio.n_impar} · {condominio.nome}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: C.subtle }}>✕</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+            {/* Identificação */}
+            <div>
+              {sectionLabel('Identificação')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ gridColumn: '1 / -1' }}>{inputField('Nome', 'nome')}</div>
+                {inputField('NIPC', 'nipc')}
+                {inputField('Nº Frações', 'n_fracoes', 'number')}
+                {inputField('IBAN', 'iban')}
+              </div>
+            </div>
+
+            {/* Localização */}
+            <div>
+              {sectionLabel('Localização')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div style={{ gridColumn: '1 / -1' }}>{inputField('Morada', 'morada')}</div>
+                {inputField('Código Postal', 'codigo_postal')}
+              </div>
+            </div>
+
+            {/* Contactos */}
+            <div>
+              {sectionLabel('Contactos')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                {inputField('Telefone', 'telefone', 'tel')}
+                {inputField('Telemóvel', 'telemovel', 'tel')}
+                {inputField('Telefone 2', 'telefone2', 'tel')}
+              </div>
+            </div>
+
+            {/* Gestor */}
+            <div>
+              {sectionLabel('Gestor')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                {inputField('Nome do Gestor', 'gestor')}
+                {inputField('Email do Gestor', 'email_gestor', 'email')}
+              </div>
+            </div>
+
+            {erro && <p style={{ color: '#dc2626', fontSize: '0.875rem', fontWeight: 500 }}>❌ {erro}</p>}
+          </div>
+          <div style={{ padding: '1rem 1.5rem', borderTop: `1px solid ${C.border}`, display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <button type="button" onClick={onClose} style={{ background: '#f1f5f9', color: C.muted, border: 'none', borderRadius: '0.5rem', padding: '0.625rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            <button type="submit" disabled={loading} style={{ background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem', padding: '0.625rem 1.25rem', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', opacity: loading ? 0.6 : 1 }}>
+              {loading ? 'A guardar...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Tab Informação ────────────────────────────────────────────────────────────
 
 function TabInfo({ c }) {
@@ -726,8 +843,10 @@ function TabFinanceiro({ condominioId, condominioNome, condominioIban }) {
   )
 }
 
-function DetalheCondominio({ condominio, onVoltar }) {
-  const [tab, setTab] = useState('info')
+function DetalheCondominio({ condominio: condominioInicial, onVoltar }) {
+const [tab, setTab] = useState('info')
+const [condominio, setCondominio] = useState(condominioInicial)
+const [modalEditar, setModalEditar] = useState(false)
 
   return (
     <div style={{ animation: 'fadeIn 0.18s ease' }}>
@@ -743,6 +862,13 @@ function DetalheCondominio({ condominio, onVoltar }) {
         onMouseLeave={e => e.currentTarget.style.background = 'none'}
       >
         ← Voltar aos condomínios
+      </button>
+      {/* Editar */}
+            <button
+        onClick={() => setModalEditar(true)}
+        style={{ background: C.navy, color: C.white, border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1.125rem', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}
+      >
+        ✏️ Editar
       </button>
 
       {/* Cabeçalho */}
@@ -797,6 +923,7 @@ export default function Condominios() {
   const [modalAberto, setModalAberto] = useState(false)
   const [filtros, setFiltros] = useState({ n_impar: '', nome: '', loja_id: '' })
   const [detalhe, setDetalhe]         = useState(null)
+  const [modalEditar, setModalEditar] = useState(false)
 
   async function carregar(f = filtros) {
     setLoading(true)
@@ -906,6 +1033,18 @@ export default function Condominios() {
           onSave={(n_impar) => { setModalAberto(false); carregar(); alert(`✅ Condomínio criado! N Impar: ${n_impar}`) }}
         />
       )}
+
+      {modalEditar && (
+      <ModalEditar
+        condominio={condominio}
+        lojas={[]}
+        onClose={() => setModalEditar(false)}
+        onSave={(updated) => {
+          setCondominio(updated)
+          setModalEditar(false)
+        }}
+      />
+    )}
     </div>
   )
 }
