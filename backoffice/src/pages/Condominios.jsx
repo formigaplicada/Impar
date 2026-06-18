@@ -910,6 +910,16 @@ const [modalEditar, setModalEditar] = useState(false)
       {tab === 'contratos' && <TabContratos condominioId={condominio.id} lojaId={condominio.loja_id} />}
       {tab === 'financeiro' && <TabFinanceiro condominioId={condominio.id} condominioNome={condominio.nome} condominioIban={condominio.iban} />}
       {tab === 'fracoes' && <TabCondominos condominioId={condominio.id} />}
+     {modalEditar && (
+        <ModalEditar
+          condominio={condominio}
+          onClose={() => setModalEditar(false)}
+          onSave={(updated) => {
+            setCondominio(updated)
+            setModalEditar(false)
+          }}
+        />
+      )}
     </div>
   )
 }
