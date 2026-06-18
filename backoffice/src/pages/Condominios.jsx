@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import TabContratos from './TabContratos'
 import TabCondominos from './TabCondominos'
 import SeccaoDebitoDireto from './SeccaoDebitoDireto'
+import BotaoFichaCondominio from './FichaCondominioPDF'
 
 
 // ── Paleta Ímpar ─────────────────────────────────────────────────────────────
@@ -305,7 +306,15 @@ function TabInfo({ c }) {
           <Row label="IBAN" value={c.iban} />
         </InfoCard>
       </div>
+      <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
+        <BotaoFichaCondominio
+          condominioId={c.id}
+          condominioNome={c.nome}
+          nipc={c.nipc}
+        />
+      </div>
     </div>
+    
   )
 }
 

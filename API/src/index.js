@@ -341,6 +341,108 @@ app.post('/condominios', requireAuth, async (c) => {
   return c.json({ ok: true, id: cond_id, n_impar })
 })
 
+app.put('/condominios/:id', requireAuth, async (c) => {
+  try {
+    const id = c.req.param('id')
+    const sql = neon(c.env.DATABASE_URL)
+    const { nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2 } = await c.req.json()
+
+    if (!nome) return c.json({ error: 'Nome é obrigatório' }, 400)
+
+    const rows = await sql`
+      UPDATE condominios SET
+        nome          = ${nome},
+        nipc          = ${nipc || null},
+        morada        = ${morada || null},
+        codigo_postal = ${codigo_postal || null},
+        telefone      = ${telefone || null},
+        telemovel     = ${telemovel || null},
+        n_fracoes     = ${n_fracoes ? parseInt(n_fracoes) : null},
+        iban          = ${iban || null},
+        gestor        = ${gestor || null},
+        email_gestor  = ${email_gestor || null},
+        telefone2     = ${telefone2 || null}
+      WHERE id = ${id}
+      RETURNING *
+    `
+
+    if (rows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+    return c.json({ ok: true, condominio: rows[0] })
+  } catch (err) {
+    return c.json({ error: 'Erro ao atualizar condomínio', detail: err.message }, 500)
+  }
+})
+
+app.post('/admin/assets/upload/:tipo/:id', requireAuth, async (c) => {
+  try {
+    const { tipo, id } = c.req.param()
+    if (!['loja_foto1', 'loja_foto2'].includes(tipo)) {
+      return c.json({ error: 'Tipo inválido' }, 400)
+    }
+
+    const formData = await c.req.formData()
+    const file = formData.get('file')
+    if (!file) return c.json({ error: 'Ficheiro em falta' }, 400)
+
+    const ext = file.name.split('.').pop().toLowerCase()
+    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+      return c.json({ error: 'Formato inválido. Use JPG, PNG ou WebP' }, 400)
+    }
+
+    const key = `lojas/${id}/${tipo}.${ext}`
+    const buffer = await file.arrayBuffer()
+
+    await c.env.R2.put(key, buffer, {
+      httpMetadata: { contentType: file.type }
+    })
+
+    const url = `https://assets.condexpress.com/${key}`
+    const sql = neon(c.env.DATABASE_URL)
+
+    if (tipo === 'loja_foto1') {
+      await sql`UPDATE lojas SET foto_loja_1 = ${url} WHERE id = ${id}`
+    } else {
+      await sql`UPDATE lojas SET foto_loja_2 = ${url} WHERE id = ${id}`
+    }
+
+    return c.json({ ok: true, url })
+  } catch (err) {
+    return c.json({ error: 'Erro ao fazer upload', detail: err.message }, 500)
+  }
+})
+
+app.get('/condominios/:id/ficha', requireAuth, async (c) => {
+  try {
+    const id = c.req.param('id')
+    const sql = neon(c.env.DATABASE_URL)
+
+    const rows = await sql`
+      SELECT
+        c.id, c.n_impar, c.nome, c.morada, c.codigo_postal, c.telefone,
+        c.telemovel, c.telefone2, c.gestor, c.email_gestor, c.iban,
+        c.n_fracoes, c.loja_id, c.nipc,
+        l.nome         AS loja_nome,
+        l.morada       AS loja_morada,
+        l.telefone     AS loja_telefone,
+        l.email        AS loja_email,
+        l.foto_loja_1  AS loja_foto1,
+        l.foto_loja_2  AS loja_foto2,
+        u.nome         AS gestor_nome,
+        u.email        AS gestor_email,
+        u.telemovel    AS gestor_telemovel
+      FROM condominios c
+      LEFT JOIN lojas l ON l.id = c.loja_id
+      LEFT JOIN utilizadores u ON u.email = c.email_gestor
+      WHERE c.id = ${id}
+    `
+
+    if (rows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+    return c.json(rows[0])
+  } catch (err) {
+    return c.json({ error: 'Erro ao carregar ficha', detail: err.message }, 500)
+  }
+})
+
 // ── Ocorrências ───────────────────────────────────────────────
 
 app.get('/ocorrencias', requireAuth, async (c) => {
