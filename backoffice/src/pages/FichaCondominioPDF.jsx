@@ -7,8 +7,14 @@ import { api } from '../lib/api'
 Font.register({
   family: 'Yanone',
   fonts: [
-    { src: 'https://fonts.gstatic.com/s/yanonekaffeesatz/v27/3y976aknfjLm_3lMKjiMgR0IDI7-DKYweMg.ttf', fontWeight: 400 },
-    { src: 'https://fonts.gstatic.com/s/yanonekaffeesatz/v27/3y9l6aknfjLm_3lMKjiMgR0IDI7-DKYwWKOT7Q.ttf', fontWeight: 700 },
+    {
+      src: 'https://raw.githubusercontent.com/google/fonts/main/ofl/yanonekaffeesatz/YanoneKaffeesatz%5Bwght%5D.ttf',
+      fontWeight: 400,
+    },
+    {
+      src: 'https://raw.githubusercontent.com/google/fonts/main/ofl/yanonekaffeesatz/YanoneKaffeesatz%5Bwght%5D.ttf',
+      fontWeight: 700,
+    },
   ]
 })
 
