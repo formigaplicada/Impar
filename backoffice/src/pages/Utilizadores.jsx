@@ -616,7 +616,8 @@ export default function Utilizadores({ currentUser }) {
                     <td style={{ ...tdSt, color: C.subtle }}>{formatDate(u.ultimo_login)}</td>
                     <td style={tdSt}><AtivoBadge ativo={u.ativo} /></td>
                     {isAdmin && (
-                      <td style={{ ...tdSt, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <td style={{ ...tdSt, textAlign: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'center' }}>
                         <button
                           onClick={() => setModalEditar(u)}
                           style={{
@@ -647,6 +648,7 @@ export default function Utilizadores({ currentUser }) {
                             }}
                           >Reativar</button>
                         )}
+                        </div>
                       </td>
                     )}
                   </tr>
