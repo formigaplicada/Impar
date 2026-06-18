@@ -11,6 +11,7 @@ import Propostas from './Propostas'
 import OcorrenciaDetalhe from './OcorrenciaDetalhe'
 import Eventos from './Eventos'
 import Lojas from './Lojas'
+import Utilizadores from './Utilizadores'
 
 const MENU = [
   { key: 'dashboard', label: '📊 Dashboard', icon: '📊', path: '/backoffice', page: '' },
@@ -34,6 +35,7 @@ const MENU = [
       { key: 'condominios', label: '🏢 Condomínios', icon: '🏢', path: '/backoffice/condominios', page: 'condominios' },
       { key: 'prestadores', label: '🔧 Prestadores', icon: '🔧', path: '/backoffice/prestadores', page: 'prestadores' },
       { key: 'lojas',       label: '🏪 Lojas',       icon: '🏪', path: '/backoffice/lojas',       page: 'lojas'       },
+      { key: 'utilizadores', label: '👥 Utilizadores', icon: '👥', path: '/backoffice/utilizadores', page: 'utilizadores' },
     ]
   },
 ]
@@ -42,7 +44,7 @@ const PAGE_TITLE = {
   '': 'Dashboard', 'propostas': 'Propostas', 'condominios': 'Condomínios',
   'ocorrencias': 'Ocorrências', 'ocorrencia_detalhe': 'Ocorrência',
   'limpezas': 'Limpezas', 'prestadores': 'Prestadores',
-  'eventos': 'Agenda', 'lojas': 'Lojas',
+  'eventos': 'Agenda', 'lojas': 'Lojas', 'utilizadores': 'Utilizadores',
 }
 
 export default function Backoffice({ page }) {
@@ -227,6 +229,7 @@ export default function Backoffice({ page }) {
            page === 'prestadores'        ? <Prestadores /> :
            page === 'eventos'            ? <Eventos /> :
            page === 'lojas'              ? <Lojas /> :
+           page === 'utilizadores' ? <Utilizadores currentUser={user} /> :
            <Dashboard />}
         </main>
       </div>
