@@ -21,11 +21,14 @@ Font.register({
 // ── Cores ─────────────────────────────────────────────────────────────────────
 const verde       = '#2D5A27'
 const verdeClaro  = '#4A8C3F'
+const verdeBorda  = '#8BC34A'
 const cinzaEscuro = '#1E293B'
 const cinzaMedio  = '#64748B'
 const bgVerde     = '#EBF5E9'
 const branco      = '#FFFFFF'
 const navy        = '#011640'
+
+const LOGO_URL = 'https://www.impar.pt/wp-content/uploads/2025/01/logo-impar-2048x807.png'
 
 // ── Estilos ───────────────────────────────────────────────────────────────────
 const S = StyleSheet.create({
@@ -35,82 +38,84 @@ const S = StyleSheet.create({
     paddingTop: 0,
     paddingBottom: 0,
     paddingHorizontal: 0,
+    borderWidth: 3,
+    borderColor: verdeBorda,
   },
 
-  // Cabeçalho verde
+  // Cabeçalho
   header: {
     backgroundColor: bgVerde,
-    paddingVertical: 18,
-    paddingHorizontal: 32,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 2,
-    borderBottomColor: verde,
+    borderBottomWidth: 1,
+    borderBottomColor: verdeBorda,
+  },
+  logo: {
+    width: 90,
+    height: 35,
+    objectFit: 'contain',
   },
   headerTitulo: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 700,
-    color: verde,
+    color: cinzaEscuro,
     fontFamily: 'Yanone',
-  },
-  headerNImpar: {
-    fontSize: 14,
-    color: cinzaMedio,
-    fontFamily: 'Yanone',
-    marginTop: 2,
-  },
-
-  // Corpo
-  body: {
-    paddingHorizontal: 32,
-    paddingTop: 20,
-    paddingBottom: 20,
-    flex: 1,
   },
 
   // Morada principal
-  moradaBlock: {
-    marginBottom: 20,
-    paddingBottom: 14,
+  moradaSection: {
+    paddingHorizontal: 28,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+    backgroundColor: branco,
   },
   moradaNome: {
     fontSize: 22,
     fontWeight: 700,
     color: cinzaEscuro,
     fontFamily: 'Yanone',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   moradaDetalhe: {
-    fontSize: 14,
+    fontSize: 13,
     color: cinzaMedio,
     fontFamily: 'Yanone',
+  },
+
+  // Corpo
+  body: {
+    paddingHorizontal: 28,
+    paddingTop: 14,
+    paddingBottom: 14,
+    flex: 1,
   },
 
   // Grid de dois blocos
   grid: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 14,
   },
   card: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-    borderRadius: 6,
-    padding: 12,
+    borderRadius: 5,
+    padding: 11,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   cardTitulo: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 700,
     color: verdeClaro,
     fontFamily: 'Yanone',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
+    letterSpacing: 1.2,
+    marginBottom: 7,
   },
   cardRow: {
     flexDirection: 'row',
@@ -131,79 +136,76 @@ const S = StyleSheet.create({
     textAlign: 'right',
   },
 
-  // Secção loja
+  // Seccao loja
   lojaSection: {
-    marginBottom: 16,
+    marginBottom: 14,
     backgroundColor: bgVerde,
-    borderRadius: 6,
+    borderRadius: 5,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#C8E6C0',
+    borderColor: verdeBorda,
   },
   lojaSectionTitulo: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: 700,
     color: verdeClaro,
     fontFamily: 'Yanone',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
+    letterSpacing: 1.2,
+    marginBottom: 10,
   },
-  lojaRow: {
+  lojaFotos: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 16,
+    gap: 10,
+    marginBottom: 10,
   },
-  lojaInfo: {
+  lojaFoto: {
     flex: 1,
+    height: 110,
+    borderRadius: 4,
+    objectFit: 'cover',
+    borderWidth: 1,
+    borderColor: verdeBorda,
   },
   lojaNome: {
     fontSize: 16,
     fontWeight: 700,
     color: cinzaEscuro,
     fontFamily: 'Yanone',
-    marginBottom: 3,
+    marginBottom: 2,
+    textAlign: 'center',
   },
   lojaDetalhe: {
     fontSize: 12,
     color: cinzaMedio,
     fontFamily: 'Yanone',
+    textAlign: 'center',
     marginBottom: 2,
   },
   lojaContacto: {
     fontSize: 12,
     color: verde,
     fontFamily: 'Yanone',
-  },
-  lojaFotos: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  lojaFoto: {
-    width: 90,
-    height: 60,
-    borderRadius: 4,
-    objectFit: 'cover',
+    textAlign: 'center',
   },
 
   // Gestor
   gestorSection: {
-    marginBottom: 16,
+    marginBottom: 14,
     padding: 14,
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
   },
   gestorTitulo: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: 700,
     color: verdeClaro,
     fontFamily: 'Yanone',
     textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: 8,
+    letterSpacing: 1.2,
+    marginBottom: 7,
   },
   gestorNome: {
     fontSize: 16,
@@ -211,50 +213,53 @@ const S = StyleSheet.create({
     color: cinzaEscuro,
     fontFamily: 'Yanone',
     marginBottom: 3,
+    textAlign: 'center',
   },
   gestorContacto: {
     fontSize: 12,
     color: verde,
     fontFamily: 'Yanone',
+    textAlign: 'center',
+    marginBottom: 2,
   },
 
   // QR + App
   appSection: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    gap: 16,
     backgroundColor: bgVerde,
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 16,
+    borderRadius: 5,
+    padding: 14,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#C8E6C0',
-  },
-  qrImage: {
-    width: 70,
-    height: 70,
-  },
-  appTexto: {
-    flex: 1,
+    borderColor: verdeBorda,
   },
   appTitulo: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: 700,
     color: verde,
     fontFamily: 'Yanone',
-    marginBottom: 3,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  qrImage: {
+    width: 100,
+    height: 100,
+    marginBottom: 6,
   },
   appSub: {
-    fontSize: 11,
+    fontSize: 10,
     color: cinzaMedio,
     fontFamily: 'Yanone',
+    textAlign: 'center',
   },
 
-  // Rodapé
+  // Rodape
   footer: {
     backgroundColor: navy,
-    paddingVertical: 10,
-    paddingHorizontal: 32,
+    paddingVertical: 9,
+    paddingHorizontal: 28,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -274,7 +279,7 @@ function FichaPDF({ dados, qrDataUrl }) {
   const Row = ({ label, value }) => value ? (
     <View style={S.cardRow}>
       <Text style={S.cardLabel}>{label}</Text>
-      <Text style={S.cardValue}>{value}</Text>
+      <Text style={S.cardValue}>{String(value)}</Text>
     </View>
   ) : null
 
@@ -282,84 +287,86 @@ function FichaPDF({ dados, qrDataUrl }) {
     <Document>
       <Page size="A4" style={S.page}>
 
-        {/* Cabeçalho */}
+        {/* Cabecalho */}
         <View style={S.header}>
-          <View>
-            <Text style={S.headerTitulo}>Ficha do Condomínio</Text>
-            <Text style={S.headerNImpar}>Nº Ímpar: {d.n_impar}</Text>
-          </View>
+          <Image src={LOGO_URL} style={S.logo} />
+          <Text style={S.headerTitulo}>Ficha do Condominio</Text>
+        </View>
+
+        {/* Morada principal */}
+        <View style={S.moradaSection}>
+          <Text style={S.moradaNome}>{d.nome}</Text>
+          {d.morada && (
+            <Text style={S.moradaDetalhe}>
+              {d.morada}{d.codigo_postal ? `  ·  ${d.codigo_postal}` : ''}
+            </Text>
+          )}
         </View>
 
         {/* Corpo */}
         <View style={S.body}>
 
-          {/* Morada principal */}
-          <View style={S.moradaBlock}>
-            <Text style={S.moradaNome}>{d.nome}</Text>
-            {d.morada && <Text style={S.moradaDetalhe}>{d.morada}{d.codigo_postal ? `  ·  ${d.codigo_postal}` : ''}</Text>}
-          </View>
-
-          {/* Grid: Identificação + Contactos */}
+          {/* Grid: Identificacao + Contactos */}
           <View style={S.grid}>
             <View style={S.card}>
-              <Text style={S.cardTitulo}>Identificação</Text>
-              <Row label="Nº Frações" value={d.n_fracoes} />
+              <Text style={S.cardTitulo}>Identificacao</Text>
+              <Row label="N. Impar" value={d.n_impar} />
+              <Row label="N. Fracoes" value={d.n_fracoes} />
               <Row label="IBAN" value={d.iban} />
             </View>
             <View style={S.card}>
               <Text style={S.cardTitulo}>Contactos</Text>
               <Row label="Telefone" value={d.telefone} />
-              <Row label="Telemóvel" value={d.telemovel} />
+              <Row label="Telemovel" value={d.telemovel} />
               <Row label="Telefone 2" value={d.telefone2} />
             </View>
           </View>
 
           {/* Loja de suporte */}
           <View style={S.lojaSection}>
-            <Text style={S.lojaSectionTitulo}>🏢  A Sua Loja de Suporte</Text>
-            <View style={S.lojaRow}>
-              <View style={S.lojaInfo}>
-                <Text style={S.lojaNome}>{d.loja_nome}</Text>
-                {d.loja_morada && <Text style={S.lojaDetalhe}>{d.loja_morada}</Text>}
-                {d.loja_email && <Text style={S.lojaContacto}>✉️  {d.loja_email}</Text>}
-                {d.loja_telefone && <Text style={S.lojaContacto}>☎  {d.loja_telefone}</Text>}
+            <Text style={S.lojaSectionTitulo}>A Sua Loja de Suporte</Text>
+
+            {(d.loja_foto1 || d.loja_foto2) && (
+              <View style={S.lojaFotos}>
+                {d.loja_foto1 && <Image src={d.loja_foto1} style={S.lojaFoto} />}
+                {d.loja_foto2 && <Image src={d.loja_foto2} style={S.lojaFoto} />}
               </View>
-              {(d.loja_foto1 || d.loja_foto2) && (
-                <View style={S.lojaFotos}>
-                  {d.loja_foto1 && <Image src={d.loja_foto1} style={S.lojaFoto} />}
-                  {d.loja_foto2 && <Image src={d.loja_foto2} style={S.lojaFoto} />}
-                </View>
-              )}
-            </View>
+            )}
+
+            <Text style={S.lojaNome}>{d.loja_nome}</Text>
+            {d.loja_morada && <Text style={S.lojaDetalhe}>{d.loja_morada}</Text>}
+            {(d.loja_email || d.loja_telefone) && (
+              <Text style={S.lojaContacto}>
+                {d.loja_email}{d.loja_telefone ? `  |  ${d.loja_telefone}` : ''}
+              </Text>
+            )}
           </View>
 
           {/* Gestor dedicado */}
           {(d.gestor || d.gestor_nome) && (
             <View style={S.gestorSection}>
-              <Text style={S.gestorTitulo}>📞  O Seu Gestor Dedicado</Text>
-              <Text style={S.gestorNome}>👤 {d.gestor_nome || d.gestor}</Text>
-              {d.gestor_email && <Text style={S.gestorContacto}>✉️  {d.gestor_email}</Text>}
-              {d.gestor_telemovel && <Text style={S.gestorContacto}>📱  {d.gestor_telemovel}</Text>}
+              <Text style={S.gestorTitulo}>O Seu Gestor Dedicado</Text>
+              <Text style={S.gestorNome}>{d.gestor_nome || d.gestor}</Text>
+              {d.gestor_email && <Text style={S.gestorContacto}>{d.gestor_email}</Text>}
+              {d.gestor_telemovel && <Text style={S.gestorContacto}>{d.gestor_telemovel}</Text>}
             </View>
           )}
 
           {/* QR App */}
           {qrDataUrl && (
             <View style={S.appSection}>
+              <Text style={S.appTitulo}>App do Condominio  ·  Reporte Ocorrencias</Text>
               <Image src={qrDataUrl} style={S.qrImage} />
-              <View style={S.appTexto}>
-                <Text style={S.appTitulo}>📱  App do Condomínio</Text>
-                <Text style={S.appSub}>Reporte ocorrências e acompanhe o seu condomínio através da app Ímpar.</Text>
-              </View>
+              <Text style={S.appSub}>Aceda a informacao e reporte ocorrencias pelo telemovel</Text>
             </View>
           )}
 
         </View>
 
-        {/* Rodapé */}
+        {/* Rodape */}
         <View style={S.footer}>
-          <Text style={S.footerText}>www.impar.pt  ·  Gestão de Condomínios desde 2004</Text>
-          <Text style={S.footerText}>Ímpar © {new Date().getFullYear()}</Text>
+          <Text style={S.footerText}>www.impar.pt  ·  Gestao de Condominios desde 2004</Text>
+          <Text style={S.footerText}>Impar © {new Date().getFullYear()}</Text>
         </View>
 
       </Page>
@@ -367,7 +374,7 @@ function FichaPDF({ dados, qrDataUrl }) {
   )
 }
 
-// ── Botão gerador ─────────────────────────────────────────────────────────────
+// ── Botao gerador ─────────────────────────────────────────────────────────────
 
 export default function BotaoFichaCondominio({ condominioId, condominioNome, nipc }) {
   const [loading, setLoading] = useState(false)
@@ -377,11 +384,9 @@ export default function BotaoFichaCondominio({ condominioId, condominioNome, nip
     setLoading(true)
     setErro(null)
     try {
-      // 1. Buscar dados
       const dados = await api.get(`/condominios/${condominioId}/ficha`)
       if (dados.error) throw new Error(dados.error)
 
-      // 2. Gerar QR
       let qrDataUrl = null
       if (nipc) {
         qrDataUrl = await QRCode.toDataURL(
@@ -390,7 +395,6 @@ export default function BotaoFichaCondominio({ condominioId, condominioNome, nip
         )
       }
 
-      // 3. Gerar PDF e fazer download
       const blob = await pdf(<FichaPDF dados={dados} qrDataUrl={qrDataUrl} />).toBlob()
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
@@ -422,10 +426,10 @@ export default function BotaoFichaCondominio({ condominioId, condominioNome, nip
           transition: 'all 0.15s',
         }}
       >
-        {loading ? '⏳ A gerar…' : '📄 Gerar Ficha'}
+        {loading ? 'A gerar...' : 'Gerar Ficha PDF'}
       </button>
       {erro && (
-        <p style={{ marginTop: '0.5rem', fontSize: '0.78rem', color: '#dc2626' }}>❌ {erro}</p>
+        <p style={{ marginTop: '0.5rem', fontSize: '0.78rem', color: '#dc2626' }}>Erro: {erro}</p>
       )}
     </div>
   )
