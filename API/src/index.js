@@ -216,22 +216,27 @@ app.get('/condominios', requireAuth, async (c) => {
   const user = c.get('user')
   const { n_impar, nome, loja_id } = c.req.query()
 
-  const rows = await sql`
-    SELECT
-      c.id, c.n_impar, c.nome, c.nipc, c.morada, c.codigo_postal,
-      c.telefone, c.telemovel, c.n_fracoes, c.iban,
-      c.gestor, c.email_gestor, c.telefone2, c.ativo,
-      l.id as loja_id, l.nome as loja_nome
-    FROM condominios c
-    LEFT JOIN lojas l ON l.id = c.loja_id
-    WHERE c.ativo = true
-      ${user.role !== 'admin' && user.loja_id ? sql`AND c.loja_id = ${user.loja_id}` : sql``}
-      ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
-      ${nome ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
-      ${loja_id ? sql`AND c.loja_id = ${parseInt(loja_id)}` : sql``}
-    ORDER BY c.n_impar ASC
-    LIMIT 100
-  `
+    const rows = await sql`
+      SELECT
+        c.id, c.n_impar, c.nome, c.nipc, c.morada, c.codigo_postal,
+        c.telefone, c.telemovel, c.n_fracoes, c.iban,
+        c.gestor, c.email_gestor, c.telefone2, c.ativo,
+        l.id as loja_id, l.nome as loja_nome
+      FROM condominios c
+      LEFT JOIN lojas l ON l.id = c.loja_id
+      WHERE c.ativo = true
+        ${user.role !== 'admin' ? sql`
+          AND (
+            c.loja_id IN (SELECT loja_id FROM utilizador_lojas WHERE utilizador_id = ${user.id})
+            OR c.id IN (SELECT condominio_id FROM utilizador_condominios WHERE utilizador_id = ${user.id})
+          )
+        ` : sql``}
+        ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
+        ${nome ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
+        ${loja_id ? sql`AND c.loja_id = ${parseInt(loja_id)}` : sql``}
+      ORDER BY c.n_impar ASC
+      LIMIT 100
+    `
   return c.json({ condominios: rows })
 })
 
@@ -1121,6 +1126,31 @@ app.get('/utilizadores', requireAuth, async (c) => {
     ORDER BY u.nome ASC
   `
   return c.json({ utilizadores: rows })
+})
+
+app.get('/utilizadores/gestores/:loja_id', requireAuth, async (c) => {
+  try {
+    const loja_id = parseInt(c.req.param('loja_id'))
+    const sql = neon(c.env.DATABASE_URL)
+
+    const rows = await sql`
+      SELECT
+        u.id, u.nome, u.email, u.telemovel,
+        EXISTS (
+          SELECT 1 FROM utilizador_lojas ul
+          WHERE ul.utilizador_id = u.id AND ul.loja_id = ${loja_id}
+        ) AS tem_acesso_loja
+      FROM utilizadores u
+      WHERE u.ativo = true
+        AND u.role IN ('gestor_loja', 'gestor_condominio')
+      ORDER BY
+        tem_acesso_loja DESC,
+        u.nome ASC
+    `
+    return c.json({ utilizadores: rows })
+  } catch (err) {
+    return c.json({ error: 'Erro ao listar gestores', detail: err.message }, 500)
+  }
 })
 
 // ── Impersonate ───────────────────────────────────────────────

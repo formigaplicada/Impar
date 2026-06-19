@@ -160,15 +160,23 @@ function ModalEditar({ condominio, lojas, onClose, onSave }) {
     gestor:        condominio.gestor        || '',
     email_gestor:  condominio.email_gestor  || '',
     telefone2:     condominio.telefone2     || '',
-  })
+   })
   const [loading, setLoading] = useState(false)
   const [erro,    setErro]    = useState('')
+  const [gestores, setGestores] = useState([])
 
   useEffect(() => {
     const handler = e => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
+
+  useEffect(() => {
+  if (condominio.loja_id) {
+    api.get(`/utilizadores/gestores/${condominio.loja_id}`)
+      .then(d => setGestores(d?.utilizadores || []))
+  }
+}, [condominio.loja_id])
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -242,13 +250,62 @@ function ModalEditar({ condominio, lojas, onClose, onSave }) {
             </div>
 
             {/* Gestor */}
-            <div>
-              {sectionLabel('Gestor')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                {inputField('Nome do Gestor', 'gestor')}
-                {inputField('Email do Gestor', 'email_gestor', 'email')}
-              </div>
-            </div>
+<div>
+  {sectionLabel('Gestor')}
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Gestor</label>
+      <select
+        value={form.email_gestor || ''}
+        onChange={e => {
+          const u = gestores.find(g => g.email === e.target.value)
+          setForm(f => ({
+            ...f,
+            email_gestor: e.target.value,
+            gestor: u?.nome || f.gestor,
+            telefone2: u?.telemovel || '',
+          }))
+        }}
+        style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', color: C.text, cursor: 'pointer' }}
+      >
+        <option value="">— Selecionar gestor —</option>
+        {gestores.map((g, i) => {
+          const isFirst = i === 0
+          const prevTemAcesso = i > 0 && gestores[i-1].tem_acesso_loja
+          const separator = !g.tem_acesso_loja && prevTemAcesso
+          return (
+            <>
+              {separator && <option disabled>── Outros gestores ──</option>}
+              <option key={g.id} value={g.email}>
+                {g.nome}{g.tem_acesso_loja ? ' ★' : ''}
+              </option>
+            </>
+          )
+        })}
+      </select>
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Email</label>
+        <input
+          type="email"
+          value={form.email_gestor || ''}
+          onChange={e => setForm(f => ({ ...f, email_gestor: e.target.value }))}
+          style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', color: C.text }}
+        />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Telefone</label>
+        <input
+          type="tel"
+          value={form.telefone2 || ''}
+          onChange={e => setForm(f => ({ ...f, telefone2: e.target.value }))}
+          style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', color: C.text }}
+        />
+      </div>
+    </div>
+  </div>
+</div>
 
             {erro && <p style={{ color: '#dc2626', fontSize: '0.875rem', fontWeight: 500 }}>❌ {erro}</p>}
           </div>
