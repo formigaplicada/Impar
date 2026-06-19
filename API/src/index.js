@@ -1610,6 +1610,7 @@ app.post('/admin/onedrive/sync', requireAuth, async (c) => {
     JOIN lojas l ON l.id = c.loja_id
     WHERE c.onedrive_folder_id IS NULL
       AND c.ativo = true
+      AND c.n_impar < 100000
     ORDER BY l.id, c.n_impar
   `
 
@@ -1688,6 +1689,12 @@ app.post('/admin/onedrive/sync/:condominio_id', requireAuth, async (c) => {
   if (rows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
 
   const cond = rows[0]
+
+  // Só sincroniza condomínios com n_impar < 100000
+  if (cond.n_impar >= 100000) {
+    return c.json({ ok: false, reason: 'n_impar_invalido' })
+  }   
+
   const loja = {
     id:                        cond.loja_id,
     nome:                      cond.loja_nome,
@@ -3470,6 +3477,7 @@ async function syncLojaOneDrive({ token, loja, sql }) {
       WHERE ativo = true
       `
 
+      
   // Dois maps para lookup por n_impar e old_n_impar
   const porNImpar    = new Map()
   const porOldNImpar = new Map()
@@ -3480,11 +3488,13 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     }
   }
 
- function extractPrefix(name) {
+function extractPrefix(name) {
   const match = name.match(/^(\d+)\s*-/)
   if (!match) return null
   if (match[1].length < 5) return null
-  return Number(match[1])
+  const n = Number(match[1])
+  if (n >= 100000) return null
+  return n
 }
 
   function extractNome(name) {
