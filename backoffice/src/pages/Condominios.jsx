@@ -366,8 +366,6 @@ function TabInfo({ c }) {
       <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
         <BotaoFichaCondominio
           condominioId={c.id}
-          condominioNome={c.nome}
-          nipc={c.nipc}
         />
       </div>
     </div>    

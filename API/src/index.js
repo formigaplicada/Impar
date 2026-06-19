@@ -768,6 +768,86 @@ sql`
 
 // ── Prestadores ───────────────────────────────────────────────
 
+// GET /prestadores/lookup?email=...&telefone=...
+app.get('/prestadores/lookup', requireAuth, async (c) => {
+  const sql = neon(c.env.DATABASE_URL)
+  const { email, telefone } = c.req.query()
+
+  if (!email && !telefone) {
+    return c.json({ error: 'Indica pelo menos email ou telefone' }, 400)
+  }
+
+  try {
+    let rows
+
+    if (email && telefone) {
+      rows = await sql`
+        SELECT p.id, p.nome, p.nif, p.iban, p.telefone, p.email, p.cidade, p.ativo, p.created_at
+        FROM prestadores p
+        WHERE LOWER(p.email) = LOWER(${email}) OR p.telefone = ${telefone}
+        LIMIT 1
+      `
+    } else if (email) {
+      rows = await sql`
+        SELECT p.id, p.nome, p.nif, p.iban, p.telefone, p.email, p.cidade, p.ativo, p.created_at
+        FROM prestadores p
+        WHERE LOWER(p.email) = LOWER(${email})
+        LIMIT 1
+      `
+    } else {
+      rows = await sql`
+        SELECT p.id, p.nome, p.nif, p.iban, p.telefone, p.email, p.cidade, p.ativo, p.created_at
+        FROM prestadores p
+        WHERE p.telefone = ${telefone}
+        LIMIT 1
+      `
+    }
+
+    if (rows.length === 0) return c.json({ found: false })
+    return c.json({ found: true, prestador: rows[0] })
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
+  }
+})
+
+app.get('/condominios/:id/ficha-url', requireAuth, async (c) => {
+  try {
+    const id  = c.req.param('id')
+    const sql = neon(c.env.DATABASE_URL)
+
+    const rows = await sql`
+      SELECT n_impar, onedrive_folder_id
+      FROM condominios
+      WHERE id = ${id}
+    `
+    if (rows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+
+    const { n_impar, onedrive_folder_id } = rows[0]
+
+    if (!onedrive_folder_id) {
+      return c.json({ url: null, motivo: 'sem_pasta_onedrive' })
+    }
+
+    const token = await getMicrosoftToken(c.env)
+
+    // Procurar ficheiro Ficha_{n_impar}.xlsx na pasta do condomínio
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/users/vitor.lopes@impar.pt/drive/items/${onedrive_folder_id}/children?$select=name,webUrl`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    const data = await res.json()
+    const ficheiro = (data.value || []).find(f => f.name === `Ficha_${n_impar}.xlsx`)
+
+    if (!ficheiro) {
+      return c.json({ url: null, motivo: 'ficha_nao_existe' })
+    }
+
+    return c.json({ url: ficheiro.webUrl })
+  } catch (err) {
+    return c.json({ error: 'Erro ao obter URL da ficha', detail: err.message }, 500)
+  }
+})
+
 app.get('/prestadores', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const { nome, nif, loja_id, servico_id } = c.req.query()
@@ -3477,7 +3557,7 @@ async function syncLojaOneDrive({ token, loja, sql }) {
       WHERE ativo = true
       `
 
-      
+
   // Dois maps para lookup por n_impar e old_n_impar
   const porNImpar    = new Map()
   const porOldNImpar = new Map()
