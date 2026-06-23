@@ -28,7 +28,7 @@ const C = {
 function ResultadoSync({ res, onFechar }) {
   if (!res) return null
 
-  const { criados = 0, ligados = 0, ignorados = 0, detalhes = [], reason, error } = res
+  const { criados = 0, ligados = 0, inativados = 0, ignorados = 0, detalhes = [], reason, error } = res
 
   if (!res.ok) {
     const msgs = {
