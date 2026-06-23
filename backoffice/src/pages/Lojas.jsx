@@ -48,9 +48,10 @@ function ResultadoSync({ res, onFechar }) {
     <div style={{ marginTop: '1rem' }}>
       {/* Resumo */}
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: temDetalhes.length > 0 ? '0.875rem' : 0 }}>
-        <Chip cor="green"  valor={criados}   label="criado"   />
-        <Chip cor="blue"   valor={ligados}   label="ligado"   />
-        <Chip cor="subtle" valor={ignorados} label="ignorado" />
+        <Chip cor="green"  valor={criados}    label="criado"    />
+        <Chip cor="blue"   valor={ligados}    label="ligado"    />
+        <Chip cor="amber"  valor={inativados ?? 0} label="inativado" />
+        <Chip cor="subtle" valor={ignorados}  label="ignorado"  />
       </div>
 
       {/* Detalhe das acções (criados + ligados) */}
@@ -93,6 +94,7 @@ function Chip({ cor, valor, label }) {
     green:  { bg: C.greenL, color: C.green,  border: '#bbf7d0' },
     blue:   { bg: C.blueL,  color: C.blue,   border: '#bfdbfe' },
     subtle: { bg: '#f8fafc', color: C.subtle, border: C.border  },
+    amber: { bg: C.amberL, color: C.amber, border: '#fde68a' },
   }
   const s = cores[cor] || cores.subtle
   return (
@@ -109,6 +111,7 @@ function ResultadoBadge({ resultado, motivo }) {
     ligado:   { bg: C.blueL,   color: C.blue,   label: '🔗 Ligado'  },
     erro:     { bg: C.redL,    color: C.red,     label: '❌ Erro'    },
     ignorado: { bg: '#f8fafc', color: C.subtle,  label: '— Ignorado' },
+    inativado: { bg: C.amberL, color: C.amber, label: '🚫 Inativado' },
   }
   const s = map[resultado] || map.ignorado
   return (
