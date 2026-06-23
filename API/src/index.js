@@ -69,6 +69,587 @@ const allowed = [
   await next()
 })
 
+app.post('/condominios/processar', async (c) => {
+  const authKey = c.req.header('X-Automation-Key')
+  if (!authKey || authKey !== c.env.AUTOMATION_API_KEY) {
+    return c.json({ error: 'Não autorizado' }, 401)
+  }
+
+  const sql = neon(c.env.DATABASE_URL)
+  const { nomePasta } = await c.req.json()
+
+  if (!nomePasta) {
+    return c.json({ error: 'nomePasta é obrigatório' }, 400)
+  }
+
+  try {
+    const token = await getMicrosoftToken(c.env)
+    const propostas_user = 'propostas@impar.pt'
+    const vitor_user = 'vitor.lopes@impar.pt'
+    const pastaPath = `Condexpress/Importacoes/Pendentes/${nomePasta}`
+
+    // ── 1. Obter o ID da pasta temporária no OneDrive de propostas ────────────
+    const pastaRes = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${propostas_user}/drive/root:/${pastaPath}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (!pastaRes.ok) {
+      const err = await pastaRes.json()
+      return c.json({ error: 'Pasta temporária não encontrada', detail: err?.error?.message }, 404)
+    }
+    const pastaData = await pastaRes.json()
+    const pastaTempId = pastaData.id
+
+    // ── 2. Listar ficheiros da pasta temporária ───────────────────────────────
+    const listRes = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${propostas_user}/drive/items/${pastaTempId}/children?$select=id,name,size`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (!listRes.ok) {
+      const err = await listRes.json()
+      return c.json({ error: 'Erro ao listar ficheiros', detail: err?.error?.message }, 500)
+    }
+    const listData = await listRes.json()
+    const ficheiros = listData.value || []
+
+    if (ficheiros.length === 0) {
+      return c.json({ error: 'Pasta temporária está vazia' }, 400)
+    }
+
+    // ── 3. Download e extração de dados com Claude ────────────────────────────
+    const pdfs = []
+    for (const f of ficheiros) {
+      const dlRes = await fetch(
+        `https://graph.microsoft.com/v1.0/users/${propostas_user}/drive/items/${f.id}/content`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (!dlRes.ok) continue
+      const buffer = await dlRes.arrayBuffer()
+        const bytes = new Uint8Array(buffer)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        const base64 = btoa(binary)
+      pdfs.push({ nome: f.name, base64, id: f.id })
+    }
+
+    if (pdfs.length === 0) {
+      return c.json({ error: 'Não foi possível fazer download de nenhum ficheiro' }, 500)
+    }
+
+    // Enviar PDFs ao Claude para extração
+    const claudeMessages = [
+      {
+        role: 'user',
+        content: [
+          ...pdfs.map(p => ({
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: p.base64 }
+          })),
+          {
+            type: 'text',
+            text: `Analisa estes documentos de gestão de condomínio e extrai os seguintes dados em JSON.
+Responde APENAS com o JSON, sem texto adicional, sem markdown.
+Campos obrigatórios:
+{
+  "nome": "nome completo do condomínio",
+  "nipc": "NIF/NIPC do condomínio (só dígitos)",
+  "morada": "morada completa",
+  "codigo_postal": "código postal no formato XXXX-XXX",
+  "cidade": "cidade",
+  "telefone": "telefone (só dígitos)",
+  "telemovel": "telemóvel (só dígitos)",
+  "iban": "IBAN completo",
+  "fracoes": [
+    { "fracao": "letra/código da fração", "permilagem": numero }
+  ]
+}`
+          }
+        ]
+      }
+    ]
+
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': c.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        messages: claudeMessages
+      })
+    })
+
+    if (!claudeRes.ok) {
+      const err = await claudeRes.json()
+      return c.json({ error: 'Erro ao chamar Claude API', detail: err?.error?.message }, 500)
+    }
+
+    const claudeData = await claudeRes.json()
+    const claudeText = claudeData.content?.find(b => b.type === 'text')?.text || ''
+
+    let dadosExtraidos
+    try {
+      dadosExtraidos = JSON.parse(claudeText.replace(/```json|```/g, '').trim())
+    } catch (e) {
+      return c.json({ error: 'Claude não devolveu JSON válido', raw: claudeText }, 500)
+    }
+    console.log(`[processar] tokens: input=${claudeData.usage?.input_tokens} output=${claudeData.usage?.output_tokens}`)
+
+    // ── 4. Inferir loja pelo código postal ────────────────────────────────────
+    const cpPrefixo = (dadosExtraidos.codigo_postal || '').substring(0, 4)
+    const lojaRes = await sql`
+      SELECT l.id, l.nome, l.proximo_n_impar, l.onedrive_activos_folder_id
+      FROM codigo_postal_loja cpl
+      JOIN lojas l ON l.id = cpl.loja_id
+      WHERE cpl.prefixo_cp = ${cpPrefixo}
+      LIMIT 1
+    `
+
+    if (lojaRes.length === 0) {
+      return c.json({ error: 'Loja não encontrada para o código postal', codigo_postal: dadosExtraidos.codigo_postal }, 400)
+    }
+
+    const loja = lojaRes[0]
+
+    if (!loja.onedrive_activos_folder_id) {
+      return c.json({ error: 'Loja sem pasta OneDrive configurada', loja: loja.nome }, 400)
+    }
+console.log(`[processar] loja inferida: ${loja.id} - ${loja.nome}`)
+    // ── 5. Criar condomínio na BD (reutiliza lógica do POST /condominios) ─────
+    const novaLojaRes = await sql`
+      UPDATE lojas SET proximo_n_impar = proximo_n_impar + 1
+      WHERE id = ${loja.id}
+      RETURNING proximo_n_impar - 1 as n_impar
+    `
+    const n_impar = novaLojaRes[0].n_impar
+    const cond_id = String(n_impar).padStart(6, '0')
+
+    await sql`
+      INSERT INTO condominios (id, n_impar, loja_id, nome, nipc, morada, codigo_postal, telefone, telemovel, iban)
+      VALUES (
+        ${cond_id}, ${n_impar}, ${loja.id},
+        ${dadosExtraidos.nome || nomePasta},
+        ${dadosExtraidos.nipc || null},
+        ${dadosExtraidos.morada || null},
+        ${dadosExtraidos.codigo_postal || null},
+        ${dadosExtraidos.telefone || null},
+        ${dadosExtraidos.telemovel || null},
+        ${dadosExtraidos.iban || null}
+      )
+    `
+console.log(`[processar] condomínio criado: ${cond_id} n_impar=${n_impar}`)
+    // ── 6. Criar pasta definitiva no OneDrive de vitor.lopes ─────────────────
+    const nomePastaDefinitiva = `${n_impar} - ${dadosExtraidos.nome || nomePasta}`
+
+    const criarPastaRes = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${vitor_user}/drive/items/${loja.onedrive_activos_folder_id}/children`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: nomePastaDefinitiva,
+          folder: {},
+          '@microsoft.graph.conflictBehavior': 'rename'
+        })
+      }
+    )
+
+    if (!criarPastaRes.ok) {
+      const err = await criarPastaRes.json()
+      return c.json({ error: 'Erro ao criar pasta definitiva no OneDrive', detail: err?.error?.message }, 500)
+    }
+
+    const pastaDefinitiva = await criarPastaRes.json()
+    const pastaDefinitivaId = pastaDefinitiva.id
+
+    // Gravar onedrive_folder_id no condomínio
+    await sql`
+      UPDATE condominios SET onedrive_folder_id = ${pastaDefinitivaId}
+      WHERE id = ${cond_id}
+    `
+console.log(`[processar] pasta criada: ${nomePastaDefinitiva} id=${pastaDefinitivaId}`)
+    // ── 7. Upload dos ficheiros para a pasta definitiva ───────────────────────
+      for (const pdf of pdfs) {
+        await uploadFileOneDrive({
+          token,
+          user: vitor_user,
+          parentId: pastaDefinitivaId,
+          nome: pdf.nome,
+          base64: pdf.base64
+        })
+      }
+console.log(`[processar] upload concluído: ${pdfs.length} ficheiros`)
+    // ── 8. Apagar pasta temporária no OneDrive de propostas ───────────────────
+    await fetch(
+      `https://graph.microsoft.com/v1.0/users/${propostas_user}/drive/items/${pastaTempId}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      } 
+    )
+
+    return c.json({
+      ok: true,
+      id: cond_id,
+      n_impar,
+      nome: dadosExtraidos.nome,
+      loja: loja.nome,
+      onedrive_folder_id: pastaDefinitivaId
+    })
+
+  } catch (err) {
+    return c.json({ error: 'Erro interno ao processar condomínio', detail: err.message }, 500)
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /condominios/processar
+//
+// Endpoint chamado pelo Power Automate quando chega um email com anexos.
+// Fluxo:
+//   1. Valida a API key de automação
+//   2. Recebe lista de ficheiros (base64) gravados pelo Power Automate no OneDrive
+//   3. Envia os ficheiros à Claude API para extração de dados
+//   4. Infere a loja pelo prefixo do código postal (tabela codigo_postal_loja)
+//   5. Cria o condomínio na BD (reutiliza lógica existente com n_impar atómico)
+//   6. Cria a pasta do condomínio no OneDrive da loja
+//   7. Insere frações e condóminos
+//   8. Devolve resultado ao Power Automate
+//
+// Autenticação: header X-Automation-Key com o valor de env.AUTOMATION_API_KEY
+//
+// Body (JSON):
+// {
+//   "ficheiros": [
+//     { "nome": "ficha.pdf", "base64": "..." },
+//     { "nome": "lista_fracoes.pdf", "base64": "..." }
+//   ]
+// }
+//
+// Response:
+// {
+//   "ok": true,
+//   "n_impar": 12585,
+//   "id": "012585",
+//   "dados_extraidos": { ... },
+//   "avisos": ["NIF em falta na fração B"]
+// }
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.post('/condominios/processar', async (c) => {
+  // ── 1. Autenticação por API key ───────────────────────────────────────────
+  const apiKey = c.req.header('X-Automation-Key')
+  if (!apiKey || apiKey !== c.env.AUTOMATION_API_KEY) {
+    return c.json({ error: 'Não autorizado' }, 401)
+  }
+
+  const sql = neon(c.env.DATABASE_URL)
+
+  let body
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'Body JSON inválido' }, 400)
+  }
+
+  const { ficheiros } = body
+
+  if (!ficheiros || !Array.isArray(ficheiros) || ficheiros.length === 0) {
+    return c.json({ error: 'É necessário enviar pelo menos um ficheiro' }, 400)
+  }
+
+  // Valida que cada ficheiro tem nome e base64
+  for (const f of ficheiros) {
+    if (!f.nome || !f.base64) {
+      return c.json({ error: `Ficheiro inválido: faltam campos "nome" ou "base64"` }, 400)
+    }
+  }
+
+  // ── 2. Extração de dados com Claude API ──────────────────────────────────
+  let dadosExtraidos
+  try {
+    dadosExtraidos = await extrairDadosComClaude(ficheiros, c.env.ANTHROPIC_API_KEY)
+  } catch (err) {
+    return c.json({ error: 'Erro na extração de dados com Claude', detail: err.message }, 502)
+  }
+
+  const { nome, nipc, morada, codigo_postal, cidade, telefone, telemovel, iban, fracoes } = dadosExtraidos
+
+  if (!nome) {
+    return c.json({ error: 'Não foi possível extrair o nome do condomínio dos documentos' }, 422)
+  }
+  if (!codigo_postal) {
+    return c.json({ error: 'Não foi possível extrair o código postal dos documentos' }, 422)
+  }
+
+  // ── 3. Inferir loja pelo prefixo do código postal ────────────────────────
+  const prefixo = codigo_postal.replace(/\D/g, '').substring(0, 4)
+
+  const lojaRes = await sql`
+    SELECT cpl.loja_id, l.nome AS loja_nome, l.onedrive_activos_folder_id
+    FROM codigo_postal_loja cpl
+    JOIN lojas l ON l.id = cpl.loja_id
+    WHERE cpl.prefixo_cp = ${prefixo}
+  `
+
+  if (lojaRes.length === 0) {
+    return c.json({
+      error: `Código postal "${codigo_postal}" (prefixo ${prefixo}) não está mapeado para nenhuma loja`,
+    }, 422)
+  }
+
+  const loja_id = lojaRes[0].loja_id
+  const loja_nome = lojaRes[0].loja_nome
+  const onedrive_activos_folder_id = lojaRes[0].onedrive_activos_folder_id
+
+  // ── 4. Criar condomínio na BD (n_impar atómico) ──────────────────────────
+  const lojaUpdate = await sql`
+    UPDATE lojas SET proximo_n_impar = proximo_n_impar + 1
+    WHERE id = ${loja_id}
+    RETURNING proximo_n_impar - 1 AS n_impar
+  `
+
+  if (lojaUpdate.length === 0) {
+    return c.json({ error: 'Loja não encontrada ao tentar gerar n_impar' }, 500)
+  }
+
+  const n_impar = lojaUpdate[0].n_impar
+  const cond_id = String(n_impar).padStart(6, '0')
+
+  await sql`
+    INSERT INTO condominios (
+      id, n_impar, loja_id, nome, nipc, morada, codigo_postal, cidade,
+      telefone, telemovel, n_fracoes, iban
+    ) VALUES (
+      ${cond_id}, ${n_impar}, ${loja_id}, ${nome},
+      ${nipc || null}, ${morada || null}, ${codigo_postal || null}, ${cidade || null},
+      ${telefone || null}, ${telemovel || null},
+      ${fracoes && fracoes.length > 0 ? fracoes.length : null},
+      ${iban || null}
+    )
+  `
+
+  // ── 5. Criar pasta do condomínio no OneDrive ──────────────────────────────
+  let onedrive_folder_id = null
+
+  if (onedrive_activos_folder_id) {
+    try {
+      const token = await getMicrosoftToken(c.env)
+      const nomePasta = `${n_impar} - ${nome}`
+
+      const pastaRes = await fetch(
+        `https://graph.microsoft.com/v1.0/users/vitor.lopes@impar.pt/drive/items/${onedrive_activos_folder_id}/children`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: nomePasta,
+            folder: {},
+            '@microsoft.graph.conflictBehavior': 'rename',
+          }),
+        }
+      )
+
+      if (pastaRes.ok) {
+        const pastaData = await pastaRes.json()
+        onedrive_folder_id = pastaData.id
+
+        await sql`
+          UPDATE condominios SET onedrive_folder_id = ${onedrive_folder_id}
+          WHERE id = ${cond_id}
+        `
+      } else {
+        const err = await pastaRes.json()
+        console.error('Erro ao criar pasta OneDrive:', err?.error?.message)
+      }
+    } catch (err) {
+      // Não falha o processo todo por causa da pasta OneDrive
+      console.error('Erro OneDrive:', err.message)
+    }
+  }
+
+  // ── 6. Inserir frações e condóminos ──────────────────────────────────────
+  const avisos = []
+
+  if (fracoes && fracoes.length > 0) {
+    for (const fracao of fracoes) {
+      // Inserir fração
+      let fracaoId
+      try {
+        const fracaoRes = await sql`
+          INSERT INTO condomino_fracoes (condominio_id, designacao, permilagem)
+          VALUES (${cond_id}, ${fracao.designacao || null}, ${fracao.permilagem || null})
+          RETURNING id
+        `
+        fracaoId = fracaoRes[0].id
+      } catch (err) {
+        avisos.push(`Erro ao criar fração "${fracao.designacao}": ${err.message}`)
+        continue
+      }
+
+      // Inserir condóminos da fração
+      if (fracao.condominos && fracao.condominos.length > 0) {
+        for (const condomino of fracao.condominos) {
+          if (!condomino.nome) continue
+
+          if (!condomino.nif) {
+            avisos.push(`NIF em falta para "${condomino.nome}" (fração ${fracao.designacao})`)
+          }
+
+          try {
+            await sql`
+              INSERT INTO condominos (
+                condominio_id, fracao_id, nome, nif, email, telefone, morada, papel
+              ) VALUES (
+                ${cond_id}, ${fracaoId},
+                ${condomino.nome || null}, ${condomino.nif || null},
+                ${condomino.email || null}, ${condomino.telefone || null},
+                ${condomino.morada || null}, ${condomino.papel || 'proprietario'}
+              )
+            `
+          } catch (err) {
+            avisos.push(`Erro ao criar condómino "${condomino.nome}": ${err.message}`)
+          }
+        }
+      }
+    }
+  }
+
+  return c.json({
+    ok: true,
+    id: cond_id,
+    n_impar,
+    loja_id,
+    loja_nome,
+    onedrive_folder_id,
+    dados_extraidos: dadosExtraidos,
+    avisos,
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// extrairDadosComClaude
+//
+// Envia os ficheiros (base64) à Claude API e devolve um objeto estruturado
+// com os dados do condomínio extraídos dos documentos.
+//
+// Devolve:
+// {
+//   nome, nipc, morada, codigo_postal, cidade, telefone, telemovel, iban,
+//   fracoes: [
+//     {
+//       designacao,   // ex: "A - R/C"
+//       permilagem,   // número
+//       condominos: [
+//         { nome, nif, email, telefone, morada, papel }  // papel: "proprietario"|"inquilino"
+//       ]
+//     }
+//   ]
+// }
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function extrairDadosComClaude(ficheiros, anthropicApiKey) {
+  // Construir o conteúdo da mensagem com todos os ficheiros
+  const content = [
+    {
+      type: 'text',
+      text: `Analisa os documentos em anexo e extrai os dados do condomínio.
+Responde APENAS com um objeto JSON válido, sem texto adicional, sem markdown, sem blocos de código.
+
+O objeto deve ter exatamente esta estrutura:
+{
+  "nome": "nome completo do condomínio",
+  "nipc": "número de identificação fiscal (NIF/NIPC) do condomínio, ou null",
+  "morada": "morada completa (rua, número), ou null",
+  "codigo_postal": "código postal no formato XXXX-XXX ou XXXX, ou null",
+  "cidade": "cidade/localidade, ou null",
+  "telefone": "telefone, ou null",
+  "telemovel": "telemóvel, ou null",
+  "iban": "IBAN da conta bancária do condomínio (começa por PT50...), ou null",
+  "fracoes": [
+    {
+      "designacao": "designação da fração, ex: A - R/C",
+      "permilagem": número decimal ou null,
+      "condominos": [
+        {
+          "nome": "nome completo",
+          "nif": "NIF sem espaços ou traços, ou null se não disponível",
+          "email": "email ou null",
+          "telefone": "telefone ou null",
+          "morada": "morada do condómino ou null",
+          "papel": "proprietario" ou "inquilino"
+        }
+      ]
+    }
+  ]
+}
+
+Notas importantes:
+- Se um campo não existir nos documentos, usa null (não uses string vazia)
+- O NIPC do condomínio é diferente do NIF dos condóminos — não os confundas
+- A permilagem é um número (ex: 247.0), não uma string
+- O papel deve ser "proprietario" para [P], "inquilino" para [I]
+- Se houver vários documentos, combina a informação de todos`,
+    },
+  ]
+
+  // Adicionar cada ficheiro como documento base64
+  for (const ficheiro of ficheiros) {
+    const ext = ficheiro.nome.split('.').pop().toLowerCase()
+    const mediaType = ext === 'pdf' ? 'application/pdf' : 'image/jpeg'
+
+    content.push({
+      type: 'document',
+      source: {
+        type: 'base64',
+        media_type: mediaType,
+        data: ficheiro.base64,
+      },
+    })
+  }
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': anthropicApiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content }],
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json()
+    throw new Error(err?.error?.message || `Claude API HTTP ${res.status}`)
+  }
+
+  const data = await res.json()
+  const texto = data.content?.find(b => b.type === 'text')?.text?.trim()
+
+  if (!texto) throw new Error('Claude não devolveu resposta')
+
+  try {
+    return JSON.parse(texto)
+  } catch {
+    throw new Error(`Claude devolveu JSON inválido: ${texto.substring(0, 200)}`)
+  }
+}
+
 // ── Auth ─────────────────────────────────────────────────────
 
 app.get('/auth/login', (c) => {
@@ -209,35 +790,42 @@ app.get('/me', requireAuth, async (c) => {
 })
 
 
-// ── Condomínios ───────────────────────────────────────────────
-
 app.get('/condominios', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const user = c.get('user')
-  const { n_impar, nome, loja_id } = c.req.query()
+  const { n_impar, nome, loja_id, page, limit } = c.req.query()
 
-    const rows = await sql`
-      SELECT
-        c.id, c.n_impar, c.nome, c.nipc, c.morada, c.codigo_postal,
-        c.telefone, c.telemovel, c.n_fracoes, c.iban,
-        c.gestor, c.email_gestor, c.telefone2, c.ativo,
-        l.id as loja_id, l.nome as loja_nome
-      FROM condominios c
-      LEFT JOIN lojas l ON l.id = c.loja_id
-      WHERE c.ativo = true
-        ${user.role !== 'admin' ? sql`
-          AND (
-            c.loja_id IN (SELECT loja_id FROM utilizador_lojas WHERE utilizador_id = ${user.id})
-            OR c.id IN (SELECT condominio_id FROM utilizador_condominios WHERE utilizador_id = ${user.id})
-          )
-        ` : sql``}
-        ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
-        ${nome ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
-        ${loja_id ? sql`AND c.loja_id = ${parseInt(loja_id)}` : sql``}
-      ORDER BY c.n_impar ASC
-      LIMIT 100
-    `
-  return c.json({ condominios: rows })
+  const pg  = Math.max(1, parseInt(page)  || 1)
+  const lim = Math.min(200, Math.max(1, parseInt(limit) || 50))
+  const offset = (pg - 1) * lim
+
+  const rows = await sql`
+    SELECT
+      c.id, c.n_impar, c.nome, c.nipc, c.morada, c.codigo_postal,
+      c.telefone, c.telemovel, c.n_fracoes, c.iban,
+      c.gestor, c.email_gestor, c.telefone2, c.ativo,
+      l.id as loja_id, l.nome as loja_nome,
+      COUNT(*) OVER() AS total_count
+    FROM condominios c
+    LEFT JOIN lojas l ON l.id = c.loja_id
+    WHERE c.ativo = true
+      ${user.role !== 'admin' ? sql`
+        AND (
+          c.loja_id IN (SELECT loja_id FROM utilizador_lojas WHERE utilizador_id = ${user.id})
+          OR c.id IN (SELECT condominio_id FROM utilizador_condominios WHERE utilizador_id = ${user.id})
+        )
+      ` : sql``}
+      ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
+      ${nome    ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
+      ${loja_id ? sql`AND c.loja_id = ${parseInt(loja_id)}` : sql``}
+    ORDER BY c.n_impar ASC
+    LIMIT ${lim} OFFSET ${offset}
+  `
+
+  const total = rows.length > 0 ? parseInt(rows[0].total_count) : 0
+  const condominios = rows.map(({ total_count, ...r }) => r)
+
+  return c.json({ condominios, total, page: pg, limit: lim })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -415,6 +1003,61 @@ app.post('/admin/assets/upload/:tipo/:id', requireAuth, async (c) => {
     return c.json({ error: 'Erro ao fazer upload', detail: err.message }, 500)
   }
 })
+
+// Função auxiliar — usar antes do endpoint /condominios/processar
+async function uploadFileOneDrive({ token, user, parentId, nome, base64 }) {
+  const buffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+  const fileSize = buffer.length
+
+  // Criar upload session
+  const sessionRes = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${user}/drive/items/${parentId}:/${nome}:/createUploadSession`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        item: {
+          '@microsoft.graph.conflictBehavior': 'replace'
+        }
+      })
+    }
+  )
+
+  if (!sessionRes.ok) {
+    const err = await sessionRes.json()
+    throw new Error(`Erro ao criar upload session para ${nome}: ${err?.error?.message}`)
+  }
+
+  const { uploadUrl } = await sessionRes.json()
+
+  // Upload em chunks de 4MB
+  const chunkSize = 4 * 1024 * 1024
+  let offset = 0
+
+  while (offset < fileSize) {
+    const chunk = buffer.slice(offset, offset + chunkSize)
+    const end = offset + chunk.length - 1
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Length': String(chunk.length),
+        'Content-Range': `bytes ${offset}-${end}/${fileSize}`
+      },
+      body: chunk
+    })
+
+    if (!uploadRes.ok && uploadRes.status !== 202) {
+      const err = await uploadRes.json()
+      throw new Error(`Erro ao fazer upload de ${nome}: ${err?.error?.message}`)
+    }
+
+    offset += chunk.length
+  }
+}
 
 app.get('/condominios/:id/ficha', requireAuth, async (c) => {
   try {

@@ -997,27 +997,34 @@ export default function Condominios() {
   const [filtros, setFiltros] = useState({ n_impar: '', nome: '', loja_id: '' })
   const [detalhe, setDetalhe]         = useState(null)
   const [modalEditar, setModalEditar] = useState(false)
+  const [pagina, setPagina]   = useState(1)
+  const [limite, setLimite]   = useState(50)
+  const [total, setTotal]     = useState(0)
 
-  async function carregar(f = filtros) {
-    setLoading(true)
-    const params = new URLSearchParams()
-    if (f.n_impar) params.set('n_impar', f.n_impar)
-    if (f.nome)    params.set('nome', f.nome)
-    if (f.loja_id) params.set('loja_id', f.loja_id)
-    const data = await api.get(`/condominios?${params}`)
-    setCondominios(data?.condominios || [])
-    setLoading(false)
-  }
+  async function carregar(f = filtros, pg = pagina, lim = limite) {
+  setLoading(true)
+  const params = new URLSearchParams()
+  if (f.n_impar) params.set('n_impar', f.n_impar)
+  if (f.nome)    params.set('nome', f.nome)
+  if (f.loja_id) params.set('loja_id', f.loja_id)
+  params.set('page',  pg)
+  params.set('limit', lim)
+  const data = await api.get(`/condominios?${params}`)
+  setCondominios(data?.condominios || [])
+  setTotal(data?.total || 0)
+  setPagina(data?.page || 1)
+  setLoading(false)
+}
 
   async function carregarLojas() {
     const data = await api.get('/lojas')
     setLojas(data?.lojas || [])
   }
 
-  useEffect(() => { carregar(); carregarLojas() }, [])
+  useEffect(() => { carregar(filtros, pagina, limite); carregarLojas() }, [])
 
   function handleFiltro(e) { setFiltros({ ...filtros, [e.target.name]: e.target.value }) }
-  function handleSubmit(e) { e.preventDefault(); carregar(filtros) }
+  function handleSubmit(e) { e.preventDefault(); setPagina(1); carregar(filtros, 1, limite) }
 
   // Detalhe
   if (detalhe) return (
@@ -1055,7 +1062,12 @@ export default function Condominios() {
           </select>
         </div>
         <button type="submit" style={{ ...btnPrimary }}>Filtrar</button>
-        <button type="button" onClick={() => { setFiltros({ n_impar: '', nome: '', loja_id: '' }); carregar({}) }} style={{ ...btnSecondary }}>Limpar</button>
+        <button type="button" onClick={() => {
+        const f = { n_impar: '', nome: '', loja_id: '' }
+        setFiltros(f)
+        setPagina(1)
+        carregar(f, 1, limite)
+      }} style={{ ...btnSecondary }}>Limpar</button>
         <div style={{ flex: 1 }} />
         <button type="button" onClick={() => setModalAberto(true)} style={{ ...btnPrimary, background: '#16a34a' }}>+ Novo Condomínio</button>
       </form>
@@ -1097,9 +1109,33 @@ export default function Condominios() {
           </table>
         )}
       </div>
-      <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: C.subtle }}>
-        {condominios.length} condomínio{condominios.length !== 1 ? 's' : ''}
-      </p>
+{/* Paginação */}
+<div style={{ marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+  <p style={{ margin: 0, fontSize: '0.75rem', color: C.subtle }}>
+    {total === 0 ? 'Nenhum resultado' : `${(pagina - 1) * limite + 1}–${Math.min(pagina * limite, total)} de ${total} condomínios`}
+  </p>
+  <div style={{ flex: 1 }} />
+  <select
+    value={limite}
+    onChange={e => { const l = parseInt(e.target.value); setLimite(l); setPagina(1); carregar(filtros, 1, l) }}
+    style={{ ...inputSt, width: 'auto', fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}
+  >
+    {[25, 50, 100].map(n => <option key={n} value={n}>{n} por página</option>)}
+  </select>
+  <button
+    disabled={pagina <= 1}
+    onClick={() => { const p = pagina - 1; setPagina(p); carregar(filtros, p, limite) }}
+    style={{ ...btnSecondary, opacity: pagina <= 1 ? 0.4 : 1, padding: '0.35rem 0.875rem' }}
+  >← Anterior</button>
+  <span style={{ fontSize: '0.78rem', color: C.muted, fontWeight: 600 }}>
+    Pág. {pagina} / {Math.max(1, Math.ceil(total / limite))}
+  </span>
+  <button
+    disabled={pagina * limite >= total}
+    onClick={() => { const p = pagina + 1; setPagina(p); carregar(filtros, p, limite) }}
+    style={{ ...btnSecondary, opacity: pagina * limite >= total ? 0.4 : 1, padding: '0.35rem 0.875rem' }}
+  >Próxima →</button>
+</div>
 
       {modalAberto && (
         <Modal lojas={lojas} onClose={() => setModalAberto(false)}
