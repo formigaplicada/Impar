@@ -1044,6 +1044,10 @@ async function carregarGestores() {
 
   return (
     <div>
+      {/* Cabeçalho */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.75rem' }}>
+        <button type="button" onClick={() => setModalAberto(true)} style={{ ...btnPrimary, background: '#16a34a' }}>+ Novo Condomínio</button>
+      </div>
       {/* Filtros */}
       <form onSubmit={handleSubmit} style={{
         background: C.surface, borderRadius: '0.875rem',
@@ -1102,8 +1106,7 @@ async function carregarGestores() {
         carregar(f, 1, limite)
       }} style={{ ...btnSecondary }}>Limpar</button>
         <div style={{ flex: 1 }} />
-        <button type="button" onClick={() => setModalAberto(true)} style={{ ...btnPrimary, background: '#16a34a' }}>+ Novo Condomínio</button>
-      </form>
+        </form>
 
       {/* Tabela */}
       <div style={{ background: C.surface, borderRadius: '0.875rem', border: `1px solid ${C.border}`, overflow: 'hidden', boxShadow: '0 1px 4px rgba(1,22,64,0.06)' }}>
