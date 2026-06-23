@@ -1095,7 +1095,7 @@ async function carregarGestores() {
           style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: C.navy }}
         />
         <label htmlFor="mostrar-inativos" style={{ fontSize: '0.82rem', fontWeight: 500, color: C.muted, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          Inativos?
+          Inactivos
         </label>
       </div>
         <button type="submit" style={{ ...btnPrimary }}>Filtrar</button>
