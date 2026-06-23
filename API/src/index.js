@@ -793,7 +793,7 @@ app.get('/me', requireAuth, async (c) => {
 app.get('/condominios', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const user = c.get('user')
-  const { n_impar, nome, loja_id, page, limit } = c.req.query()
+  const { n_impar, nome, loja_id, gestor, ativo, page, limit } = c.req.query()
 
   const pg  = Math.max(1, parseInt(page)  || 1)
   const lim = Math.min(200, Math.max(1, parseInt(limit) || 50))
@@ -808,7 +808,17 @@ app.get('/condominios', requireAuth, async (c) => {
       COUNT(*) OVER() AS total_count
     FROM condominios c
     LEFT JOIN lojas l ON l.id = c.loja_id
-    WHERE c.ativo = true
+   WHERE ${ativo === 'false' ? sql`c.ativo = false` : sql`c.ativo = true`}
+  ${user.role !== 'admin' ? sql`
+    AND (
+      c.loja_id IN (SELECT loja_id FROM utilizador_lojas WHERE utilizador_id = ${user.id})
+      OR c.id IN (SELECT condominio_id FROM utilizador_condominios WHERE utilizador_id = ${user.id})
+    )
+  ` : sql``}
+  ${n_impar ? sql`AND c.n_impar = ${parseInt(n_impar)}` : sql``}
+  ${nome    ? sql`AND c.nome ILIKE ${'%' + nome + '%'}` : sql``}
+  ${loja_id ? sql`AND c.loja_id = ${parseInt(loja_id)}` : sql``}
+  ${gestor  ? sql`AND c.email_gestor = ${gestor}` : sql``}
       ${user.role !== 'admin' ? sql`
         AND (
           c.loja_id IN (SELECT loja_id FROM utilizador_lojas WHERE utilizador_id = ${user.id})
@@ -1849,6 +1859,22 @@ app.get('/utilizadores', requireAuth, async (c) => {
     ORDER BY u.nome ASC
   `
   return c.json({ utilizadores: rows })
+})
+
+app.get('/utilizadores/gestores', requireAuth, async (c) => {
+  try {
+    const sql = neon(c.env.DATABASE_URL)
+    const rows = await sql`
+      SELECT id, nome, email
+      FROM utilizadores
+      WHERE ativo = true
+        AND role IN ('gestor_loja', 'gestor_condominio')
+      ORDER BY nome ASC
+    `
+    return c.json({ utilizadores: rows })
+  } catch (err) {
+    return c.json({ error: 'Erro ao listar gestores', detail: err.message }, 500)
+  }
 })
 
 app.get('/utilizadores/gestores/:loja_id', requireAuth, async (c) => {

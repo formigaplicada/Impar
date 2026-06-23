@@ -994,12 +994,13 @@ export default function Condominios() {
   const [lojas, setLojas]             = useState([])
   const [loading, setLoading]         = useState(true)
   const [modalAberto, setModalAberto] = useState(false)
-  const [filtros, setFiltros] = useState({ n_impar: '', nome: '', loja_id: '' })
   const [detalhe, setDetalhe]         = useState(null)
   const [modalEditar, setModalEditar] = useState(false)
   const [pagina, setPagina]   = useState(1)
   const [limite, setLimite]   = useState(50)
   const [total, setTotal]     = useState(0)
+  const [filtros, setFiltros] = useState({ n_impar: '', nome: '', loja_id: '', gestor: '', ativo: 'true' })
+  const [gestores, setGestores] = useState([])
 
   async function carregar(f = filtros, pg = pagina, lim = limite) {
   setLoading(true)
@@ -1007,6 +1008,8 @@ export default function Condominios() {
   if (f.n_impar) params.set('n_impar', f.n_impar)
   if (f.nome)    params.set('nome', f.nome)
   if (f.loja_id) params.set('loja_id', f.loja_id)
+  if (f.gestor) params.set('gestor', f.gestor)
+  params.set('ativo', f.ativo || 'true')  
   params.set('page',  pg)
   params.set('limit', lim)
   const data = await api.get(`/condominios?${params}`)
@@ -1016,12 +1019,17 @@ export default function Condominios() {
   setLoading(false)
 }
 
-  async function carregarLojas() {
-    const data = await api.get('/lojas')
-    setLojas(data?.lojas || [])
-  }
+async function carregarLojas() {
+  const data = await api.get('/lojas')
+  setLojas(data?.lojas || [])
+}
 
-  useEffect(() => { carregar(filtros, pagina, limite); carregarLojas() }, [])
+async function carregarGestores() {
+  const data = await api.get('/utilizadores/gestores')
+  setGestores(data?.utilizadores || [])
+}
+
+  useEffect(() => { carregar(filtros, pagina, limite); carregarLojas(); carregarGestores() }, [])
 
   function handleFiltro(e) { setFiltros({ ...filtros, [e.target.name]: e.target.value }) }
   function handleSubmit(e) { e.preventDefault(); setPagina(1); carregar(filtros, 1, limite) }
@@ -1061,9 +1069,34 @@ export default function Condominios() {
             {lojas.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
           </select>
         </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Gestor</label>
+        <select name="gestor" value={filtros.gestor} onChange={handleFiltro}
+          style={{ ...inputSt, width: '200px' }}>
+          <option value="">Todos os gestores</option>
+          {gestores.map(g => <option key={g.id} value={g.email}>{g.nome}</option>)}
+        </select>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingBottom: '0.1rem' }}>
+        <input
+          type="checkbox"
+          id="mostrar-inativos"
+          checked={filtros.ativo === 'false'}
+          onChange={e => {
+            const f = { ...filtros, ativo: e.target.checked ? 'false' : 'true' }
+            setFiltros(f)
+            setPagina(1)
+            carregar(f, 1, limite)
+          }}
+          style={{ width: '15px', height: '15px', cursor: 'pointer', accentColor: C.navy }}
+        />
+        <label htmlFor="mostrar-inativos" style={{ fontSize: '0.82rem', fontWeight: 500, color: C.muted, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          Mostrar inativos
+        </label>
+      </div>
         <button type="submit" style={{ ...btnPrimary }}>Filtrar</button>
         <button type="button" onClick={() => {
-        const f = { n_impar: '', nome: '', loja_id: '' }
+        const f = { n_impar: '', nome: '', loja_id: '', gestor: '', ativo: 'true' }
         setFiltros(f)
         setPagina(1)
         carregar(f, 1, limite)
