@@ -228,8 +228,8 @@ export default function Backoffice({ page }) {
            page === 'limpezas'           ? <Limpezas /> :
            page === 'prestadores'        ? <Prestadores /> :
            page === 'eventos'            ? <Eventos /> :
-           page === 'lojas'              ? <Lojas /> :
-           page === 'utilizadores' ? <Utilizadores currentUser={user} /> :
+           page === 'lojas'              ? <Lojas isAdmin={isAdmin} /> :
+           page === 'utilizadores'       ? <Utilizadores currentUser={user} /> :
            <Dashboard />}
         </main>
       </div>
