@@ -264,8 +264,16 @@ def main():
 
             try:
                 ficha_bytes = preencher_template(template_bytes, d)
-                graph_upload(token, drive_id, pasta_id, nome_ficheiro, ficha_bytes)
-                print(f"   OK {n_impar}")
+                try:
+                    graph_upload(token, drive_id, pasta_id, nome_ficheiro, ficha_bytes)
+                    print(f"   OK {n_impar}")
+                except requests.exceptions.HTTPError as e:
+                    if force and e.response is not None and e.response.status_code == 423:
+                        nome_fallback = nome_ficheiro.replace(".xlsx", "_1.xlsx")
+                        graph_upload(token, drive_id, pasta_id, nome_fallback, ficha_bytes)
+                        print(f"   OK {n_impar} (locked, gravado como {nome_fallback})")
+                    else:
+                        raise
                 total_criadas += 1
             except Exception as e:
                 print(f"   ERRO {n_impar}: {e}")

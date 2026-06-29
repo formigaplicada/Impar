@@ -6,7 +6,9 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 const dd = new Hono()
 
-// ── Helpers PAIN.001 ──────────────────────────────────────────────────────────
+// =============================================================================
+// HELPERS — XML
+// =============================================================================
 
 function escapeXml(str) {
   if (!str) return ''
@@ -16,7 +18,7 @@ function escapeXml(str) {
 }
 
 function extrairTag(xml, tag) {
-  const match = xml.match(new RegExp(`<${tag}>([^<]*)<\/${tag}>`))
+  const match = xml.match(new RegExp(`<${tag}>([^<]*)<\\/${tag}>`))
   return match ? match[1].trim() : null
 }
 
@@ -31,81 +33,80 @@ const SEPA_REASON_CODES = {
   RR01: 'Identificação do devedor em falta', RR02: 'Nome do devedor em falta',
   RR03: 'Nome do credor em falta', RR04: 'Motivo regulatório',
   SL01: 'Serviço específico do banco devedor',
+  RJ11: 'Autorização inativa pelo Devedor ou Banco do Devedor',
+  '0000': 'Normal; lançamento executado',
 }
 
-function gerarPain001(creditor, batch, transactions) {
+// =============================================================================
+// HELPERS — PAIN.008
+// =============================================================================
+
+function gerarPain008(creditor, ficheiro, transacoes) {
   const now      = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
-  const msgId    = `IMPAR-${batch.id}-${Date.now()}`
-  const totalTxs = transactions.length
-  const totalValor = transactions.reduce((s, t) => s + parseFloat(t.valor), 0).toFixed(2)
+  const msgId    = escapeXml(ficheiro.identificacao)
+  const totalTxs = transacoes.length
+  const totalValor = transacoes.reduce((s, t) => s + parseFloat(t.montante), 0).toFixed(2)
 
-  const grupos = {}
-  for (const tx of transactions) {
-    if (!grupos[tx.sequencia]) grupos[tx.sequencia] = []
-    grupos[tx.sequencia].push(tx)
-  }
-
-  const pmtInfBlocks = Object.entries(grupos).map(([seq, txs]) => {
-    const pmtInfId = `${msgId}-${seq}`
-    const pmtValor = txs.reduce((s, t) => s + parseFloat(t.valor), 0).toFixed(2)
-
-    const drctDbtTxInf = txs.map(tx => `
+  const drctDbtTxInf = transacoes.map(tx => `
       <DrctDbtTxInf>
         <PmtId><EndToEndId>${escapeXml(tx.end_to_end_id)}</EndToEndId></PmtId>
-        <InstdAmt Ccy="EUR">${parseFloat(tx.valor).toFixed(2)}</InstdAmt>
+        <InstdAmt Ccy="EUR">${parseFloat(tx.montante).toFixed(2)}</InstdAmt>
         <DrctDbtTx>
           <MndtRltdInf>
             <MndtId>${escapeXml(tx.adc)}</MndtId>
             <DtOfSgntr>${tx.data_assinatura}</DtOfSgntr>
+            <AmdmntInd>false</AmdmntInd>
           </MndtRltdInf>
         </DrctDbtTx>
-        <DbtrAgt><FinInstnId><Othr><Id>NOTPROVIDED</Id></Othr></FinInstnId></DbtrAgt>
+        <DbtrAgt>
+          <FinInstnId><BICFI>${escapeXml(tx.bic)}</BICFI></FinInstnId>
+        </DbtrAgt>
         <Dbtr><Nm>${escapeXml(tx.condominio_nome)}</Nm></Dbtr>
         <DbtrAcct><Id><IBAN>${escapeXml(tx.iban_devedor)}</IBAN></Id></DbtrAcct>
-        ${tx.descricao ? `<RmtInf><Ustrd>${escapeXml(tx.descricao)}</Ustrd></RmtInf>` : ''}
       </DrctDbtTxInf>`).join('')
 
-    return `
-  <PmtInf>
-    <PmtInfId>${escapeXml(pmtInfId)}</PmtInfId>
-    <PmtMtd>DD</PmtMtd>
-    <NbOfTxs>${txs.length}</NbOfTxs>
-    <CtrlSum>${pmtValor}</CtrlSum>
-    <PmtTpInf>
-      <SvcLvl><Cd>SEPA</Cd></SvcLvl>
-      <LclInstrm><Cd>CORE</Cd></LclInstrm>
-      <SeqTp>${seq}</SeqTp>
-    </PmtTpInf>
-    <ReqdColltnDt>${batch.data_execucao}</ReqdColltnDt>
-    <Cdtr><Nm>${escapeXml(creditor.nome)}</Nm></Cdtr>
-    <CdtrAcct><Id><IBAN>${escapeXml(creditor.iban)}</IBAN></Id></CdtrAcct>
-    <CdtrAgt><FinInstnId><BIC>${escapeXml(creditor.bic)}</BIC></FinInstnId></CdtrAgt>
-    <CdtrSchmeId>
-      <Id><PrvtId><Othr>
-        <Id>${escapeXml(creditor.creditor_identifier)}</Id>
-        <SchmeNm><Prtry>SEPA</Prtry></SchmeNm>
-      </Othr></PrvtId></Id>
-    </CdtrSchmeId>
-    ${drctDbtTxInf}
-  </PmtInf>`
-  }).join('')
-
   return `<?xml version="1.0" encoding="UTF-8"?>
-<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.003.02"
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="urn:iso:std:iso:20022:tech:xsd:pain.008.003.02 pain.008.003.02.xsd">
+          xsi:schemaLocation="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08 pain.008.001.08.xsd">
   <CstmrDrctDbtInitn>
     <GrpHdr>
-      <MsgId>${escapeXml(msgId)}</MsgId>
+      <MsgId>${msgId}</MsgId>
       <CreDtTm>${now}</CreDtTm>
       <NbOfTxs>${totalTxs}</NbOfTxs>
       <CtrlSum>${totalValor}</CtrlSum>
       <InitgPty><Nm>${escapeXml(creditor.nome)}</Nm></InitgPty>
     </GrpHdr>
-    ${pmtInfBlocks}
+    <PmtInf>
+      <PmtInfId>${msgId}</PmtInfId>
+      <PmtMtd>DD</PmtMtd>
+      <NbOfTxs>${totalTxs}</NbOfTxs>
+      <CtrlSum>${totalValor}</CtrlSum>
+      <PmtTpInf>
+        <SvcLvl><Cd>SEPA</Cd></SvcLvl>
+        <LclInstrm><Cd>CORE</Cd></LclInstrm>
+        <SeqTp>RCUR</SeqTp>
+      </PmtTpInf>
+      <ReqdColltnDt>${ficheiro.data_liquidacao}</ReqdColltnDt>
+      <Cdtr><Nm>${escapeXml(creditor.nome)}</Nm></Cdtr>
+      <CdtrAcct><Id><IBAN>${escapeXml(creditor.iban)}</IBAN></Id></CdtrAcct>
+      <CdtrAgt><FinInstnId><BICFI>${escapeXml(creditor.bic)}</BICFI></FinInstnId></CdtrAgt>
+      <ChrgBr>SLEV</ChrgBr>
+      <CdtrSchmeId>
+        <Id><PrvtId><Othr>
+          <Id>${escapeXml(creditor.creditor_identifier)}</Id>
+          <SchmeNm><Prtry>SEPA</Prtry></SchmeNm>
+        </Othr></PrvtId></Id>
+      </CdtrSchmeId>
+      ${drctDbtTxInf}
+    </PmtInf>
   </CstmrDrctDbtInitn>
 </Document>`
 }
+
+// =============================================================================
+// HELPERS — PAIN.002
+// =============================================================================
 
 function parsePain002(xmlText) {
   const devolvidos = []
@@ -116,21 +117,26 @@ function parsePain002(xmlText) {
     const reasonCode    = extrairTag(block, 'Cd') || extrairTag(block, 'Prtry')
     const dataDevolucao = extrairTag(block, 'AccptncDtTm')?.substring(0, 10)
       || new Date().toISOString().substring(0, 10)
+    const iban          = extrairTag(block, 'IBAN')
+    const adc           = extrairTag(block, 'MndtId')
 
     if (!endToEndId || !reasonCode) continue
 
     devolvidos.push({
-      end_to_end_id:       endToEndId,
-      reason_code:         reasonCode,
-      reason_description:  SEPA_REASON_CODES[reasonCode] || `Código ${reasonCode}`,
-      data_devolucao:      dataDevolucao,
-      raw_xml:             block,
+      end_to_end_id:      endToEndId,
+      reason_code:        reasonCode,
+      reason_description: SEPA_REASON_CODES[reasonCode] || `Código ${reasonCode}`,
+      data_devolucao:     dataDevolucao,
+      iban_devedor:       iban,
+      adc,
     })
   }
   return devolvidos
 }
 
-// ── Helpers DD assinatura ─────────────────────────────────────────────────────
+// =============================================================================
+// HELPERS — MANDATOS / PDF / EMAIL
+// =============================================================================
 
 function gerarTokenDD() {
   const array = new Uint8Array(32)
@@ -388,175 +394,311 @@ async function gerarMandatoPDF(data) {
   return await pdfDoc.save()
 }
 
-// ── POST /dd/lotes ────────────────────────────────────────────────────────────
+// =============================================================================
+// HELPERS — GERAÇÃO
+// =============================================================================
+
+// Deriva a versão do identificador (v1, v2, ...) para o mesmo loja+periodo
+async function proximaVersao(sql, lojaId, periodo) {
+  const rows = await sql`
+    SELECT identificacao FROM ficheiros_dd
+    WHERE loja_id = ${lojaId} AND identificacao LIKE ${periodo + '%'}
+    ORDER BY id DESC LIMIT 1
+  `
+  if (rows.length === 0) return 'v1'
+  const match = rows[0].identificacao.match(/v(\d+)$/)
+  return match ? `v${parseInt(match[1]) + 1}` : 'v2'
+}
+
+// Constrói o nome do ficheiro: "{loja.nome} {MM} {YYYY} {vN}"
+function buildIdentificacao(lojaNome, periodo, versao) {
+  const [ano, mes] = periodo.split('-')
+  return `${lojaNome} ${mes} ${ano} ${versao}`
+}
+
+// Data de liquidação: dia 25 do mês do período
+function dataLiquidacao(periodo) {
+  const [ano, mes] = periodo.split('-')
+  return `${ano}-${mes}-25`
+}
+
+// =============================================================================
+// POST /dd/lotes — gerar ficheiro PAIN.008 para uma loja + período
+// =============================================================================
 
 dd.post('/lotes', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
 
-  const { periodo, data_execucao, condominio_ids } = await c.req.json()
-  if (!periodo || !data_execucao) return c.json({ error: 'periodo e data_execucao são obrigatórios' }, 400)
+  const { loja_id, periodo } = await c.req.json()
+  if (!loja_id || !periodo) return c.json({ error: 'loja_id e periodo são obrigatórios' }, 400)
   if (!/^\d{4}-\d{2}$/.test(periodo)) return c.json({ error: 'periodo deve ter formato YYYY-MM' }, 400)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data_execucao)) return c.json({ error: 'data_execucao deve ter formato YYYY-MM-DD' }, 400)
 
   const sql = neon(c.env.DATABASE_URL)
 
   try {
-    const loteExistente = await sql`SELECT id FROM dd_batches WHERE periodo = ${periodo}`
-    if (loteExistente.length > 0) return c.json({ error: `Já existe um lote para o período ${periodo}` }, 409)
-
-    const creditorRows = await sql`SELECT * FROM dd_creditor LIMIT 1`
-    if (creditorRows.length === 0) return c.json({ error: 'Creditor não configurado' }, 500)
-    const creditor = creditorRows[0]
-
-    const condominios = condominio_ids && condominio_ids.length > 0
-      ? await sql`
-          SELECT c.id, c.nome, c.nipc, m.id as mandato_id, m.adc, m.data_assinatura, m.iban as iban_devedor
-          FROM condominios c JOIN mandatos m ON m.condominio_id = c.id
-          WHERE c.ativo = true AND m.estado = 'ativo' AND c.id = ANY(${condominio_ids}) ORDER BY c.nome
-        `
-      : await sql`
-          SELECT c.id, c.nome, c.nipc, m.id as mandato_id, m.adc, m.data_assinatura, m.iban as iban_devedor
-          FROM condominios c JOIN mandatos m ON m.condominio_id = c.id
-          WHERE c.ativo = true AND m.estado = 'ativo' ORDER BY c.nome
-        `
-
-    if (condominios.length === 0) return c.json({ error: 'Nenhum condomínio com mandato ativo encontrado' }, 400)
-
-    const mandatoIds = condominios.map(c => c.mandato_id)
-    const mandatosComHistorico = await sql`
-      SELECT DISTINCT mandato_id FROM dd_transactions WHERE mandato_id = ANY(${mandatoIds}) AND estado = 'cobrado'
+    // Loja + creditor
+    const lojaRows = await sql`
+      SELECT l.id, l.nome, dc.nome AS credor_nome, dc.iban, dc.bic, dc.creditor_identifier
+      FROM lojas l
+      JOIN dd_creditor dc ON dc.id = l.creditor_id
+      WHERE l.id = ${loja_id} AND l.ativo = true
     `
-    const mandatosRCUR = new Set(mandatosComHistorico.map(r => r.mandato_id))
-
-    const referencia = `IMPAR-${periodo}`
-    const batchRows = await sql`
-      INSERT INTO dd_batches (referencia, periodo, data_execucao, estado)
-      VALUES (${referencia}, ${periodo}, ${data_execucao}, 'rascunho') RETURNING *
-    `
-    const batch = batchRows[0]
-
-    let totalValor = 0
-    const txsParaXml = []
-
-    for (const cond of condominios) {
-      const sequencia  = mandatosRCUR.has(cond.mandato_id) ? 'RCUR' : 'FRST'
-      const endToEndId = `IMPAR-${batch.id}-${cond.id}-${periodo.replace('-', '')}`
-      const descricao  = `Quota ${periodo} - ${cond.nome}`
-      const valor      = parseFloat(cond.quota_mensal || 0)
-      if (valor <= 0) continue
-
-      await sql`
-        INSERT INTO dd_transactions (batch_id, condominio_id, mandato_id, sequencia, valor, descricao, end_to_end_id, estado)
-        VALUES (${batch.id}, ${cond.id}, ${cond.mandato_id}, ${sequencia}, ${valor}, ${descricao}, ${endToEndId}, 'pendente')
-      `
-      totalValor += valor
-      txsParaXml.push({ ...cond, sequencia, end_to_end_id: endToEndId, descricao, valor, condominio_nome: cond.nome })
+    if (lojaRows.length === 0) return c.json({ error: 'Loja não encontrada ou sem creditor configurado' }, 404)
+    const loja    = lojaRows[0]
+    const creditor = {
+      nome:                 loja.credor_nome,
+      iban:                 loja.iban,
+      bic:                  loja.bic,
+      creditor_identifier:  loja.creditor_identifier,
     }
 
-    await sql`
-      UPDATE dd_batches SET total_transacoes = ${txsParaXml.length}, total_valor = ${totalValor.toFixed(2)}, atualizado_em = NOW()
-      WHERE id = ${batch.id}
+    // Condomínios da loja com contrato DD ativo + mandato ativo
+    const condominios = await sql`
+      SELECT
+        c.id, c.nome,
+        m.id        AS mandato_id,
+        m.adc,
+        m.data_assinatura,
+        m.iban      AS iban_devedor,
+        b.bic,
+        COALESCE(
+          (SELECT SUM(cs.valor_mensal)
+           FROM contrato_servicos cs
+           WHERE cs.contrato_id = ct.id),
+          0
+        ) AS montante
+      FROM condominios c
+      JOIN contratos ct
+        ON ct.condominio_id = c.id
+        AND ct.tipo = 'condominio'
+        AND ct.payment_method = 'DD'
+        AND ct.estado = 'ativo'
+      JOIN mandatos_dd m
+        ON m.condominio_id = c.id
+        AND m.estado = 'activo'
+      JOIN bancos b ON b.id = m.banco_id
+      WHERE c.loja_id = ${loja_id} AND c.ativo = true
+      ORDER BY c.nome
     `
 
-    const xmlContent = gerarPain001(creditor, batch, txsParaXml)
-    await sql`UPDATE dd_batches SET pain001_xml = ${xmlContent}, estado = 'gerado', atualizado_em = NOW() WHERE id = ${batch.id}`
+    if (condominios.length === 0) {
+      return c.json({ error: 'Nenhum condomínio com contrato DD e mandato ativo encontrado para esta loja' }, 400)
+    }
 
-    return c.json({ ok: true, batch_id: batch.id, referencia, total_transacoes: txsParaXml.length, total_valor: totalValor.toFixed(2) }, 201)
+    // Versão e identificação
+    const versao       = await proximaVersao(sql, loja_id, periodo)
+    const identificacao = buildIdentificacao(loja.nome, periodo, versao)
+    const dataLiq      = dataLiquidacao(periodo)
+
+    // Criar ficheiro_dd
+    const ficheiroRows = await sql`
+      INSERT INTO ficheiros_dd (loja_id, identificacao, data_liquidacao, estado)
+      VALUES (${loja_id}, ${identificacao}, ${dataLiq}, 'gerado')
+      RETURNING id
+    `
+    const ficheiroId = ficheiroRows[0].id
+
+    // Montar transações: primeiro as pendentes de meses anteriores, depois as do período atual
+    const pendentesAnteriores = await sql`
+      SELECT
+        cd.id, cd.montante, cd.mandato_id,
+        m.adc, m.data_assinatura, m.iban AS iban_devedor,
+        b.bic,
+        c.nome AS condominio_nome,
+        f.identificacao AS periodo_origem
+      FROM "cobranças_dd" cd
+      JOIN mandatos_dd m ON m.id = cd.mandato_id
+      JOIN bancos b ON b.id = m.banco_id
+      JOIN condominios c ON c.id = cd.condominio_id
+      JOIN ficheiros_dd f ON f.id = cd.ficheiro_id
+      WHERE cd.estado = 'pendente'
+        AND c.loja_id = ${loja_id}
+        AND cd.ficheiro_id != ${ficheiroId}
+      ORDER BY cd.criado_em ASC
+    `
+
+    // Inserir cobranças (pendentes anteriores + correntes)
+    const todasTxs = []
+    let sequencia = 1
+
+    // Pendentes de meses anteriores
+    for (const p of pendentesAnteriores) {
+      const endToEndId = `${sequencia}`
+      await sql`
+        INSERT INTO "cobranças_dd" (ficheiro_id, condominio_id, mandato_id, montante, estado)
+        SELECT ${ficheiroId}, condominio_id, mandato_id, montante, 'pendente'
+        FROM "cobranças_dd" WHERE id = ${p.id}
+      `
+      // Marcar o original como incluído no novo ficheiro
+      await sql`UPDATE "cobranças_dd" SET estado = 'reincluido' WHERE id = ${p.id}`
+
+      todasTxs.push({
+        end_to_end_id:   endToEndId,
+        montante:        p.montante,
+        adc:             p.adc,
+        data_assinatura: p.data_assinatura,
+        iban_devedor:    p.iban_devedor,
+        bic:             p.bic,
+        condominio_nome: p.condominio_nome,
+      })
+      sequencia++
+    }
+
+    // Cobranças do período atual
+    for (const cond of condominios) {
+      const montante = parseFloat(cond.montante)
+      if (montante <= 0) continue
+
+      const endToEndId = `${sequencia}`
+      await sql`
+        INSERT INTO "cobranças_dd" (ficheiro_id, condominio_id, mandato_id, montante, estado)
+        VALUES (${ficheiroId}, ${cond.id}, ${cond.mandato_id}, ${montante}, 'pendente')
+      `
+      todasTxs.push({
+        end_to_end_id:   endToEndId,
+        montante,
+        adc:             cond.adc,
+        data_assinatura: cond.data_assinatura,
+        iban_devedor:    cond.iban_devedor,
+        bic:             cond.bic,
+        condominio_nome: cond.nome,
+      })
+      sequencia++
+    }
+
+    if (todasTxs.length === 0) {
+      await sql`DELETE FROM ficheiros_dd WHERE id = ${ficheiroId}`
+      return c.json({ error: 'Nenhuma transação com montante válido' }, 400)
+    }
+
+    // Totais + XML
+    const montanteTotal = todasTxs.reduce((s, t) => s + parseFloat(t.montante), 0)
+    const ficheiro = { identificacao, data_liquidacao: dataLiq }
+    const xmlContent = gerarPain008(creditor, ficheiro, todasTxs)
+
+    await sql`
+      UPDATE ficheiros_dd
+      SET n_registos = ${todasTxs.length},
+          montante_total = ${montanteTotal.toFixed(2)},
+          pain008_xml = ${xmlContent}
+      WHERE id = ${ficheiroId}
+    `
+
+    return c.json({
+      ok:              true,
+      ficheiro_id:     ficheiroId,
+      identificacao,
+      data_liquidacao: dataLiq,
+      n_registos:      todasTxs.length,
+      montante_total:  montanteTotal.toFixed(2),
+      pendentes_reincluidos: pendentesAnteriores.length,
+    }, 201)
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
 })
 
-// ── GET /dd/lotes ─────────────────────────────────────────────────────────────
+// =============================================================================
+// GET /dd/lotes — listar ficheiros por loja
+// =============================================================================
 
 dd.get('/lotes', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
   const sql = neon(c.env.DATABASE_URL)
+  const { loja_id } = c.req.query()
 
   try {
     const rows = await sql`
-      SELECT b.id, b.referencia, b.periodo, b.data_execucao,
-             b.total_transacoes, b.total_valor, b.estado, b.criado_em, b.atualizado_em,
-             COUNT(r.id) as total_devolucoes,
-             COALESCE(SUM(CASE WHEN t.estado = 'cobrado'   THEN t.valor END), 0) as valor_cobrado,
-             COALESCE(SUM(CASE WHEN t.estado = 'devolvido' THEN t.valor END), 0) as valor_devolvido
-      FROM dd_batches b
-      LEFT JOIN dd_transactions t ON t.batch_id = b.id
-      LEFT JOIN dd_returns r ON r.batch_id = b.id
-      GROUP BY b.id ORDER BY b.criado_em DESC LIMIT 50
+      SELECT
+        f.id, f.loja_id, f.identificacao, f.data_geracao, f.data_liquidacao,
+        f.n_registos, f.montante_total, f.estado,
+        l.nome AS loja_nome,
+        COUNT(cd.id)                                                          AS total_cobranças,
+        COALESCE(SUM(CASE WHEN cd.estado = 'aceite'    THEN cd.montante END), 0) AS valor_aceite,
+        COALESCE(SUM(CASE WHEN cd.estado = 'rejeitado' THEN cd.montante END), 0) AS valor_rejeitado,
+        COALESCE(SUM(CASE WHEN cd.estado = 'pendente'  THEN cd.montante END), 0) AS valor_pendente
+      FROM ficheiros_dd f
+      JOIN lojas l ON l.id = f.loja_id
+      LEFT JOIN "cobranças_dd" cd ON cd.ficheiro_id = f.id
+      ${loja_id ? sql`WHERE f.loja_id = ${parseInt(loja_id)}` : sql``}
+      GROUP BY f.id, l.nome
+      ORDER BY f.data_geracao DESC
+      LIMIT 50
     `
-    return c.json({ lotes: rows })
+    return c.json({ ficheiros: rows })
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
 })
 
-// ── GET /dd/lotes/:id ─────────────────────────────────────────────────────────
+// =============================================================================
+// GET /dd/lotes/:id — detalhe de ficheiro + cobranças
+// =============================================================================
 
 dd.get('/lotes/:id', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
   const sql = neon(c.env.DATABASE_URL)
   const id  = parseInt(c.req.param('id'))
 
   try {
-    const batchRows = await sql`SELECT * FROM dd_batches WHERE id = ${id}`
-    if (batchRows.length === 0) return c.json({ error: 'Lote não encontrado' }, 404)
-
-    const transacoes = await sql`
-      SELECT t.id, t.sequencia, t.valor, t.descricao, t.end_to_end_id, t.estado, t.criado_em, t.atualizado_em,
-             c.nome as condominio_nome, c.nipc, c.id as condominio_id,
-             r.reason_code, r.reason_description, r.data_devolucao
-      FROM dd_transactions t JOIN condominios c ON c.id = t.condominio_id
-      LEFT JOIN dd_returns r ON r.transaction_id = t.id
-      WHERE t.batch_id = ${id} ORDER BY c.nome
+    const ficheiroRows = await sql`
+      SELECT f.*, l.nome AS loja_nome, dc.nome AS credor_nome
+      FROM ficheiros_dd f
+      JOIN lojas l ON l.id = f.loja_id
+      JOIN dd_creditor dc ON dc.id = l.creditor_id
+      WHERE f.id = ${id}
     `
-    return c.json({ lote: batchRows[0], transacoes })
+    if (ficheiroRows.length === 0) return c.json({ error: 'Ficheiro não encontrado' }, 404)
+
+    const cobranças = await sql`
+      SELECT
+        cd.id, cd.montante, cd.estado, cd.codigo_retorno, cd.criado_em,
+        c.nome AS condominio_nome, c.id AS condominio_id,
+        m.adc, m.iban AS iban_devedor,
+        b.nome AS banco_nome,
+        SEPA_REASON_CODES.descricao AS descricao_retorno
+      FROM "cobranças_dd" cd
+      JOIN condominios c ON c.id = cd.condominio_id
+      JOIN mandatos_dd m ON m.id = cd.mandato_id
+      JOIN bancos b ON b.id = m.banco_id
+      LEFT JOIN LATERAL (
+        SELECT ${JSON.stringify(SEPA_REASON_CODES)}::jsonb ->> cd.codigo_retorno AS descricao
+      ) SEPA_REASON_CODES ON true
+      WHERE cd.ficheiro_id = ${id}
+      ORDER BY c.nome
+    `
+
+    return c.json({ ficheiro: ficheiroRows[0], cobranças })
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
 })
 
-// ── PUT /dd/lotes/:id/estado ──────────────────────────────────────────────────
+// =============================================================================
+// GET /dd/lotes/:id/pain008 — download XML
+// =============================================================================
 
-dd.put('/lotes/:id/estado', requireAuth, async (c) => {
+dd.get('/lotes/:id/pain008', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
-  const sql = neon(c.env.DATABASE_URL)
-  const id  = parseInt(c.req.param('id'))
-  const { estado } = await c.req.json()
 
-  const estados_validos = ['rascunho', 'gerado', 'submetido', 'processado']
-  if (!estados_validos.includes(estado)) return c.json({ error: 'Estado inválido' }, 400)
-
-  try {
-    const rows = await sql`SELECT id FROM dd_batches WHERE id = ${id}`
-    if (rows.length === 0) return c.json({ error: 'Lote não encontrado' }, 404)
-    await sql`UPDATE dd_batches SET estado = ${estado}, atualizado_em = NOW() WHERE id = ${id}`
-    return c.json({ ok: true, estado })
-  } catch (e) {
-    return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
-  }
-})
-
-// ── GET /dd/lotes/:id/pain001 ─────────────────────────────────────────────────
-
-dd.get('/lotes/:id/pain001', requireAuth, async (c) => {
-  const user = c.get('user')
-  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
   const sql = neon(c.env.DATABASE_URL)
   const id  = parseInt(c.req.param('id'))
 
   try {
-    const rows = await sql`SELECT referencia, pain001_xml FROM dd_batches WHERE id = ${id}`
-    if (rows.length === 0) return c.json({ error: 'Lote não encontrado' }, 404)
-    if (!rows[0].pain001_xml) return c.json({ error: 'PAIN.001 ainda não gerado' }, 400)
-    return new Response(rows[0].pain001_xml, {
+    const rows = await sql`SELECT identificacao, pain008_xml FROM ficheiros_dd WHERE id = ${id}`
+    if (rows.length === 0) return c.json({ error: 'Ficheiro não encontrado' }, 404)
+    if (!rows[0].pain008_xml) return c.json({ error: 'XML ainda não gerado' }, 400)
+
+    return new Response(rows[0].pain008_xml, {
       headers: {
-        'Content-Type': 'application/xml',
-        'Content-Disposition': `attachment; filename="${rows[0].referencia}-PAIN001.xml"`,
+        'Content-Type': 'application/xml; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${rows[0].identificacao}.xml"`,
       },
     })
   } catch (e) {
@@ -564,116 +706,173 @@ dd.get('/lotes/:id/pain001', requireAuth, async (c) => {
   }
 })
 
-// ── POST /dd/lotes/:id/pain002 ────────────────────────────────────────────────
+// =============================================================================
+// POST /dd/lotes/:id/retorno — processar PAIN.002
+// =============================================================================
 
-dd.post('/lotes/:id/pain002', requireAuth, async (c) => {
+dd.post('/lotes/:id/retorno', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
   const sql = neon(c.env.DATABASE_URL)
   const id  = parseInt(c.req.param('id'))
 
   try {
-    const batchRows = await sql`SELECT id FROM dd_batches WHERE id = ${id}`
-    if (batchRows.length === 0) return c.json({ error: 'Lote não encontrado' }, 404)
+    const ficheiroRows = await sql`SELECT id, loja_id FROM ficheiros_dd WHERE id = ${id}`
+    if (ficheiroRows.length === 0) return c.json({ error: 'Ficheiro não encontrado' }, 404)
+    const ficheiro = ficheiroRows[0]
 
     const { xml } = await c.req.json()
     if (!xml) return c.json({ error: 'xml é obrigatório no body' }, 400)
 
     const devolvidos = parsePain002(xml)
-    if (devolvidos.length === 0) return c.json({ error: 'Nenhuma devolução encontrada no PAIN.002' }, 400)
 
+    // Criar registo de retorno
+    const retornoRows = await sql`
+      INSERT INTO retornos_dd (ficheiro_dd_id, loja_id, tipo, data_retorno, data_liquidacao, n_registos, xml_original)
+      VALUES (${id}, ${ficheiro.loja_id}, 'pain002', NOW(), NOW(), ${devolvidos.length}, ${xml})
+      RETURNING id
+    `
+    const retornoId = retornoRows[0].id
+
+    // Buscar todas as cobranças do ficheiro de uma vez
+    const cobranças = await sql`
+      SELECT cd.id, cd.mandato_id, m.adc
+      FROM "cobranças_dd" cd
+      JOIN mandatos_dd m ON m.id = cd.mandato_id
+      WHERE cd.ficheiro_id = ${id} AND cd.estado = 'pendente'
+    `
+    // Map por adc para lookup rápido
+    const porAdc = Object.fromEntries(cobranças.map(r => [r.adc, r]))
+
+    const adcsRejeitados = new Set()
     let processados = 0, naoEncontrados = 0
 
     for (const dev of devolvidos) {
-      const txRows = await sql`
-        SELECT t.id, c.nome, c.email_gestor FROM dd_transactions t JOIN condominios c ON c.id = t.condominio_id
-        WHERE t.end_to_end_id = ${dev.end_to_end_id} AND t.batch_id = ${id}
+      const cobranca = dev.adc ? porAdc[dev.adc] : null
+
+      // Inserir evento_retorno
+      await sql`
+        INSERT INTO eventos_retorno (retorno_id, cobranca_id, adc, iban_devedor, montante, codigo_retorno, descricao_retorno)
+        SELECT
+          ${retornoId},
+          ${cobranca ? cobranca.id : null},
+          ${dev.adc || dev.end_to_end_id},
+          ${dev.iban_devedor || null},
+          cd.montante,
+          ${dev.reason_code},
+          ${dev.reason_description}
+        FROM "cobranças_dd" cd
+        WHERE cd.id = ${cobranca ? cobranca.id : null}
+        UNION ALL
+        SELECT ${retornoId}, null, ${dev.adc || dev.end_to_end_id}, ${dev.iban_devedor || null},
+               null, ${dev.reason_code}, ${dev.reason_description}
+        WHERE ${cobranca ? cobranca.id : null} IS NULL
+        LIMIT 1
       `
-      if (txRows.length === 0) {
+
+      if (!cobranca) {
         naoEncontrados++
-        await sql`
-          INSERT INTO dd_returns (batch_id, end_to_end_id, reason_code, reason_description, data_devolucao, raw_xml)
-          VALUES (${id}, ${dev.end_to_end_id}, ${dev.reason_code}, ${dev.reason_description}, ${dev.data_devolucao}, ${dev.raw_xml})
-        `
         continue
       }
-      const tx = txRows[0]
+
+      adcsRejeitados.add(cobranca.id)
       await sql`
-        INSERT INTO dd_returns (batch_id, transaction_id, end_to_end_id, reason_code, reason_description, data_devolucao, raw_xml)
-        VALUES (${id}, ${tx.id}, ${dev.end_to_end_id}, ${dev.reason_code}, ${dev.reason_description}, ${dev.data_devolucao}, ${dev.raw_xml})
+        UPDATE "cobranças_dd"
+        SET estado = 'rejeitado', codigo_retorno = ${dev.reason_code}
+        WHERE id = ${cobranca.id}
       `
-      await sql`UPDATE dd_transactions SET estado = 'devolvido', atualizado_em = NOW() WHERE id = ${tx.id}`
-      if (tx.email_gestor) {
-        await sql`
-          INSERT INTO dd_notifications (transaction_id, batch_id, tipo, destinatario, assunto, estado)
-          VALUES (${tx.id}, ${id}, 'devolucao', ${tx.email_gestor}, ${`Débito devolvido — ${tx.nome} — ${dev.reason_description}`}, 'pendente')
-        `
-      }
       processados++
     }
 
-    await sql`UPDATE dd_transactions SET estado = 'cobrado', atualizado_em = NOW() WHERE batch_id = ${id} AND estado = 'pendente'`
-    await sql`UPDATE dd_batches SET estado = 'processado', atualizado_em = NOW() WHERE id = ${id}`
+    // Cobranças que não vieram no retorno → aceites
+    const idsRejeitados = [...adcsRejeitados]
+    if (idsRejeitados.length > 0) {
+      await sql`
+        UPDATE "cobranças_dd"
+        SET estado = 'aceite'
+        WHERE ficheiro_id = ${id}
+          AND estado = 'pendente'
+          AND id != ALL(${idsRejeitados})
+      `
+    } else {
+      await sql`
+        UPDATE "cobranças_dd" SET estado = 'aceite'
+        WHERE ficheiro_id = ${id} AND estado = 'pendente'
+      `
+    }
 
-    return c.json({ ok: true, devolvidos: processados, nao_encontrados: naoEncontrados, total_no_ficheiro: devolvidos.length })
+    await sql`UPDATE ficheiros_dd SET estado = 'processado' WHERE id = ${id}`
+
+    return c.json({
+      ok:              true,
+      retorno_id:      retornoId,
+      rejeitados:      processados,
+      aceites:         cobranças.length - processados,
+      nao_encontrados: naoEncontrados,
+      total_retorno:   devolvidos.length,
+    })
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
 })
 
-// ── GET /dd/lotes/:id/transacoes ──────────────────────────────────────────────
-
-dd.get('/lotes/:id/transacoes', requireAuth, async (c) => {
-  const user = c.get('user')
-  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
-  const sql = neon(c.env.DATABASE_URL)
-  const id  = parseInt(c.req.param('id'))
-  const { estado } = c.req.query()
-
-  try {
-    const rows = await sql`
-      SELECT t.id, t.sequencia, t.valor, t.descricao, t.end_to_end_id, t.estado,
-             c.nome as condominio_nome, c.nipc, c.iban,
-             r.reason_code, r.reason_description, r.data_devolucao
-      FROM dd_transactions t JOIN condominios c ON c.id = t.condominio_id
-      LEFT JOIN dd_returns r ON r.transaction_id = t.id
-      WHERE t.batch_id = ${id}
-        ${estado ? sql`AND t.estado = ${estado}` : sql``}
-      ORDER BY c.nome
-    `
-    return c.json({ transacoes: rows })
-  } catch (e) {
-    return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
-  }
-})
-
-// ── GET /dd/dashboard ─────────────────────────────────────────────────────────
+// =============================================================================
+// GET /dd/dashboard — resumo geral (filtrável por loja)
+// =============================================================================
 
 dd.get('/dashboard', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
   const sql = neon(c.env.DATABASE_URL)
+  const { loja_id } = c.req.query()
+  const lojaFilter = loja_id ? sql`AND f.loja_id = ${parseInt(loja_id)}` : sql``
 
   try {
-    const [resumo, ultimosLotes, topDevolucoes] = await Promise.all([
+    const [resumo, ultimosFicheiros, topRejeicoes] = await Promise.all([
       sql`
-        SELECT COUNT(DISTINCT b.id) as total_lotes,
-               COALESCE(SUM(CASE WHEN t.estado = 'cobrado'   THEN t.valor END), 0) as total_cobrado,
-               COALESCE(SUM(CASE WHEN t.estado = 'devolvido' THEN t.valor END), 0) as total_devolvido,
-               COALESCE(SUM(CASE WHEN t.estado = 'pendente'  THEN t.valor END), 0) as total_pendente,
-               COUNT(CASE WHEN t.estado = 'devolvido' THEN 1 END) as num_devolucoes
-        FROM dd_batches b LEFT JOIN dd_transactions t ON t.batch_id = b.id
+        SELECT
+          COUNT(DISTINCT f.id)                                                           AS total_ficheiros,
+          COALESCE(SUM(CASE WHEN cd.estado = 'aceite'    THEN cd.montante END), 0)      AS total_aceite,
+          COALESCE(SUM(CASE WHEN cd.estado = 'rejeitado' THEN cd.montante END), 0)      AS total_rejeitado,
+          COALESCE(SUM(CASE WHEN cd.estado = 'pendente'  THEN cd.montante END), 0)      AS total_pendente,
+          COUNT(CASE WHEN cd.estado = 'rejeitado' THEN 1 END)                           AS num_rejeicoes
+        FROM ficheiros_dd f
+        LEFT JOIN "cobranças_dd" cd ON cd.ficheiro_id = f.id
+        WHERE true ${lojaFilter}
       `,
-      sql`SELECT id, referencia, periodo, data_execucao, total_transacoes, total_valor, estado FROM dd_batches ORDER BY criado_em DESC LIMIT 6`,
-      sql`SELECT reason_code, reason_description, COUNT(*) as ocorrencias FROM dd_returns GROUP BY reason_code, reason_description ORDER BY ocorrencias DESC LIMIT 10`,
+      sql`
+        SELECT f.id, f.identificacao, f.data_liquidacao, f.n_registos, f.montante_total, f.estado, l.nome AS loja_nome
+        FROM ficheiros_dd f
+        JOIN lojas l ON l.id = f.loja_id
+        WHERE true ${lojaFilter}
+        ORDER BY f.data_geracao DESC LIMIT 6
+      `,
+      sql`
+        SELECT cd.codigo_retorno, COUNT(*) AS ocorrencias,
+               COALESCE(SUM(cd.montante), 0) AS montante_total
+        FROM "cobranças_dd" cd
+        JOIN ficheiros_dd f ON f.id = cd.ficheiro_id
+        WHERE cd.estado = 'rejeitado' ${lojaFilter}
+        GROUP BY cd.codigo_retorno
+        ORDER BY ocorrencias DESC LIMIT 10
+      `,
     ])
-    return c.json({ resumo: resumo[0], ultimos_lotes: ultimosLotes, top_devolucoes: topDevolucoes })
+
+    return c.json({
+      resumo:           resumo[0],
+      ultimos_ficheiros: ultimosFicheiros,
+      top_rejeicoes:    topRejeicoes,
+    })
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
 })
 
-// ── POST /dd/mandatos/create ──────────────────────────────────────────────────
+// =============================================================================
+// POST /dd/mandatos/create
+// =============================================================================
 
 dd.post('/mandatos/create', requireAuth, async (c) => {
   const sql  = neon(c.env.DATABASE_URL)
@@ -704,7 +903,9 @@ dd.post('/mandatos/create', requireAuth, async (c) => {
   }
 })
 
-// ── GET /dd/assinar/:token (público) ─────────────────────────────────────────
+// =============================================================================
+// GET /dd/assinar/:token (público)
+// =============================================================================
 
 dd.get('/assinar/:token', async (c) => {
   const sql   = neon(c.env.DATABASE_URL)
@@ -712,10 +913,13 @@ dd.get('/assinar/:token', async (c) => {
 
   try {
     const rows = await sql`
-      SELECT m.id, m.adc, m.iban, m.estado, m.nome_devedor, m.email_devedor, m.token_expires_at, m.signed_at,
-             cond.nome AS condominio_nome, cond.morada AS condominio_morada, cond.codigo_postal AS condominio_cp, cond.cidade AS condominio_cidade,
-             b.nome AS banco_nome, b.bic AS banco_bic,
-             cr.nome AS credor_nome, cr.creditor_identifier AS credor_id, cr.morada AS credor_morada, cr.codigo_postal AS credor_cp, cr.cidade AS credor_cidade
+      SELECT
+        m.id, m.adc, m.iban, m.estado, m.nome_devedor, m.email_devedor, m.token_expires_at, m.signed_at,
+        cond.nome AS condominio_nome, cond.morada AS condominio_morada,
+        cond.codigo_postal AS condominio_cp, cond.cidade AS condominio_cidade,
+        b.nome AS banco_nome, b.bic AS banco_bic,
+        cr.nome AS credor_nome, cr.creditor_identifier AS credor_id,
+        cr.morada AS credor_morada, cr.codigo_postal AS credor_cp, cr.cidade AS credor_cidade
       FROM mandatos_dd m
       JOIN condominios cond ON cond.id = m.condominio_id
       LEFT JOIN bancos b ON b.id = m.banco_id
@@ -729,16 +933,21 @@ dd.get('/assinar/:token', async (c) => {
     if (new Date(m.token_expires_at) < new Date()) return c.json({ error: 'Este link expirou.', expired: true }, 410)
 
     return c.json({
-      adc: m.adc, iban: m.iban ? formatIBANDD(m.iban) : '', bic: m.banco_bic || '', nome_devedor: m.nome_devedor,
-      condominio: { nome: m.condominio_nome, morada: m.condominio_morada, cod_postal: m.condominio_cp, cidade: m.condominio_cidade },
-      credor: { nome: m.credor_nome || 'Rede Impar, Lda', identifier: m.credor_id || 'PT18ZZZ114843', morada: m.credor_morada || '', cod_postal: m.credor_cp || '', cidade: m.credor_cidade || '' },
+      adc:         m.adc,
+      iban:        m.iban ? formatIBANDD(m.iban) : '',
+      bic:         m.banco_bic || '',
+      nome_devedor: m.nome_devedor,
+      condominio:  { nome: m.condominio_nome, morada: m.condominio_morada, cod_postal: m.condominio_cp, cidade: m.condominio_cidade },
+      credor:      { nome: m.credor_nome || 'Rede Impar, Lda', identifier: m.credor_id || 'PT18ZZZ114843', morada: m.credor_morada || '', cod_postal: m.credor_cp || '', cidade: m.credor_cidade || '' },
     })
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
 })
 
-// ── POST /dd/assinar/:token (público) ────────────────────────────────────────
+// =============================================================================
+// POST /dd/assinar/:token (público)
+// =============================================================================
 
 dd.post('/assinar/:token', async (c) => {
   const sql   = neon(c.env.DATABASE_URL)
@@ -747,13 +956,18 @@ dd.post('/assinar/:token', async (c) => {
   const body  = await c.req.json()
   const { iban, bic, banco_id, nome_devedor, signature_png } = body
 
-  if (!signature_png || !nome_devedor) return c.json({ error: 'Campos obrigatórios: nome_devedor, signature_png' }, 400)
+  if (!signature_png || !nome_devedor) {
+    return c.json({ error: 'Campos obrigatórios: nome_devedor, signature_png' }, 400)
+  }
 
   try {
     const rows = await sql`
-      SELECT m.*, cond.nome AS condo_nome, cond.morada, cond.codigo_postal, cond.cidade,
-             cr.nome AS credor_nome, cr.creditor_identifier, cr.morada AS credor_morada, cr.codigo_postal AS credor_cp, cr.cidade AS credor_cidade,
-             b.bic AS banco_bic
+      SELECT
+        m.*,
+        cond.nome AS condo_nome, cond.morada, cond.codigo_postal, cond.cidade,
+        cr.nome AS credor_nome, cr.creditor_identifier,
+        cr.morada AS credor_morada, cr.codigo_postal AS credor_cp, cr.cidade AS credor_cidade,
+        b.bic AS banco_bic
       FROM mandatos_dd m
       JOIN condominios cond ON cond.id = m.condominio_id
       JOIN lojas l ON l.id = cond.loja_id
@@ -771,18 +985,37 @@ dd.post('/assinar/:token', async (c) => {
     const finalBic  = bic || m.banco_bic || ''
 
     const pdfBytes = await gerarMandatoPDF({
-      adc: m.adc, nomeDevedor: nome_devedor, moradaDevedor: m.morada || '', cpDevedor: m.codigo_postal || '', cidadeDevedor: m.cidade || '',
-      credorNome: m.credor_nome || 'Rede Impar, Lda', credorId: m.creditor_identifier || 'PT18ZZZ114843',
-      credorMorada: m.credor_morada || '', credorCp: m.credor_cp || '', credorCidade: m.credor_cidade || '',
-      iban: ibanClean, bic: finalBic, signaturePng: signature_png, signedAt, signedIp: ip,
+      adc:          m.adc,
+      nomeDevedor:  nome_devedor,
+      moradaDevedor: m.morada || '',
+      cpDevedor:    m.codigo_postal || '',
+      cidadeDevedor: m.cidade || '',
+      credorNome:   m.credor_nome || 'Rede Impar, Lda',
+      credorId:     m.creditor_identifier || 'PT18ZZZ114843',
+      credorMorada: m.credor_morada || '',
+      credorCp:     m.credor_cp || '',
+      credorCidade: m.credor_cidade || '',
+      iban:         ibanClean,
+      bic:          finalBic,
+      signaturePng: signature_png,
+      signedAt,
+      signedIp:     ip,
     })
 
     const pdfUrl = await uploadMandatoPDF(c.env, m.condominio_id, m.adc, pdfBytes)
 
     await sql`
-      UPDATE mandatos_dd SET iban = ${ibanClean}, banco_id = ${banco_id || m.banco_id}, nome_devedor = ${nome_devedor},
-        signature_png = ${signature_png}, signed_at = ${signedAt.toISOString()}, signed_ip = ${ip},
-        pdf_url = ${pdfUrl}, estado = 'activo', data_assinatura = CURRENT_DATE, atualizado_em = NOW()
+      UPDATE mandatos_dd
+      SET iban             = ${ibanClean},
+          banco_id         = ${banco_id || m.banco_id},
+          nome_devedor     = ${nome_devedor},
+          signature_png    = ${signature_png},
+          signed_at        = ${signedAt.toISOString()},
+          signed_ip        = ${ip},
+          pdf_url          = ${pdfUrl},
+          estado           = 'activo',
+          data_assinatura  = CURRENT_DATE,
+          atualizado_em    = NOW()
       WHERE token = ${token}
     `
 
@@ -794,7 +1027,9 @@ dd.post('/assinar/:token', async (c) => {
   }
 })
 
-// ── GET /dd/bancos (público) ──────────────────────────────────────────────────
+// =============================================================================
+// GET /dd/bancos (público)
+// =============================================================================
 
 dd.get('/bancos', async (c) => {
   const sql = neon(c.env.DATABASE_URL)
