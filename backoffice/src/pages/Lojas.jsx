@@ -145,7 +145,7 @@ function ModalGerarDD({ loja, onFechar }) {
       if (res?.ok && res?.ficheiro_id) {
         // Download automático do XML
         const token = localStorage.getItem('session_token')
-        const url   = `${import.meta.env.VITE_API_URL}/dd/lotes/${res.ficheiro_id}/pain008`
+        const url   = `https://api.condexpress.com/dd/lotes/${res.ficheiro_id}/pain008`
         const resp  = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (resp.ok) {
           const blob     = await resp.blob()
@@ -237,7 +237,7 @@ function ModalGerarDD({ loja, onFechar }) {
                   <button
                     onClick={async () => {
                       const token = localStorage.getItem('session_token')
-                      const url   = `${import.meta.env.VITE_API_URL}/dd/lotes/${resultado.ficheiro_id}/excel`
+                      const url   = `https://api.condexpress.com/dd/lotes/${resultado.ficheiro_id}/excel`
                       const resp  = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
                       if (resp.ok) {
                         const blob    = await resp.blob()
