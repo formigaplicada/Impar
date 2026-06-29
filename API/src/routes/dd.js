@@ -1073,6 +1073,81 @@ dd.post('/assinar/:token', async (c) => {
   }
 })
 
+dd.get('/lotes/:id/banco-csv', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const id  = parseInt(c.req.param('id'))
+
+  try {
+    const ficheiroRows = await sql`
+      SELECT f.id, f.identificacao FROM ficheiros_dd f WHERE f.id = ${id}
+    `
+    if (ficheiroRows.length === 0) return c.json({ error: 'Ficheiro não encontrado' }, 404)
+    const ficheiro = ficheiroRows[0]
+
+    const cobranças = await sql`
+      SELECT
+        cd.montante,
+        cd.criado_em,
+        m.adc,
+        m.data_assinatura,
+        m.iban      AS iban_devedor,
+        c.nome      AS condominio_nome,
+        -- Tipo: Acerto se reincluído de ficheiro anterior, Serviços se corrente
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM "cobranças_dd" cd_orig
+            WHERE cd_orig.estado = 'reincluido'
+              AND cd_orig.condominio_id = cd.condominio_id
+              AND cd_orig.mandato_id    = cd.mandato_id
+              AND cd_orig.montante      = cd.montante
+          ) THEN 'Acerto'
+          ELSE 'Serviços'
+        END AS tipo
+      FROM "cobranças_dd" cd
+      JOIN mandatos_dd m ON m.id = cd.mandato_id
+      JOIN condominios c ON c.id = cd.condominio_id
+      WHERE cd.ficheiro_id = ${id}
+      ORDER BY cd.id ASC
+    `
+
+    if (cobranças.length === 0) return c.json({ error: 'Sem cobranças neste ficheiro' }, 400)
+
+    // Formatar data_assinatura como DD-MM-YYYY
+    function formatDataPT(val) {
+      if (!val) return ''
+      const d = val instanceof Date ? val : new Date(val)
+      const dd = String(d.getDate()).padStart(2, '0')
+      const mm = String(d.getMonth() + 1).padStart(2, '0')
+      const yyyy = d.getFullYear()
+      return `${dd}-${mm}-${yyyy}`
+    }
+
+    const linhas = cobranças.map((r, i) => {
+      const montante = Math.round(parseFloat(r.montante)) // inteiro, sem decimais
+      const seq      = i + 1
+      const data     = formatDataPT(r.data_assinatura)
+      const nome     = (r.condominio_nome || '').replace(/;/g, ',') // escapar ; no nome
+      const iban     = (r.iban_devedor || '').replace(/\s/g, '')
+
+      return [seq, montante, r.adc, data, 'FALSE', '', nome, '', '', iban, '', r.tipo].join(';')
+    })
+
+    const csv = linhas.join('\n')
+
+    return new Response(csv, {
+      headers: {
+        'Content-Type':        'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${ficheiro.identificacao}_banco.csv"`,
+      },
+    })
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
+  }
+})
+
 // =============================================================================
 // GET /dd/bancos (público)
 // =============================================================================

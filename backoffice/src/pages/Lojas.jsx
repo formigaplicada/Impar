@@ -145,7 +145,7 @@ function ModalGerarDD({ loja, onFechar }) {
       if (res?.ok && res?.ficheiro_id) {
         // Download automático do XML
         const token = localStorage.getItem('session_token')
-        const url   = `https://api.condexpress.com/dd/lotes/${res.ficheiro_id}/pain008`
+        const url   = `${import.meta.env.VITE_API_URL}/dd/lotes/${res.ficheiro_id}/pain008`
         const resp  = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         if (resp.ok) {
           const blob     = await resp.blob()
@@ -233,33 +233,57 @@ function ModalGerarDD({ loja, onFechar }) {
                       <span style={{ color: C.amber }}>⚠️ {resultado.pendentes_reincluidos} cobrança{resultado.pendentes_reincluidos !== 1 ? 's' : ''} reincluída{resultado.pendentes_reincluidos !== 1 ? 's' : ''} de meses anteriores</span>
                     )}
                   </div>
-                  {/* Botão exportar CSV */}
-                  <button
-                    onClick={async () => {
-                      const token = localStorage.getItem('session_token')
-                      const url   = `https://api.condexpress.com/dd/lotes/${resultado.ficheiro_id}/excel`
-                      const resp  = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-                      if (resp.ok) {
-                        const blob    = await resp.blob()
-                        const blobUrl = URL.createObjectURL(blob)
-                        const a       = document.createElement('a')
-                        a.href        = blobUrl
-                        a.download    = `${resultado.identificacao}.csv`
-                        a.click()
-                        URL.revokeObjectURL(blobUrl)
-                      }
-                    }}
-                    style={{
-                      marginTop: '0.75rem',
-                      display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
-                      padding: '0.45rem 1rem',
-                      background: C.white, border: `1.5px solid ${C.green}`,
-                      borderRadius: '0.5rem', fontSize: '0.82rem', fontWeight: 600,
-                      color: C.green, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
-                    }}
-                  >
-                    📥 Exportar resumo CSV
-                  </button>
+                  {/* Botões de exportação */}
+                  <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {/* Resumo CSV (gestão/limpeza) */}
+                    <button
+                      onClick={async () => {
+                        const token = localStorage.getItem('session_token')
+                        const resp  = await fetch(`https://api.condexpress.com/dd/lotes/${resultado.ficheiro_id}/excel`, { headers: { Authorization: `Bearer ${token}` } })
+                        if (resp.ok) {
+                          const blob = await resp.blob()
+                          const a    = document.createElement('a')
+                          a.href     = URL.createObjectURL(blob)
+                          a.download = `${resultado.identificacao}.csv`
+                          a.click()
+                          URL.revokeObjectURL(a.href)
+                        }
+                      }}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                        padding: '0.45rem 1rem',
+                        background: C.white, border: `1.5px solid ${C.green}`,
+                        borderRadius: '0.5rem', fontSize: '0.82rem', fontWeight: 600,
+                        color: C.green, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                      }}
+                    >
+                      📥 Resumo CSV
+                    </button>
+                    {/* CSV para aplicação do banco */}
+                    <button
+                      onClick={async () => {
+                        const token = localStorage.getItem('session_token')
+                        const resp  = await fetch(`https://api.condexpress.com/dd/lotes/${resultado.ficheiro_id}/banco-csv`, { headers: { Authorization: `Bearer ${token}` } })
+                        if (resp.ok) {
+                          const blob = await resp.blob()
+                          const a    = document.createElement('a')
+                          a.href     = URL.createObjectURL(blob)
+                          a.download = `${resultado.identificacao}_banco.csv`
+                          a.click()
+                          URL.revokeObjectURL(a.href)
+                        }
+                      }}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                        padding: '0.45rem 1rem',
+                        background: C.white, border: `1.5px solid ${C.blue}`,
+                        borderRadius: '0.5rem', fontSize: '0.82rem', fontWeight: 600,
+                        color: C.blue, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                      }}
+                    >
+                      🏦 CSV Banco
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>❌ {resultado.error || 'Erro ao gerar ficheiro'}</>
