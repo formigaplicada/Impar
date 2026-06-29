@@ -54,7 +54,7 @@ function gerarPain008(creditor, ficheiro, transacoes) {
         <DrctDbtTx>
           <MndtRltdInf>
             <MndtId>${escapeXml(tx.adc)}</MndtId>
-            <DtOfSgntr>${tx.data_assinatura}</DtOfSgntr>
+            <DtOfSgntr>${tx.data_assinatura instanceof Date ? tx.data_assinatura.toISOString().slice(0, 10) : String(tx.data_assinatura).slice(0, 10)}</DtOfSgntr>
             <AmdmntInd>false</AmdmntInd>
           </MndtRltdInf>
         </DrctDbtTx>
@@ -65,7 +65,7 @@ function gerarPain008(creditor, ficheiro, transacoes) {
         <DbtrAcct><Id><IBAN>${escapeXml(tx.iban_devedor)}</IBAN></Id></DbtrAcct>
       </DrctDbtTxInf>`).join('')
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="urn:iso:std:iso:20022:tech:xsd:pain.008.001.08 pain.008.001.08.xsd">
@@ -75,7 +75,10 @@ function gerarPain008(creditor, ficheiro, transacoes) {
       <CreDtTm>${now}</CreDtTm>
       <NbOfTxs>${totalTxs}</NbOfTxs>
       <CtrlSum>${totalValor}</CtrlSum>
-      <InitgPty><Nm>${escapeXml(creditor.nome)}</Nm></InitgPty>
+      <InitgPty>
+        <Nm>${escapeXml(creditor.nome)}</Nm>
+        <Id><PrvtId><Othr><Id>NOTPROVIDED</Id></Othr></PrvtId></Id>
+      </InitgPty>
     </GrpHdr>
     <PmtInf>
       <PmtInfId>${msgId}</PmtInfId>
@@ -95,7 +98,6 @@ function gerarPain008(creditor, ficheiro, transacoes) {
       <CdtrSchmeId>
         <Id><PrvtId><Othr>
           <Id>${escapeXml(creditor.creditor_identifier)}</Id>
-          <SchmeNm><Prtry>SEPA</Prtry></SchmeNm>
         </Othr></PrvtId></Id>
       </CdtrSchmeId>
       ${drctDbtTxInf}
@@ -901,26 +903,43 @@ dd.get('/dashboard', requireAuth, async (c) => {
 
 dd.post('/mandatos/create', requireAuth, async (c) => {
   const sql  = neon(c.env.DATABASE_URL)
-  const body = await c.req.json()
-  const { condominio_id, nome_devedor, email_devedor, iban, adc } = body
+  const { condominio_id, email_devedor } = await c.req.json()
 
-  if (!condominio_id || !nome_devedor || !email_devedor || !adc) {
-    return c.json({ error: 'Campos obrigatórios: condominio_id, nome_devedor, email_devedor, adc' }, 400)
+  if (!condominio_id || !email_devedor) {
+    return c.json({ error: 'Campos obrigatórios: condominio_id, email_devedor' }, 400)
   }
 
   try {
+    // Buscar dados do condomínio + banco via IBAN
+    const condRows = await sql`
+      SELECT c.nipc, c.nome, c.iban, b.id AS banco_id, b.codigo AS banco_codigo
+      FROM condominios c
+      LEFT JOIN bancos b ON b.codigo = LEFT(c.iban, 8)
+      WHERE c.id = ${condominio_id}
+    `
+    if (condRows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
+    const cond = condRows[0]
+
+    if (!cond.nipc)     return c.json({ error: 'Condomínio sem NIF definido' }, 400)
+    if (!cond.iban)     return c.json({ error: 'Condomínio sem IBAN definido' }, 400)
+    if (!cond.banco_id) return c.json({ error: 'Banco não reconhecido para o IBAN ' + cond.iban }, 400)
+
+    // Gerar ADC: PT50 + 4 dígitos do banco + NIF
+    const codigoBanco = cond.banco_codigo.substring(4, 8) // PT500035 → 0035
+    const adc = `PT50${codigoBanco}${cond.nipc}`
+
     const token     = gerarTokenDD()
     const expiresAt = expiresAtDD(7)
 
     const rows = await sql`
-      INSERT INTO mandatos_dd (condominio_id, adc, iban, data_assinatura, estado, token, token_expires_at, nome_devedor, email_devedor)
-      VALUES (${condominio_id}, ${adc}, ${iban || ''}, CURRENT_DATE, 'pendente', ${token}, ${expiresAt}, ${nome_devedor}, ${email_devedor})
+      INSERT INTO mandatos_dd (condominio_id, adc, iban, banco_id, data_assinatura, estado, token, token_expires_at, nome_devedor, email_devedor)
+      VALUES (${condominio_id}, ${adc}, ${cond.iban}, ${cond.banco_id}, CURRENT_DATE, 'pendente', ${token}, ${expiresAt}, ${cond.nome}, ${email_devedor})
       RETURNING id, token, adc
     `
     const mandato = rows[0]
     const link    = `${c.env.DD_BASE_URL}/dd/assinar?t=${token}`
 
-    await enviarEmailMandato(c.env, { to: email_devedor, nome: nome_devedor, link, adc, expiresAt: new Date(expiresAt) })
+    await enviarEmailMandato(c.env, { to: email_devedor, nome: cond.nome, link, adc, expiresAt: new Date(expiresAt) })
 
     return c.json({ id: mandato.id, token: mandato.token, link, adc: mandato.adc, email: email_devedor })
   } catch (e) {

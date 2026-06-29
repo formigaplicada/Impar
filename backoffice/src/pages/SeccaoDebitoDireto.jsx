@@ -76,34 +76,20 @@ function EstadoBadge({ estado }) {
 // ── Modal: Criar mandato DD ───────────────────────────────────────────────────
 
 function ModalCriarMandato({ condominioId, condominioNome, condominioIban = '', onCriado, onFechar }) {
-  const [form, setForm] = useState({
-    nome_devedor:  condominioNome || '',
-    email_devedor: '',
-    iban:          condominioIban || '',
-  })
+  const [emailDevedor, setEmailDevedor] = useState('')
   const [loading, setLoading] = useState(false)
   const [erro, setErro]       = useState('')
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
   async function handleSubmit() {
-    if (!form.nome_devedor.trim()) return setErro('Introduza o nome do representante.')
-    if (!form.email_devedor.trim() || !form.email_devedor.includes('@'))
+    if (!emailDevedor.trim() || !emailDevedor.includes('@'))
       return setErro('Introduza um email válido.')
 
     setErro('')
     setLoading(true)
     try {
-      // Gerar referência ADC
-      const adc = `IMPAR-${condominioId}-${Date.now()}`
-
       const res = await api.post('/dd/mandatos/create', {
         condominio_id: String(condominioId),
-        iban: condominioIban.replace(/\s/g, '') || '',
-        nome_devedor:  form.nome_devedor.trim(),
-        email_devedor: form.email_devedor.trim(),
-        iban:          form.iban.replace(/\s/g, '') || '',
-        adc,
+        email_devedor: emailDevedor.trim(),
       })
 
       if (res?.error) throw new Error(res.error)
@@ -125,7 +111,7 @@ function ModalCriarMandato({ condominioId, condominioNome, condominioIban = '', 
       }}
     >
       <div style={{
-        background: C.white, borderRadius: '1rem', width: '100%', maxWidth: 520,
+        background: C.white, borderRadius: '1rem', width: '100%', maxWidth: 480,
         maxHeight: '90vh', overflowY: 'auto', padding: '2rem',
         boxShadow: '0 20px 60px rgba(1,22,64,0.25)',
       }}>
@@ -142,43 +128,32 @@ function ModalCriarMandato({ condominioId, condominioNome, condominioIban = '', 
           <button onClick={onFechar} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.4rem', color: C.muted }}>×</button>
         </div>
 
-        {/* Form */}
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={lbl}>Nome do representante *</label>
-          <input
-            style={inp}
-            value={form.nome_devedor}
-            onChange={e => set('nome_devedor', e.target.value)}
-            placeholder="Nome do administrador ou representante legal"
-          />
+        {/* Info do condomínio (read-only) */}
+        <div style={{
+          background: C.bg, border: `1px solid ${C.border}`,
+          borderRadius: '0.5rem', padding: '0.875rem 1rem', marginBottom: '1.25rem',
+        }}>
+          <div style={{ fontSize: '0.72rem', color: C.muted, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Condomínio</div>
+          <div style={{ fontSize: '0.875rem', fontWeight: 700, color: C.navy, marginBottom: '0.25rem' }}>{condominioNome}</div>
+          {condominioIban && (
+            <div style={{ fontSize: '0.78rem', color: C.muted, fontFamily: 'monospace' }}>{condominioIban.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim()}</div>
+          )}
         </div>
 
+        {/* Só email */}
         <div style={{ marginBottom: '1rem' }}>
-          <label style={lbl}>Email *</label>
+          <label style={lbl}>Email para envio do link *</label>
           <input
             style={inp}
             type="email"
-            value={form.email_devedor}
-            onChange={e => set('email_devedor', e.target.value)}
+            value={emailDevedor}
+            onChange={e => setEmailDevedor(e.target.value)}
             placeholder="email@condominio.pt"
+            autoFocus
           />
           <p style={{ margin: '0.3rem 0 0', fontSize: '0.72rem', color: C.subtle }}>
             O link de assinatura será enviado para este endereço
           </p>
-        </div>
-
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={lbl}>IBAN</label>
-          <input
-            style={{ ...inp, fontFamily: "'SF Mono', 'Fira Code', monospace", letterSpacing: '0.5px' }}
-            value={form.iban}
-            onChange={e => {
-              const clean = e.target.value.replace(/\s/g, '').toUpperCase()
-              set('iban', clean.replace(/(.{4})/g, '$1 ').trim())
-            }}
-            placeholder="PT50 0000 0000 0000 0000 0000 0"
-            maxLength={29}
-          />
         </div>
 
         {/* Info box */}
@@ -190,7 +165,7 @@ function ModalCriarMandato({ condominioId, condominioNome, condominioIban = '', 
           <strong>O que acontece a seguir:</strong>
           <ol style={{ margin: '0.5rem 0 0 1rem', padding: 0 }}>
             <li>O cliente recebe um email com link seguro</li>
-            <li>Preenche/confirma o IBAN e assina digitalmente</li>
+            <li>Confirma os dados e assina digitalmente</li>
             <li>O PDF do mandato SEPA é gerado e guardado no SharePoint</li>
             <li>O estado aqui atualiza para <strong>Activo</strong></li>
           </ol>
