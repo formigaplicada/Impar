@@ -223,7 +223,7 @@ function ModalGerarDD({ loja, onFechar }) {
               borderRadius: '0.625rem', fontSize: '0.82rem',
               color: resultado.ok ? C.green : C.red,
             }}>
-              {resultado.ok ? (
+              {resultado?.ok ? (
                 <>
                   <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>✅ Ficheiro gerado e download iniciado</div>
                   <div style={{ color: C.text, fontSize: '0.78rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -233,11 +233,38 @@ function ModalGerarDD({ loja, onFechar }) {
                       <span style={{ color: C.amber }}>⚠️ {resultado.pendentes_reincluidos} cobrança{resultado.pendentes_reincluidos !== 1 ? 's' : ''} reincluída{resultado.pendentes_reincluidos !== 1 ? 's' : ''} de meses anteriores</span>
                     )}
                   </div>
+                  {/* Botão exportar CSV */}
+                  <button
+                    onClick={async () => {
+                      const token = localStorage.getItem('session_token')
+                      const url   = `${import.meta.env.VITE_API_URL}/dd/lotes/${resultado.ficheiro_id}/excel`
+                      const resp  = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+                      if (resp.ok) {
+                        const blob    = await resp.blob()
+                        const blobUrl = URL.createObjectURL(blob)
+                        const a       = document.createElement('a')
+                        a.href        = blobUrl
+                        a.download    = `${resultado.identificacao}.csv`
+                        a.click()
+                        URL.revokeObjectURL(blobUrl)
+                      }
+                    }}
+                    style={{
+                      marginTop: '0.75rem',
+                      display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                      padding: '0.45rem 1rem',
+                      background: C.white, border: `1.5px solid ${C.green}`,
+                      borderRadius: '0.5rem', fontSize: '0.82rem', fontWeight: 600,
+                      color: C.green, cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                    }}
+                  >
+                    📥 Exportar resumo CSV
+                  </button>
                 </>
               ) : (
                 <>❌ {resultado.error || 'Erro ao gerar ficheiro'}</>
               )}
-            </div>
+          </div>
           )}
         </div>
 

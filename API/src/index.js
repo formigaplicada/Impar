@@ -9,17 +9,15 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 const app = new Hono()
 
-app.route('/condominos', condominos)
-app.route('/dd', dd)
-
 app.use('*', cors({
   origin: ['https://app.condexpress.com', 'https://my.condexpress.com'],
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
 }))
 
-app.route('/ai', aiRouter);
-
+app.route('/condominos', condominos)
+app.route('/dd', dd)
+app.route('/ai', aiRouter)
 app.use('/admin/*', requireAuth)
 app.route('/admin', admin)
 
@@ -3813,7 +3811,7 @@ async function syncLojaOneDrive({ token, loja, sql }) {
 app.get('/lojas', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const rows = await sql`
-    SELECT id, codigo, nome, gestor, email, telefone, morada, proximo_n_impar, onedrive_activos_folder_id
+    SELECT id, codigo, nome, gestor, email, telefone, morada, proximo_n_impar, onedrive_activos_folder_id, creditor_id
     FROM lojas
     WHERE ativo = true
     ORDER BY nome ASC

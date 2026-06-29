@@ -425,7 +425,6 @@ function dataLiquidacao(periodo) {
 // =============================================================================
 // POST /dd/lotes — gerar ficheiro PAIN.008 para uma loja + período
 // =============================================================================
-
 dd.post('/lotes', requireAuth, async (c) => {
   const user = c.get('user')
   if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
@@ -445,27 +444,32 @@ dd.post('/lotes', requireAuth, async (c) => {
       WHERE l.id = ${loja_id} AND l.ativo = true
     `
     if (lojaRows.length === 0) return c.json({ error: 'Loja não encontrada ou sem creditor configurado' }, 404)
-    const loja    = lojaRows[0]
+    const loja     = lojaRows[0]
     const creditor = {
-      nome:                 loja.credor_nome,
-      iban:                 loja.iban,
-      bic:                  loja.bic,
-      creditor_identifier:  loja.creditor_identifier,
+      nome:                loja.credor_nome,
+      iban:                loja.iban,
+      bic:                 loja.bic,
+      creditor_identifier: loja.creditor_identifier,
     }
 
-    // Condomínios da loja com contrato DD ativo + mandato ativo
+    // Condomínios da loja com contrato DD ativo + mandato ativo/pendente
+    // DISTINCT ON para evitar duplicados quando há múltiplos contratos DD
     const condominios = await sql`
-      SELECT
+      SELECT DISTINCT ON (c.id)
         c.id, c.nome,
-        m.id        AS mandato_id,
+        m.id           AS mandato_id,
         m.adc,
         m.data_assinatura,
-        m.iban      AS iban_devedor,
+        m.iban         AS iban_devedor,
         b.bic,
         COALESCE(
           (SELECT SUM(cs.valor_mensal)
            FROM contrato_servicos cs
-           WHERE cs.contrato_id = ct.id),
+           JOIN contratos ct2 ON ct2.id = cs.contrato_id
+           WHERE ct2.condominio_id = c.id
+             AND ct2.tipo = 'condominio'
+             AND ct2.payment_method = 'DD'
+             AND ct2.estado = 'ativo'),
           0
         ) AS montante
       FROM condominios c
@@ -476,10 +480,10 @@ dd.post('/lotes', requireAuth, async (c) => {
         AND ct.estado = 'ativo'
       JOIN mandatos_dd m
         ON m.condominio_id = c.id
-        AND m.estado = 'activo'
+        AND m.estado IN ('activo', 'pendente')
       JOIN bancos b ON b.id = m.banco_id
       WHERE c.loja_id = ${loja_id} AND c.ativo = true
-      ORDER BY c.nome
+      ORDER BY c.id, m.id ASC
     `
 
     if (condominios.length === 0) {
@@ -487,9 +491,9 @@ dd.post('/lotes', requireAuth, async (c) => {
     }
 
     // Versão e identificação
-    const versao       = await proximaVersao(sql, loja_id, periodo)
+    const versao        = await proximaVersao(sql, loja_id, periodo)
     const identificacao = buildIdentificacao(loja.nome, periodo, versao)
-    const dataLiq      = dataLiquidacao(periodo)
+    const dataLiq       = dataLiquidacao(periodo)
 
     // Criar ficheiro_dd
     const ficheiroRows = await sql`
@@ -499,72 +503,92 @@ dd.post('/lotes', requireAuth, async (c) => {
     `
     const ficheiroId = ficheiroRows[0].id
 
-    // Montar transações: primeiro as pendentes de meses anteriores, depois as do período atual
+    // Buscar pendentes de meses anteriores
     const pendentesAnteriores = await sql`
       SELECT
-        cd.id, cd.montante, cd.mandato_id,
+        cd.id, cd.montante, cd.mandato_id, cd.condominio_id,
         m.adc, m.data_assinatura, m.iban AS iban_devedor,
         b.bic,
-        c.nome AS condominio_nome,
-        f.identificacao AS periodo_origem
+        c.nome AS condominio_nome
       FROM "cobranças_dd" cd
-      JOIN mandatos_dd m ON m.id = cd.mandato_id
-      JOIN bancos b ON b.id = m.banco_id
-      JOIN condominios c ON c.id = cd.condominio_id
-      JOIN ficheiros_dd f ON f.id = cd.ficheiro_id
-      WHERE cd.estado = 'pendente'
+      JOIN mandatos_dd m  ON m.id  = cd.mandato_id
+      JOIN bancos b       ON b.id  = m.banco_id
+      JOIN condominios c  ON c.id  = cd.condominio_id
+      WHERE cd.estado = 'rejeitado'
         AND c.loja_id = ${loja_id}
         AND cd.ficheiro_id != ${ficheiroId}
       ORDER BY cd.criado_em ASC
     `
 
-    // Inserir cobranças (pendentes anteriores + correntes)
     const todasTxs = []
-    let sequencia = 1
+    let sequencia  = 1
 
-    // Pendentes de meses anteriores
-    for (const p of pendentesAnteriores) {
-      const endToEndId = `${sequencia}`
+    // ── Batch insert pendentes anteriores ────────────────────────────────────
+    if (pendentesAnteriores.length > 0) {
+      const pFicheiroIds    = pendentesAnteriores.map(() => ficheiroId)
+      const pCondominioIds  = pendentesAnteriores.map(p => p.condominio_id)
+      const pMandatoIds     = pendentesAnteriores.map(p => p.mandato_id)
+      const pMontantes      = pendentesAnteriores.map(p => p.montante)
+      const pOriginalIds    = pendentesAnteriores.map(p => p.id)
+
       await sql`
         INSERT INTO "cobranças_dd" (ficheiro_id, condominio_id, mandato_id, montante, estado)
-        SELECT ${ficheiroId}, condominio_id, mandato_id, montante, 'pendente'
-        FROM "cobranças_dd" WHERE id = ${p.id}
+        SELECT
+          unnest(${pFicheiroIds}::int[]),
+          unnest(${pCondominioIds}::text[]),
+          unnest(${pMandatoIds}::int[]),
+          unnest(${pMontantes}::numeric[]),
+          'pendente'
       `
-      // Marcar o original como incluído no novo ficheiro
-      await sql`UPDATE "cobranças_dd" SET estado = 'reincluido' WHERE id = ${p.id}`
 
-      todasTxs.push({
-        end_to_end_id:   endToEndId,
-        montante:        p.montante,
-        adc:             p.adc,
-        data_assinatura: p.data_assinatura,
-        iban_devedor:    p.iban_devedor,
-        bic:             p.bic,
-        condominio_nome: p.condominio_nome,
-      })
-      sequencia++
+      await sql`
+        UPDATE "cobranças_dd" SET estado = 'reincluido'
+        WHERE id = ANY(${pOriginalIds}::int[])
+      `
+
+      for (const p of pendentesAnteriores) {
+        todasTxs.push({
+          end_to_end_id:   `${sequencia++}`,
+          montante:        p.montante,
+          adc:             p.adc,
+          data_assinatura: p.data_assinatura,
+          iban_devedor:    p.iban_devedor,
+          bic:             p.bic,
+          condominio_nome: p.condominio_nome,
+        })
+      }
     }
 
-    // Cobranças do período atual
-    for (const cond of condominios) {
-      const montante = parseFloat(cond.montante)
-      if (montante <= 0) continue
+    // ── Batch insert cobranças do período atual ───────────────────────────────
+    const correntes = condominios.filter(c => parseFloat(c.montante) > 0)
 
-      const endToEndId = `${sequencia}`
+    if (correntes.length > 0) {
+      const cFicheiroIds   = correntes.map(() => ficheiroId)
+      const cCondominioIds = correntes.map(c => c.id)
+      const cMandatoIds    = correntes.map(c => c.mandato_id)
+      const cMontantes     = correntes.map(c => parseFloat(c.montante))
+
       await sql`
         INSERT INTO "cobranças_dd" (ficheiro_id, condominio_id, mandato_id, montante, estado)
-        VALUES (${ficheiroId}, ${cond.id}, ${cond.mandato_id}, ${montante}, 'pendente')
+        SELECT
+          unnest(${cFicheiroIds}::int[]),
+          unnest(${cCondominioIds}::text[]),
+          unnest(${cMandatoIds}::int[]),
+          unnest(${cMontantes}::numeric[]),
+          'pendente'
       `
-      todasTxs.push({
-        end_to_end_id:   endToEndId,
-        montante,
-        adc:             cond.adc,
-        data_assinatura: cond.data_assinatura,
-        iban_devedor:    cond.iban_devedor,
-        bic:             cond.bic,
-        condominio_nome: cond.nome,
-      })
-      sequencia++
+
+      for (const cond of correntes) {
+        todasTxs.push({
+          end_to_end_id:   `${sequencia++}`,
+          montante:        parseFloat(cond.montante),
+          adc:             cond.adc,
+          data_assinatura: cond.data_assinatura,
+          iban_devedor:    cond.iban_devedor,
+          bic:             cond.bic,
+          condominio_nome: cond.nome,
+        })
+      }
     }
 
     if (todasTxs.length === 0) {
@@ -574,26 +598,27 @@ dd.post('/lotes', requireAuth, async (c) => {
 
     // Totais + XML
     const montanteTotal = todasTxs.reduce((s, t) => s + parseFloat(t.montante), 0)
-    const ficheiro = { identificacao, data_liquidacao: dataLiq }
-    const xmlContent = gerarPain008(creditor, ficheiro, todasTxs)
+    const ficheiro      = { identificacao, data_liquidacao: dataLiq }
+    const xmlContent    = gerarPain008(creditor, ficheiro, todasTxs)
 
     await sql`
       UPDATE ficheiros_dd
-      SET n_registos = ${todasTxs.length},
+      SET n_registos    = ${todasTxs.length},
           montante_total = ${montanteTotal.toFixed(2)},
-          pain008_xml = ${xmlContent}
+          pain008_xml   = ${xmlContent}
       WHERE id = ${ficheiroId}
     `
 
     return c.json({
-      ok:              true,
-      ficheiro_id:     ficheiroId,
+      ok:                    true,
+      ficheiro_id:           ficheiroId,
       identificacao,
-      data_liquidacao: dataLiq,
-      n_registos:      todasTxs.length,
-      montante_total:  montanteTotal.toFixed(2),
+      data_liquidacao:       dataLiq,
+      n_registos:            todasTxs.length,
+      montante_total:        montanteTotal.toFixed(2),
       pendentes_reincluidos: pendentesAnteriores.length,
     }, 201)
+
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
@@ -1036,6 +1061,146 @@ dd.get('/bancos', async (c) => {
   try {
     const rows = await sql`SELECT id, nome, bic FROM bancos ORDER BY nome`
     return c.json(rows)
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
+  }
+})
+
+dd.get('/lotes/:id/excel', requireAuth, async (c) => {
+  const user = c.get('user')
+  if (user.role !== 'admin') return c.json({ error: 'Acesso negado' }, 403)
+
+  const sql = neon(c.env.DATABASE_URL)
+  const id  = parseInt(c.req.param('id'))
+
+  const SERVICO_GESTAO  = '9b27bffe-e572-4b9c-8af3-af4c6eec9c84'
+  const SERVICO_LIMPEZA = '9bba3a34-f82f-4b57-bf07-b3d0f4ad809a'
+
+  try {
+    const ficheiroRows = await sql`
+      SELECT f.id, f.identificacao, f.loja_id, l.nome AS loja_nome
+      FROM ficheiros_dd f
+      JOIN lojas l ON l.id = f.loja_id
+      WHERE f.id = ${id}
+    `
+    if (ficheiroRows.length === 0) return c.json({ error: 'Ficheiro não encontrado' }, 404)
+    const ficheiro = ficheiroRows[0]
+
+    // Cobranças do ficheiro com toda a info necessária
+    const cobranças = await sql`
+      SELECT
+        cd.id,
+        cd.montante,
+        cd.condominio_id,
+        cd.mandato_id,
+        c.nome        AS condominio_nome,
+        c.n_impar,
+        m.adc,
+        m.iban        AS iban_devedor,
+        -- Período: do ficheiro original se for reincluído, senão do ficheiro atual
+        CASE
+          WHEN cd.estado = 'reincluido' THEN NULL
+          ELSE f_orig.identificacao
+        END AS periodo_origem,
+        -- Tipo
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM "cobranças_dd" cd_orig
+            WHERE cd_orig.estado = 'reincluido'
+              AND cd_orig.ficheiro_id != ${id}
+          ) THEN 'Acerto'
+          ELSE 'Corrente'
+        END AS tipo,
+        -- Valor gestão
+        COALESCE((
+          SELECT SUM(cs.valor_mensal)
+          FROM contrato_servicos cs
+          JOIN contratos ct ON ct.id = cs.contrato_id
+          WHERE ct.condominio_id = cd.condominio_id
+            AND ct.tipo = 'condominio'
+            AND ct.estado = 'ativo'
+            AND cs.servico_id = ${SERVICO_GESTAO}
+        ), 0) AS valor_gestao,
+        -- Valor limpeza
+        COALESCE((
+          SELECT SUM(cs.valor_mensal)
+          FROM contrato_servicos cs
+          JOIN contratos ct ON ct.id = cs.contrato_id
+          WHERE ct.condominio_id = cd.condominio_id
+            AND ct.tipo = 'condominio'
+            AND ct.estado = 'ativo'
+            AND cs.servico_id = ${SERVICO_LIMPEZA}
+        ), 0) AS valor_limpeza,
+        f_orig.identificacao AS ficheiro_origem_identificacao
+      FROM "cobranças_dd" cd
+      JOIN condominios c   ON c.id  = cd.condominio_id
+      JOIN mandatos_dd m   ON m.id  = cd.mandato_id
+      -- Ficheiro de origem (para pendentes reincluídos)
+      LEFT JOIN "cobranças_dd" cd_orig
+        ON cd_orig.estado = 'reincluido'
+        AND cd_orig.condominio_id = cd.condominio_id
+        AND cd_orig.mandato_id = cd.mandato_id
+        AND cd_orig.montante = cd.montante
+      LEFT JOIN ficheiros_dd f_orig ON f_orig.id = cd_orig.ficheiro_id
+      WHERE cd.ficheiro_id = ${id}
+      ORDER BY c.nome ASC
+    `
+
+    if (cobranças.length === 0) return c.json({ error: 'Sem cobranças neste ficheiro' }, 400)
+
+    // Determinar período corrente a partir da identificação do ficheiro
+    // ex: "Barreiro 1 06 2026 v1" -> "2026-06"
+    const matchPeriodo = ficheiro.identificacao.match(/(\d{2})\s+(\d{4})/)
+    const periodoCorrente = matchPeriodo
+      ? `${matchPeriodo[2]}-${matchPeriodo[1]}`
+      : ficheiro.identificacao
+
+    // Construir CSV
+    const BOM = '\uFEFF'
+    const sep = ';'
+
+    const cabecalho = [
+      'Loja', 'N.º Ímpar', 'Nome', 'IBAN', 'ADC',
+      'Período', 'Tipo', 'Gestão', 'Limpeza', 'Total'
+    ].join(sep)
+
+    const linhas = cobranças.map(r => {
+      // Período: se vier do ficheiro de origem usa esse, senão usa o corrente
+      const periodo = r.ficheiro_origem_identificacao
+        ? (() => {
+            const m = r.ficheiro_origem_identificacao.match(/(\d{2})\s+(\d{4})/)
+            return m ? `${m[2]}-${m[1]}` : r.ficheiro_origem_identificacao
+          })()
+        : periodoCorrente
+
+      const tipo      = r.ficheiro_origem_identificacao ? 'Acerto' : 'Corrente'
+      const gestao    = Number(r.valor_gestao).toFixed(2).replace('.', ',')
+      const limpeza   = Number(r.valor_limpeza).toFixed(2).replace('.', ',')
+      const total     = Number(r.montante).toFixed(2).replace('.', ',')
+
+      return [
+        ficheiro.loja_nome,
+        r.n_impar ?? '',
+        `"${(r.condominio_nome || '').replace(/"/g, '""')}"`,
+        r.iban_devedor ?? '',
+        r.adc ?? '',
+        periodo,
+        tipo,
+        gestao,
+        limpeza,
+        total,
+      ].join(sep)
+    })
+
+    const csv = BOM + [cabecalho, ...linhas].join('\r\n')
+
+    return new Response(csv, {
+      headers: {
+        'Content-Type':        'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${ficheiro.identificacao}.csv"`,
+      },
+    })
+
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500)
   }
