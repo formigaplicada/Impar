@@ -911,12 +911,13 @@ dd.post('/mandatos/create', requireAuth, async (c) => {
 
   try {
     // Buscar dados do condomínio + banco via IBAN
-    const condRows = await sql`
-      SELECT c.nipc, c.nome, c.iban, b.id AS banco_id, b.codigo AS banco_codigo
-      FROM condominios c
-      LEFT JOIN bancos b ON b.codigo = LEFT(c.iban, 8)
-      WHERE c.id = ${condominio_id}
-    `
+        const condRows = await sql`
+          SELECT c.nipc, c.nome, c.iban, b.id AS banco_id, b.codigo AS banco_codigo
+          FROM condominios c
+          LEFT JOIN bancos b ON b.codigo = LEFT(REPLACE(c.iban, ' ', ''), 8)
+          WHERE c.id = ${condominio_id}
+        `
+    
     if (condRows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
     const cond = condRows[0]
 
@@ -961,7 +962,7 @@ dd.get('/assinar/:token', async (c) => {
         m.id, m.adc, m.iban, m.estado, m.nome_devedor, m.email_devedor, m.token_expires_at, m.signed_at,
         cond.nome AS condominio_nome, cond.morada AS condominio_morada,
         cond.codigo_postal AS condominio_cp, cond.cidade AS condominio_cidade,
-        b.nome AS banco_nome, b.bic AS banco_bic,
+        b.id AS banco_id, b.nome AS banco_nome, b.bic AS banco_bic,
         cr.nome AS credor_nome, cr.creditor_identifier AS credor_id,
         cr.morada AS credor_morada, cr.codigo_postal AS credor_cp, cr.cidade AS credor_cidade
       FROM mandatos_dd m
@@ -980,6 +981,7 @@ dd.get('/assinar/:token', async (c) => {
       adc:         m.adc,
       iban:        m.iban ? formatIBANDD(m.iban) : '',
       bic:         m.banco_bic || '',
+      banco_id:    m.banco_id || null,
       nome_devedor: m.nome_devedor,
       condominio:  { nome: m.condominio_nome, morada: m.condominio_morada, cod_postal: m.condominio_cp, cidade: m.condominio_cidade },
       credor:      { nome: m.credor_nome || 'Rede Impar, Lda', identifier: m.credor_id || 'PT18ZZZ114843', morada: m.credor_morada || '', cod_postal: m.credor_cp || '', cidade: m.credor_cidade || '' },

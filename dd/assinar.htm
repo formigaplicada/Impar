@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -213,14 +214,15 @@
             <div class="field">
               <label>BIC SWIFT / SWIFT BIC</label>
               <div class="field-value mono" id="display-bic">—</div>
-              <div class="field-hint">Preenchido automaticamente ao selecionar o banco</div>
             </div>
             <div class="field">
-              <label>Banco / Bank *</label>
-              <select id="input-banco">
-                <option value="">Selecione o banco…</option>
-              </select>
-              <div class="field-error" id="error-banco">Por favor selecione o banco.</div>
+              <div id="campo-banco">
+                <label>Banco / Bank *</label>
+                <select id="input-banco">
+                  <option value="">Selecione o banco…</option>
+                </select>
+                <div class="field-error" id="error-banco">Por favor selecione o banco.</div>
+              </div>
             </div>
           </div>
         </div>
@@ -416,6 +418,15 @@ async function init() {
     document.getElementById('display-cidade').textContent     = data.condominio?.cidade || '—'
     document.getElementById('display-iban').textContent       = data.iban || '—'
     document.getElementById('display-bic').textContent        = data.bic || '—'
+
+    // Se banco já vem da API, pré-selecionar e esconder o selector
+    if (data.bic && data.banco_id) {
+      const bancoSel = document.getElementById('input-banco')
+      bancoSel.value = data.banco_id
+      // Esconder o campo banco e mostrar só o BIC estático
+      document.getElementById('campo-banco').style.display = 'none'
+    }
+
     document.getElementById('display-credor-nome').textContent   = data.credor?.nome || '—'
     document.getElementById('display-credor-id').textContent     = data.credor?.identifier || '—'
     document.getElementById('display-credor-morada').textContent = data.credor?.morada || '—'
@@ -511,7 +522,7 @@ document.getElementById('dd-form').addEventListener('submit', async function(e) 
   const confirmed = document.getElementById('confirm-check').checked
   let valid = true
 
-  if (!bancoSel.value) {
+  if (!bancoSel.value && document.getElementById('campo-banco').style.display !== 'none') {
     bancoSel.classList.add('error')
     document.getElementById('error-banco').style.display = 'block'
     valid = false
