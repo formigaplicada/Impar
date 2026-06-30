@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check-in Limpeza - CondExpress</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --blue-600: #2563eb; --blue-700: #1d4ed8; --blue-100: #dbeafe;
+      --green-600: #16a34a; --green-700: #15803d; --green-100: #dcfce7;
+      --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
+      --slate-600: #475569; --slate-800: #1e293b; --slate-900: #0f172a;
+      --red-600: #dc2626;
+    }
+    html, body { height: 100%; width: 100%; }
+    body { font-family: 'DM Sans', -apple-system, sans-serif; background: linear-gradient(to bottom right, var(--slate-50), var(--slate-100)); color: var(--slate-900); font-size: 16px; line-height: 1.5; }
+    .container { display: flex; flex-direction: column; min-height: 100vh; }
+    header { background: #64748b; padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; }
+    .logo-img { height: 32px; object-fit: contain; }
+    .logo-fallback { font-size: 1rem; font-weight: 700; color: white; }
+    .version-badge { background: rgba(255,255,255,0.2); color: white; padding: 2px 7px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; }
+    main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 1.5rem; }
+    .card-wrapper { width: 100%; max-width: 28rem; }
+    .card { background-color: white; border-radius: 1rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; animation: fadeIn 0.3s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .card-header { text-align: center; display: flex; flex-direction: column; gap: 0.5rem; }
+    .card-icon { width: 3rem; height: 3rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 1.5rem; }
+    .card-icon.blue { background-color: var(--blue-100); }
+    .card-icon.green { background-color: var(--green-100); }
+    .card-title { font-size: 1.5rem; font-weight: 700; color: var(--slate-900); }
+    .card-subtitle { font-size: 0.875rem; color: var(--slate-600); }
+    .error-message { color: var(--red-600); font-size: 0.875rem; margin-top: 0.5rem; font-weight: 500; text-align: center; }
+    button { padding: 0.75rem 1rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 0.5rem; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif; width: 100%; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-success { background-color: var(--green-600); color: white; }
+    .btn-success:hover:not(:disabled) { background-color: var(--green-700); }
+    .btn-primary { background-color: var(--blue-600); color: white; }
+    .btn-primary:hover:not(:disabled) { background-color: var(--blue-700); }
+    .button-group { display: flex; flex-direction: column; gap: 0.75rem; }
+    footer { background-color: white; border-top: 1px solid var(--slate-200); padding: 1rem 1.5rem; text-align: center; font-size: 0.75rem; color: var(--slate-500); }
+    .lista-condominios { display: flex; flex-direction: column; gap: 0.5rem; }
+    .item-condominio { background: var(--slate-50); border: 2px solid var(--slate-200); border-radius: 0.5rem; padding: 0.875rem 1rem; cursor: pointer; text-align: left; transition: all 0.15s; }
+    .item-condominio:hover { border-color: var(--blue-600); background: var(--blue-100); }
+    .item-nome { font-weight: 600; color: var(--slate-900); font-size: 0.9rem; }
+    .item-distancia { font-size: 0.78rem; color: var(--slate-500); margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <img src="https://www.impar.pt/wp-content/uploads/2025/01/logo-impar-2048x807.png" alt="Ímpar" class="logo-img" id="logo" onerror="this.style.display='none';document.getElementById('logoFallback').classList.remove('hidden')"/>
+        <span class="logo-fallback hidden" id="logoFallback">ÍMPAR</span>
+      </div>
+      <span class="version-badge">v1.0</span>
+    </header>
+    <main>
+      <div class="card-wrapper" id="app">
+        <div class="card"><div class="card-header"><div class="card-icon blue">⏳</div><h1 class="card-title">A carregar...</h1></div></div>
+      </div>
+    </main>
+    <footer><p>Check-in Limpeza © 2026 · CondExpress</p></footer>
+  </div>
+
+  <script>
+    const WORKER_URL = 'https://impar-api.formigaplicada.workers.dev';
+    const params     = new URLSearchParams(window.location.search);
+    const raioParam  = params.get('raio'); // opcional, default fica a cargo da API
+
+    let state = { step: 'init', loading: false, errorMsg: '', condominios: [] };
+
+    function render() {
+      const app = document.getElementById('app');
+
+      if (state.step === 'init') {
+        app.innerHTML =
+          '<div class="card"><div class="card-header"><div class="card-icon green">📍</div>' +
+          '<h1 class="card-title">Localização</h1>' +
+          '<p class="card-subtitle">Permite o acesso ao GPS para identificar o condomínio</p></div>' +
+          '<button onclick="iniciarDeteccao()" class="btn-success"' + (state.loading ? ' disabled' : '') + '>' +
+          (state.loading ? '⏳ A obter localização...' : '📍 Identificar Condomínio') + '</button>' +
+          (state.errorMsg ? '<p class="error-message">❌ ' + state.errorMsg + '</p>' : '') +
+          '</div>';
+      }
+
+      else if (state.step === 'escolha') {
+        const itens = state.condominios.map(c =>
+          '<button class="item-condominio" onclick="escolherCondominio(\'' + c.nipc + '\')">' +
+          '<div class="item-nome">' + c.nome + '</div>' +
+          '<div class="item-distancia">' + c.distancia_m + 'm de distância</div>' +
+          '</button>'
+        ).join('');
+        app.innerHTML =
+          '<div class="card"><div class="card-header"><div class="card-icon blue">🏢</div>' +
+          '<h1 class="card-title">Vários condomínios</h1>' +
+          '<p class="card-subtitle">Seleciona o condomínio correto</p></div>' +
+          '<div class="lista-condominios">' + itens + '</div></div>';
+      }
+
+      else if (state.step === 'erro') {
+        app.innerHTML =
+          '<div class="card"><div class="card-header"><div style="font-size:2rem;">⚠️</div>' +
+          '<h1 class="card-title">Não encontrado</h1>' +
+          '<p class="card-subtitle">' + state.errorMsg + '</p></div>' +
+          '<div class="button-group"><button onclick="iniciarDeteccao()" class="btn-primary">Tentar Novamente</button></div></div>';
+      }
+    }
+
+    function iniciarDeteccao() {
+      state.step = 'init'; state.loading = true; state.errorMsg = ''; render();
+
+      if (!navigator.geolocation) {
+        state.loading = false; state.step = 'erro';
+        state.errorMsg = 'O teu dispositivo não suporta geolocalização.'; render(); return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          await procurarCondominios(lat, lng);
+        },
+        () => {
+          state.loading = false; state.step = 'erro';
+          state.errorMsg = 'Ative o GPS e permite o acesso à localização.'; render();
+        },
+        { enableHighAccuracy: true, timeout: 15000 }
+      );
+    }
+
+    async function procurarCondominios(lat, lng) {
+      try {
+        let url = WORKER_URL + '/public/condominios/proximos?lat=' + lat + '&lng=' + lng;
+        if (raioParam) url += '&raio=' + encodeURIComponent(raioParam);
+
+        const res  = await fetch(url);
+        const data = await res.json();
+
+        if (!res.ok) {
+          state.loading = false; state.step = 'erro';
+          state.errorMsg = data.error || 'Erro ao procurar condomínios.'; render(); return;
+        }
+
+        state.loading = false;
+
+        if (data.total === 0) {
+          state.step = 'erro';
+          state.errorMsg = 'Nenhum condomínio encontrado perto de ti.'; render();
+        } else if (data.total === 1) {
+          irParaLimpeza(data.condominios[0].nipc);
+        } else {
+          state.condominios = data.condominios;
+          state.step = 'escolha'; render();
+        }
+      } catch (e) {
+        state.loading = false; state.step = 'erro';
+        state.errorMsg = 'Erro de ligação. Tenta novamente.'; render();
+      }
+    }
+
+    function escolherCondominio(nipc) { irParaLimpeza(nipc); }
+
+    function irParaLimpeza(nipc) {
+      window.location.href = 'limpeza.html?condominio=' + encodeURIComponent(nipc);
+    }
+
+    render();
+  </script>
+</body>
+</html>
