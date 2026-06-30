@@ -789,6 +789,36 @@ app.get('/me', requireAuth, async (c) => {
   return c.json({ user: { ...user, impersonator_nome: impersonator } })
 })
 
+app.put('/me', requireAuth, async (c) => {
+  const user = c.get('user')
+  const sql = neon(c.env.DATABASE_URL)
+
+  try {
+    const body = await c.req.json()
+    const nome = (body.nome || '').trim()
+    const telemovel = (body.telemovel || '').trim()
+    const pin = (body.pin || '').trim()
+
+    if (!nome) return c.json({ error: 'Nome é obrigatório.' }, 400)
+    if (pin && !/^\d{4}$/.test(pin)) return c.json({ error: 'PIN deve ter 4 dígitos.' }, 400)
+
+    const rows = await sql`
+      UPDATE utilizadores
+      SET nome = ${nome},
+          telemovel = ${telemovel || null},
+          pin = ${pin || null}
+      WHERE id = ${user.id}
+      RETURNING id, nome, email, role, telemovel, pin, ativo
+    `
+
+    if (rows.length === 0) return c.json({ error: 'Utilizador não encontrado.' }, 404)
+
+    return c.json({ user: rows[0] })
+  } catch (err) {
+    return c.json({ error: 'Erro ao atualizar perfil', detail: err.message }, 500)
+  }
+})
+
 
 app.get('/condominios', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)

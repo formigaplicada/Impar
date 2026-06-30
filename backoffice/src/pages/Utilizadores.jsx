@@ -428,6 +428,181 @@ function ModalConfirmar({ utilizador, onConfirmar, onFechar }) {
   )
 }
 
+// ── O meu perfil (não-admin) ──────────────────────────────────────────────────
+
+function MeuPerfil() {
+  const [dados,   setDados]   = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [form,    setForm]    = useState({ nome: '', telemovel: '', pin: '' })
+  const [saving,  setSaving]  = useState(false)
+  const [erro,    setErro]    = useState(null)
+  const [sucesso, setSucesso] = useState(false)
+
+  useEffect(() => {
+    async function carregar() {
+      setLoading(true)
+      const res = await api.get('/me')
+      const u = res?.user || null
+      setDados(u)
+      if (u) {
+        setForm({ nome: u.nome || '', telemovel: u.telemovel || '', pin: u.pin || '' })
+      }
+      setLoading(false)
+    }
+    carregar()
+  }, [])
+
+  async function handleGuardar() {
+    setErro(null)
+    setSucesso(false)
+    if (!form.nome.trim()) return setErro('Nome é obrigatório.')
+    if (form.pin && !/^\d{4}$/.test(form.pin)) return setErro('PIN deve ter 4 dígitos.')
+
+    setSaving(true)
+    try {
+      const res = await api.put('/me', form)
+      if (res.error) { setErro(res.error); setSaving(false); return }
+      setDados(res.user)
+      setSucesso(true)
+    } catch (e) {
+      setErro(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inp = {
+    width: '100%', padding: '0.5rem 0.75rem',
+    border: `1.5px solid ${C.border}`, borderRadius: '0.5rem',
+    fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif',
+    color: C.text, background: C.white, boxSizing: 'border-box',
+    outline: 'none',
+  }
+
+  const label = {
+    display: 'block', fontSize: '0.75rem', fontWeight: 600,
+    color: C.muted, marginBottom: '0.35rem', letterSpacing: '0.02em',
+  }
+
+  if (loading) {
+    return (
+      <div style={{ padding: '4rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>
+        <span style={{ display: 'block', fontSize: '1.5rem', marginBottom: '0.5rem' }}>⏳</span>
+        A carregar perfil…
+      </div>
+    )
+  }
+
+  if (!dados) {
+    return (
+      <div style={{ padding: '4rem', textAlign: 'center', color: C.subtle, fontSize: '0.875rem' }}>
+        Não foi possível carregar o perfil.
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: '1.25rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: C.text, fontFamily: 'DM Sans, sans-serif' }}>
+          O meu perfil
+        </h2>
+        <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: C.subtle }}>
+          Consulta e edita a tua informação pessoal.
+        </p>
+      </div>
+
+      <div style={{
+        background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: '0.875rem', padding: '1.5rem',
+        maxWidth: 480,
+        boxShadow: '0 1px 3px rgba(1,22,64,0.05)',
+      }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+          {/* Nome */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={label}>Nome</label>
+            <input
+              style={inp}
+              value={form.nome}
+              onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
+              placeholder="Nome completo"
+            />
+          </div>
+
+          {/* Email (não editável) */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={label}>Email</label>
+            <input style={{ ...inp, background: C.bg }} value={dados.email} readOnly />
+          </div>
+
+          {/* Role (não editável) */}
+          <div>
+            <label style={label}>Role</label>
+            <div style={{ ...inp, background: C.bg, display: 'flex', alignItems: 'center' }}>
+              <RoleBadge role={dados.role} />
+            </div>
+          </div>
+
+          {/* Telemóvel */}
+          <div>
+            <label style={label}>Telemóvel</label>
+            <input
+              style={inp}
+              value={form.telemovel}
+              onChange={e => setForm(f => ({ ...f, telemovel: e.target.value }))}
+              placeholder="9XXXXXXXX"
+            />
+          </div>
+
+          {/* PIN */}
+          <div>
+            <label style={label}>PIN</label>
+            <input
+              style={inp}
+              value={form.pin}
+              onChange={e => setForm(f => ({ ...f, pin: e.target.value }))}
+              placeholder="4 dígitos"
+              maxLength={4}
+            />
+          </div>
+        </div>
+
+        {/* Erro */}
+        {erro && (
+          <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: C.redL, border: `1px solid #fca5a5`, borderRadius: '0.5rem', fontSize: '0.82rem', color: C.red }}>
+            {erro}
+          </div>
+        )}
+
+        {/* Sucesso */}
+        {sucesso && !erro && (
+          <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: C.greenL, border: `1px solid #bbf7d0`, borderRadius: '0.5rem', fontSize: '0.82rem', color: C.green }}>
+            Perfil atualizado com sucesso.
+          </div>
+        )}
+
+        <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={handleGuardar}
+            disabled={saving}
+            style={{
+              padding: '0.5rem 1.5rem', borderRadius: '0.5rem',
+              border: 'none', background: saving ? C.border : C.navy,
+              color: saving ? C.muted : C.white,
+              fontSize: '0.875rem', fontWeight: 600,
+              cursor: saving ? 'default' : 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >{saving ? 'A guardar…' : 'Guardar'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 
 export default function Utilizadores({ currentUser }) {
@@ -453,7 +628,7 @@ export default function Utilizadores({ currentUser }) {
     setLoading(false)
   }
 
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { if (isAdmin) carregar() }, [isAdmin])
 
   async function handleDesativar() {
     const res = await api.delete(`/admin/users/${modalConfirmar.id}`)
@@ -485,6 +660,10 @@ export default function Utilizadores({ currentUser }) {
   const tdSt = {
     padding: '0.75rem 1rem', fontSize: '0.82rem', color: C.text,
     borderBottom: `1px solid ${C.borderL}`, verticalAlign: 'middle',
+  }
+
+  if (!isAdmin) {
+    return <MeuPerfil />
   }
 
   return (
