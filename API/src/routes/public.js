@@ -144,6 +144,57 @@ pub.get('/validar-pin', async (c) => {
   }
 })
 
+
+// ── Condomínios próximos (geolocalização) ───────────────────────
+
+app.get('/condominios/proximos', async (c) => {
+  try {
+    const sql  = neon(c.env.DATABASE_URL)
+    const lat  = parseFloat(c.req.query('lat'))
+    const lng  = parseFloat(c.req.query('lng'))
+    const raio = parseFloat(c.req.query('raio')) || 120 // metros, default 120
+
+    if (isNaN(lat) || isNaN(lng)) {
+      return c.json({ error: 'Parâmetros lat e lng são obrigatórios e devem ser numéricos.' }, 400)
+    }
+
+    const rows = await sql`
+      SELECT nipc, n_impar, nome, distancia_m FROM (
+        SELECT
+          nipc, n_impar, nome,
+          6371000 * acos(
+            LEAST(1, GREATEST(-1,
+              cos(radians(${lat})) * cos(radians(latitude::float)) *
+              cos(radians(longitude::float) - radians(${lng})) +
+              sin(radians(${lat})) * sin(radians(latitude::float))
+            ))
+          ) AS distancia_m
+        FROM condominios
+        WHERE ativo = true
+          AND latitude IS NOT NULL
+          AND longitude IS NOT NULL
+      ) sub
+      WHERE distancia_m <= ${raio}
+      ORDER BY distancia_m ASC
+    `
+
+    return c.json({
+      raio_usado: raio,
+      total: rows.length,
+      condominios: rows.map(r => ({
+        nipc: r.nipc,
+        n_impar: r.n_impar,
+        nome: r.nome,
+        distancia_m: Math.round(r.distancia_m)
+      }))
+    })
+
+  } catch (err) {
+    return c.json({ error: 'Erro ao procurar condomínios próximos: ' + err.message }, 500)
+  }
+})
+
+
 // ── POST /public/limpezas ─────────────────────────────────────────────────────
 
 pub.post('/limpezas', async (c) => {
