@@ -147,7 +147,7 @@ pub.get('/validar-pin', async (c) => {
 
 // ── Condomínios próximos (geolocalização) ───────────────────────
 
-app.get('/condominios/proximos', async (c) => {
+pub.get('/condominios/proximos', async (c) => {
   try {
     const sql  = neon(c.env.DATABASE_URL)
     const lat  = parseFloat(c.req.query('lat'))
