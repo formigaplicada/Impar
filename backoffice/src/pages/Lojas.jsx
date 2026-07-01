@@ -20,6 +20,8 @@ const C = {
   amberL:  '#fffbeb',
   red:     '#dc2626',
   redL:    '#fef2f2',
+  purple:  '#7c3aed',
+  purpleL: '#f5f3ff',
 }
 
 
@@ -28,7 +30,7 @@ const C = {
 function ResultadoSync({ res, onFechar }) {
   if (!res) return null
 
-  const { criados = 0, ligados = 0, inativados = 0, ignorados = 0, detalhes = [], reason, error } = res
+  const { criados = 0, ligados = 0, inativados = 0, reativados = 0, ignorados = 0, detalhes = [], reason, error } = res
 
   if (!res.ok) {
     const msgs = {
@@ -47,10 +49,11 @@ function ResultadoSync({ res, onFechar }) {
   return (
     <div style={{ marginTop: '1rem' }}>
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: temDetalhes.length > 0 ? '0.875rem' : 0 }}>
-        <Chip cor="green"  valor={criados}         label="criado"    />
-        <Chip cor="blue"   valor={ligados}          label="ligado"    />
-        <Chip cor="amber"  valor={inativados ?? 0}  label="inativado" />
-        <Chip cor="subtle" valor={ignorados}        label="ignorado"  />
+        <Chip cor="green"  valor={criados}          label="criado"    />
+        <Chip cor="blue"   valor={ligados}           label="ligado"    />
+        <Chip cor="purple" valor={reativados ?? 0}   label="reativado" />
+        <Chip cor="amber"  valor={inativados ?? 0}   label="inativado" />
+        <Chip cor="subtle" valor={ignorados}         label="ignorado"  />
       </div>
 
       {temDetalhes.length > 0 && (
@@ -80,7 +83,7 @@ function ResultadoSync({ res, onFechar }) {
         </div>
       )}
 
-      {criados === 0 && ligados === 0 && (
+      {criados === 0 && ligados === 0 && reativados === 0 && (
         <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: C.subtle }}>Nenhuma alteração — tudo já estava sincronizado.</p>
       )}
     </div>
@@ -93,6 +96,7 @@ function Chip({ cor, valor, label }) {
     blue:   { bg: C.blueL,  color: C.blue,   border: '#bfdbfe' },
     subtle: { bg: '#f8fafc', color: C.subtle, border: C.border  },
     amber:  { bg: C.amberL, color: C.amber,  border: '#fde68a' },
+    purple: { bg: C.purpleL, color: C.purple, border: '#ddd6fe' },
   }
   const s = cores[cor] || cores.subtle
   return (
@@ -107,6 +111,7 @@ function ResultadoBadge({ resultado, motivo }) {
   const map = {
     criado:    { bg: C.greenL,  color: C.green,  label: '✨ Criado'    },
     ligado:    { bg: C.blueL,   color: C.blue,   label: '🔗 Ligado'    },
+    reativado: { bg: C.purpleL, color: C.purple, label: '♻️ Reativado' },
     erro:      { bg: C.redL,    color: C.red,     label: '❌ Erro'      },
     ignorado:  { bg: '#f8fafc', color: C.subtle,  label: '— Ignorado'  },
     inativado: { bg: C.amberL,  color: C.amber,  label: '🚫 Inativado' },

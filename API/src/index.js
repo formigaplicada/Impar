@@ -3689,8 +3689,6 @@ app.post('/condominios/:id/documentos/upload', requireAuth, async (c) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 
-// ── Função core ───────────────────────────────────────────────────────────────
-
 async function syncLojaOneDrive({ token, loja, sql }) {
   if (!loja.onedrive_activos_folder_id) {
     return { ok: false, reason: 'no_activos_folder' }
@@ -3714,7 +3712,20 @@ async function syncLojaOneDrive({ token, loja, sql }) {
   }
 
   if (pastas.length === 0) {
-    return { ok: true, criados: 0, ligados: 0, inativados: 0, ignorados: 0, detalhes: [] }
+    return { ok: true, criados: 0, ligados: 0, inativados: 0, reativados: 0, ignorados: 0, detalhes: [] }
+  }
+
+  function extractPrefix(name) {
+    const match = name.match(/^(\d+)\s*-/)
+    if (!match) return null
+    if (match[1].length < 5) return null
+    const n = Number(match[1])
+    if (n >= 100000) return null
+    return n
+  }
+
+  function extractNome(name) {
+    return name.replace(/^\d+\s*-\s*/, '').trim()
   }
 
   // 2. Buscar IDs de pastas já mapeadas — 1 query
@@ -3726,7 +3737,7 @@ async function syncLojaOneDrive({ token, loja, sql }) {
   `
   const idsMapados = new Set(jaMapados.map(r => r.onedrive_folder_id))
 
-  // 3. Buscar condomínios existentes desta loja — 1 query
+  // 3. Buscar condomínios activos desta loja — 1 query
   const existentes = await sql`
     SELECT id, n_impar, old_n_impar, onedrive_folder_id
     FROM condominios
@@ -3744,25 +3755,36 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     }
   }
 
-  function extractPrefix(name) {
-    const match = name.match(/^(\d+)\s*-/)
-    if (!match) return null
-    if (match[1].length < 5) return null
-    const n = Number(match[1])
-    if (n >= 100000) return null
-    return n
-  }
+  // 3b. n_impar candidatos das pastas, pré-calculados para a pesquisa de inactivos
+  const candidatosNImpar = [...new Set(
+    pastas.map(p => extractPrefix(p.name)).filter(n => n !== null && !isNaN(n))
+  )]
 
-  function extractNome(name) {
-    return name.replace(/^\d+\s*-\s*/, '').trim()
+  // 4. Buscar condomínios INACTIVOS que correspondam a alguma pasta — globalmente (sem filtro de loja)
+  const inativosMatch = candidatosNImpar.length > 0
+    ? await sql`
+        SELECT id, n_impar, old_n_impar
+        FROM condominios
+        WHERE ativo = false
+          AND (n_impar = ANY(${candidatosNImpar}::int[]) OR old_n_impar = ANY(${candidatosNImpar}::int[]))
+      `
+    : []
+
+  const porNImparInativo    = new Map()
+  const porOldNImparInativo = new Map()
+  for (const c of inativosMatch) {
+    porNImparInativo.set(Number(c.n_impar), c)
+    if (c.old_n_impar != null) {
+      porOldNImparInativo.set(Number(String(c.old_n_impar).trim()), c)
+    }
   }
 
   const detalhes = []
   let ignorados  = 0
-  const paraCriar  = []
-  const paraLigar  = []
+  const paraCriar    = []
+  const paraLigar    = []
+  const paraReativar = []
 
-  // n_impar das pastas válidas encontradas no OneDrive
   const nImparsOneDrive = new Set()
 
   for (const pasta of pastas) {
@@ -3791,6 +3813,14 @@ async function syncLojaOneDrive({ token, loja, sql }) {
         ignorados++
         detalhes.push({ pasta: pasta.name, resultado: 'ignorado', motivo: 'já mapeado' })
       }
+      continue
+    }
+
+    const inativo = porNImparInativo.get(nImpar) || porOldNImparInativo.get(nImpar)
+
+    if (inativo) {
+      const nome = extractNome(pasta.name)
+      paraReativar.push({ condId: inativo.id, folderId: pasta.id, nImpar, nome, pasta: pasta.name })
     } else {
       const nome   = extractNome(pasta.name)
       const condId = String(nImpar)
@@ -3798,7 +3828,7 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     }
   }
 
-  // 4. Determinar condomínios a inativar — existem na BD mas não no OneDrive
+  // 5. Determinar condomínios a inativar — existem activos na BD mas não no OneDrive
   const paraInativar = existentes.filter(c => !nImparsOneDrive.has(Number(c.n_impar)))
 
   // ── Batch INSERT — 1 query ────────────────────────────────────────────────
@@ -3860,6 +3890,40 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     }
   }
 
+  // ── Batch UPDATE reativar — 1 query ───────────────────────────────────────
+  let reativados = 0
+  if (paraReativar.length > 0) {
+    try {
+      const condIds   = paraReativar.map(r => r.condId)
+      const folderIds = paraReativar.map(r => r.folderId)
+      const nomes     = paraReativar.map(r => r.nome)
+      const lojaIds   = paraReativar.map(() => loja.id)
+
+      await sql`
+        UPDATE condominios
+        SET ativo = true,
+            onedrive_folder_id = t.folder_id,
+            nome = t.nome,
+            loja_id = t.loja_id
+        FROM unnest(
+          ${condIds}::text[],
+          ${folderIds}::text[],
+          ${nomes}::text[],
+          ${lojaIds}::int[]
+        ) AS t(cond_id, folder_id, nome, loja_id)
+        WHERE condominios.id = t.cond_id
+      `
+      reativados = paraReativar.length
+      for (const r of paraReativar) {
+        detalhes.push({ pasta: r.pasta, n_impar: r.nImpar, resultado: 'reativado', condominio_id: r.condId, nome: r.nome })
+      }
+    } catch (err) {
+      for (const r of paraReativar) {
+        detalhes.push({ pasta: r.pasta, n_impar: r.nImpar, resultado: 'erro', motivo: err.message })
+      }
+    }
+  }
+
   // ── Batch UPDATE inativar — 1 query ───────────────────────────────────────
   let inativados = 0
   if (paraInativar.length > 0) {
@@ -3882,7 +3946,7 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     }
   }
 
-  return { ok: true, criados, ligados, inativados, ignorados, detalhes }
+  return { ok: true, criados, ligados, inativados, reativados, ignorados, detalhes }
 }
 
 // ── GET /lojas — lista todas as lojas (já existia, mas agora inclui onedrive_activos_folder_id) ──
