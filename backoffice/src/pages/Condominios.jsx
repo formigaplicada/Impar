@@ -116,7 +116,7 @@ function Modal({ lojas, onClose, onSave }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 {inputField('NIPC', 'nipc')}{inputField('Nº Frações', 'n_fracoes', 'number')}{inputField('IBAN', 'iban')}
 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Payment Method</label>
+  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Método de Pagamento</label>
   <select name="payment_method" value={form.payment_method} onChange={handleChange}
     style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: C.white }}>
     <option value="">—</option>
@@ -239,7 +239,7 @@ function ModalEditar({ condominio, lojas, onClose, onSave }) {
                 {inputField('IBAN', 'iban')}
                 {inputField('IBAN', 'iban')}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Payment Method</label>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Método de Pagamento</label>
                   <select name="payment_method" value={form.payment_method} onChange={handleChange}
                     style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: C.white }}>
                     <option value="">—</option>
@@ -381,7 +381,7 @@ function TabInfo({ c }) {
       <div style={{ gridColumn: '1 / -1' }}>
         <InfoCard title="Financeiro">
           <Row label="IBAN" value={c.iban} />
-          <Row label="Payment Method" value={c.payment_method === 'DD' ? 'Débito Direto' : c.payment_method === 'Transferencia' ? 'Transferência' : null} />
+          <Row label="Método de Pagamento" value={c.payment_method === 'DD' ? 'Débito Direto' : c.payment_method === 'Transferencia' ? 'Transferência' : null} />
         </InfoCard>
       </div>
       <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
