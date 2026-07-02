@@ -944,7 +944,8 @@ app.get('/condominios/:id/documentos', requireAuth, async (c) => {
 app.post('/condominios', requireAuth, async (c) => {
   const sql = neon(c.env.DATABASE_URL)
   const body = await c.req.json()
-  const { loja_id, nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2 } = body
+  const { loja_id, nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2, payment_method } = body
+
 
   if (!loja_id || !nome) {
     return c.json({ error: 'Loja e Nome são obrigatórios' }, 400)
@@ -961,15 +962,16 @@ app.post('/condominios', requireAuth, async (c) => {
   const n_impar = lojaRes[0].n_impar
   const cond_id = String(n_impar).padStart(6, '0')
   await sql`
-    INSERT INTO condominios (id, n_impar, loja_id, nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2)
-    VALUES (
-      ${cond_id}, ${n_impar}, ${loja_id}, ${nome},
-      ${nipc || null}, ${morada || null}, ${codigo_postal || null},
-      ${telefone || null}, ${telemovel || null},
-      ${n_fracoes ? parseInt(n_fracoes) : null},
-      ${iban || null}, ${gestor || null}, ${email_gestor || null}, ${telefone2 || null}
-    )
-  `
+  INSERT INTO condominios (id, n_impar, loja_id, nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2, payment_method)
+  VALUES (
+    ${cond_id}, ${n_impar}, ${loja_id}, ${nome},
+    ${nipc || null}, ${morada || null}, ${codigo_postal || null},
+    ${telefone || null}, ${telemovel || null},
+    ${n_fracoes ? parseInt(n_fracoes) : null},
+    ${iban || null}, ${gestor || null}, ${email_gestor || null}, ${telefone2 || null},
+    ${payment_method || null}
+  )
+`
 
   return c.json({ ok: true, id: cond_id, n_impar })
 })
@@ -978,26 +980,26 @@ app.put('/condominios/:id', requireAuth, async (c) => {
   try {
     const id = c.req.param('id')
     const sql = neon(c.env.DATABASE_URL)
-    const { nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2 } = await c.req.json()
-
+   const { nome, nipc, morada, codigo_postal, telefone, telemovel, n_fracoes, iban, gestor, email_gestor, telefone2, payment_method } = await c.req.json()
     if (!nome) return c.json({ error: 'Nome é obrigatório' }, 400)
 
-    const rows = await sql`
-      UPDATE condominios SET
-        nome          = ${nome},
-        nipc          = ${nipc || null},
-        morada        = ${morada || null},
-        codigo_postal = ${codigo_postal || null},
-        telefone      = ${telefone || null},
-        telemovel     = ${telemovel || null},
-        n_fracoes     = ${n_fracoes ? parseInt(n_fracoes) : null},
-        iban          = ${iban || null},
-        gestor        = ${gestor || null},
-        email_gestor  = ${email_gestor || null},
-        telefone2     = ${telefone2 || null}
-      WHERE id = ${id}
-      RETURNING *
-    `
+const rows = await sql`
+  UPDATE condominios SET
+    nome          = ${nome},
+    nipc          = ${nipc || null},
+    morada        = ${morada || null},
+    codigo_postal = ${codigo_postal || null},
+    telefone      = ${telefone || null},
+    telemovel     = ${telemovel || null},
+    n_fracoes     = ${n_fracoes ? parseInt(n_fracoes) : null},
+    iban          = ${iban || null},
+    gestor        = ${gestor || null},
+    email_gestor  = ${email_gestor || null},
+    telefone2     = ${telefone2 || null},
+    payment_method = ${payment_method || null}
+  WHERE id = ${id}
+  RETURNING *
+`
 
     if (rows.length === 0) return c.json({ error: 'Condomínio não encontrado' }, 404)
     return c.json({ ok: true, condominio: rows[0] })
@@ -3694,6 +3696,7 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     return { ok: false, reason: 'no_activos_folder' }
   }
 
+  try {
   // 1. Buscar todas as pastas do OneDrive desta loja
   let pastas
   try {
@@ -3760,13 +3763,14 @@ async function syncLojaOneDrive({ token, loja, sql }) {
     pastas.map(p => extractPrefix(p.name)).filter(n => n !== null && !isNaN(n))
   )]
 
-  // 4. Buscar condomínios INACTIVOS que correspondam a alguma pasta — globalmente (sem filtro de loja)
+   // 4. Buscar condomínios INACTIVOS que correspondam a alguma pasta — globalmente (sem filtro de loja)
+  const candidatosNImparTexto = candidatosNImpar.map(String)
   const inativosMatch = candidatosNImpar.length > 0
     ? await sql`
         SELECT id, n_impar, old_n_impar
         FROM condominios
         WHERE ativo = false
-          AND (n_impar = ANY(${candidatosNImpar}::int[]) OR old_n_impar = ANY(${candidatosNImpar}::int[]))
+          AND (n_impar = ANY(${candidatosNImpar}::int[]) OR old_n_impar = ANY(${candidatosNImparTexto}::text[]))
       `
     : []
 
@@ -3947,6 +3951,9 @@ async function syncLojaOneDrive({ token, loja, sql }) {
   }
 
   return { ok: true, criados, ligados, inativados, reativados, ignorados, detalhes }
+} catch (err) {
+    return { ok: false, reason: 'unexpected_error', error: err.message }
+  }
 }
 
 // ── GET /lojas — lista todas as lojas (já existia, mas agora inclui onedrive_activos_folder_id) ──

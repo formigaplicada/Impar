@@ -59,7 +59,7 @@ function fileIcon(item) {
 function Modal({ lojas, onClose, onSave }) {
   const [form, setForm] = useState({
     loja_id: '', nome: '', nipc: '', morada: '', codigo_postal: '',
-    telefone: '', telemovel: '', n_fracoes: '', iban: '',
+    telefone: '', telemovel: '', n_fracoes: '', iban: '', payment_method: '',
     gestor: '', email_gestor: '', telefone2: ''
   })
   const [loading, setLoading] = useState(false)
@@ -115,6 +115,15 @@ function Modal({ lojas, onClose, onSave }) {
             <div>{sectionLabel('Identificação')}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 {inputField('NIPC', 'nipc')}{inputField('Nº Frações', 'n_fracoes', 'number')}{inputField('IBAN', 'iban')}
+<div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Payment Method</label>
+  <select name="payment_method" value={form.payment_method} onChange={handleChange}
+    style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: C.white }}>
+    <option value="">—</option>
+    <option value="DD">Débito Direto</option>
+    <option value="Transferencia">Transferência</option>
+  </select>
+</div>
               </div>
             </div>
             <div>{sectionLabel('Localização')}
@@ -157,6 +166,7 @@ function ModalEditar({ condominio, lojas, onClose, onSave }) {
     telemovel:     condominio.telemovel     || '',
     n_fracoes:     condominio.n_fracoes     || '',
     iban:          condominio.iban          || '',
+    payment_method: condominio.payment_method || '',
     gestor:        condominio.gestor        || '',
     email_gestor:  condominio.email_gestor  || '',
     telefone2:     condominio.telefone2     || '',
@@ -227,6 +237,16 @@ function ModalEditar({ condominio, lojas, onClose, onSave }) {
                 {inputField('NIPC', 'nipc')}
                 {inputField('Nº Frações', 'n_fracoes', 'number')}
                 {inputField('IBAN', 'iban')}
+                {inputField('IBAN', 'iban')}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Payment Method</label>
+                  <select name="payment_method" value={form.payment_method} onChange={handleChange}
+                    style={{ padding: '0.5rem 0.75rem', border: `1.5px solid ${C.border}`, borderRadius: '0.5rem', fontSize: '0.875rem', fontFamily: 'DM Sans, sans-serif', background: C.white }}>
+                    <option value="">—</option>
+                    <option value="DD">Débito Direto</option>
+                    <option value="Transferencia">Transferência</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -361,6 +381,7 @@ function TabInfo({ c }) {
       <div style={{ gridColumn: '1 / -1' }}>
         <InfoCard title="Financeiro">
           <Row label="IBAN" value={c.iban} />
+          <Row label="Payment Method" value={c.payment_method === 'DD' ? 'Débito Direto' : c.payment_method === 'Transferencia' ? 'Transferência' : null} />
         </InfoCard>
       </div>
       <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
