@@ -237,7 +237,6 @@ function ModalEditar({ condominio, lojas, onClose, onSave }) {
                 {inputField('NIPC', 'nipc')}
                 {inputField('Nº Frações', 'n_fracoes', 'number')}
                 {inputField('IBAN', 'iban')}
-                {inputField('IBAN', 'iban')}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <label style={{ fontSize: '0.75rem', fontWeight: 500, color: C.muted }}>Método de Pagamento</label>
                   <select name="payment_method" value={form.payment_method} onChange={handleChange}
